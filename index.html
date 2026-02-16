@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Virtue Compliance | AML Compliance & KYC/KYB Lösungen für Finanzintermediäre in der Schweiz & EU</title>
     <meta name="description" content="Virtue Compliance ist Ihr Partner für AML-Compliance, automatisierte KYC/KYB-Verifizierung und regulatorische Betreuung in der Schweiz und der EU. Outsourcen Sie Ihre Compliance-Abteilung.">
     <meta name="keywords" content="AML Compliance, KYC, KYB, Geldwäscherei, Schweiz, SRO, Selbstregulierungsorganisation, Finanzintermediär, Compliance Officer, Anti-Money Laundering, Transaction Monitoring">
@@ -789,6 +789,95 @@
             .stats-grid { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr; } }
+
+        /* ─── Enhanced Mobile Optimizations ─── */
+        
+        /* Touch targets - minimum 44px */
+        @media (max-width: 768px) {
+            .nav-toggle { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+            .btn-primary, .btn-ghost { padding: 16px 28px; font-size: 15px; min-height: 48px; }
+            .btn-white, .btn-form-submit { min-height: 48px; font-size: 15px; }
+            .cookie-btn { padding: 10px 20px; font-size: 13.5px; min-height: 44px; }
+            .faq-question { padding: 18px 0; }
+            
+            /* Typography scaling */
+            .hero h1 { font-size: clamp(28px, 7vw, 42px); }
+            .hero-sub { font-size: 15px; line-height: 1.7; }
+            .section-title { font-size: clamp(24px, 5.5vw, 36px); }
+            .section-desc { font-size: 15px; }
+            .product-card h3 { font-size: 17px; }
+            .product-card > p { font-size: 14px; }
+            .service-card h3 { font-size: 15.5px; }
+            .service-card p { font-size: 13.5px; }
+            .cta-card h2 { font-size: clamp(22px, 5vw, 32px); }
+            
+            /* Spacing */
+            .section { padding: 56px 16px; }
+            .hero { padding: 120px 16px 48px; }
+            .nav-inner { padding: 0 16px; }
+            .trust-bar { padding: 28px 16px; }
+            .trust-logos { gap: 24px; justify-content: center; }
+            .trust-label { text-align: center; width: 100%; margin-bottom: 4px; }
+            
+            /* Cards */
+            .product-card { padding: 24px; }
+            .service-card { padding: 24px; }
+            .process-step { padding: 0; }
+            .benefit-item { padding: 0; }
+            
+            /* Images in trust bar */
+            .trust-logo-img { height: 20px !important; }
+            
+            /* Testimonials */
+            .testimonial-card { padding: 24px; }
+            
+            /* Stats */
+            .stats-grid { gap: 12px; }
+            .stat-card { padding: 20px 16px; }
+            
+            /* Footer */
+            .footer { padding: 48px 16px 28px; }
+            
+            /* Smooth scrolling for iOS */
+            html { -webkit-overflow-scrolling: touch; }
+            
+            /* Prevent horizontal scroll */
+            body { overflow-x: hidden; }
+            
+            /* Better mobile nav menu */
+            .nav-links[style*="display: flex"] {
+                animation: slideDown 0.25s ease;
+            }
+        }
+        
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Small phones */
+        @media (max-width: 380px) {
+            .hero h1 { font-size: 26px; }
+            .hero { padding: 110px 14px 40px; }
+            .section { padding: 48px 14px; }
+            .cta-card { padding: 32px 16px; }
+            .nav-logo-text { font-size: 14px; }
+            .hero-actions { gap: 8px; }
+            .btn-primary, .btn-ghost { padding: 14px 20px; font-size: 14px; width: 100%; justify-content: center; }
+        }
+
+        /* Landscape phones */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .hero { padding: 100px 32px 48px; min-height: auto; }
+        }
+
+        /* Tablet optimizations */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .hero-inner { gap: 40px; }
+            .products-grid { gap: 12px; }
+            .services-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+            .trust-logos { gap: 32px; }
+        }
     </style>
 
     <!-- Google Analytics - only activates after cookie consent -->
@@ -1431,8 +1520,12 @@ toggle.addEventListener('click', () => {
         display:'flex', flexDirection:'column', position:'absolute',
         top:'100%', left:'0', right:'0', background:'white',
         padding:'16px 24px', boxShadow:'0 8px 32px rgba(0,0,0,0.08)',
-        borderRadius:'0 0 12px 12px'
+        borderRadius:'0 0 12px 12px', zIndex:'999'
     });
+});
+// Close mobile nav when a link is clicked
+links.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => { links.removeAttribute('style'); });
 });
 
 document.querySelectorAll('.faq-question').forEach(btn => {
