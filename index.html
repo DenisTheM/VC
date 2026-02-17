@@ -2,17 +2,34 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Virtue Compliance | AML Compliance & KYC/KYB Lösungen für Finanzintermediäre in der Schweiz & EU</title>
     <meta name="description" content="Virtue Compliance ist Ihr Partner für AML-Compliance, automatisierte KYC/KYB-Verifizierung und regulatorische Betreuung in der Schweiz und der EU. Outsourcen Sie Ihre Compliance-Abteilung.">
     <meta name="keywords" content="AML Compliance, KYC, KYB, Geldwäscherei, Schweiz, SRO, Selbstregulierungsorganisation, Finanzintermediär, Compliance Officer, Anti-Money Laundering, Transaction Monitoring">
     <meta name="robots" content="index, follow">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="canonical" href="https://www.virtue-compliance.ch/">
     <meta property="og:title" content="Virtue Compliance | AML Compliance & KYC/KYB für die Schweiz & EU">
     <meta property="og:description" content="Automatisierte KYC/KYB-Plattform und Compliance-as-a-Service für Finanzintermediäre. Ihr externer Compliance Officer.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://www.virtue-compliance.ch/">
     <meta property="og:locale" content="de_CH">
+    <meta property="og:image" content="https://www.virtue-compliance.ch/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:site_name" content="Virtue Compliance">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Virtue Compliance | AML Compliance & KYC/KYB für die Schweiz & EU">
+    <meta name="twitter:description" content="Automatisierte KYC/KYB-Plattform und Compliance-as-a-Service für Finanzintermediäre. Ihr externer Compliance Officer.">
+    <meta name="twitter:image" content="https://www.virtue-compliance.ch/og-image.png">
+    <link rel="alternate" hreflang="de" href="https://www.virtue-compliance.ch/">
+    <link rel="alternate" hreflang="x-default" href="https://www.virtue-compliance.ch/">
+    <meta name="geo.region" content="CH-SG">
+    <meta name="geo.placename" content="Uznach">
+    <meta name="author" content="Virtue Compliance GmbH">
+    <meta name="theme-color" content="#0a1628">
 
     <script type="application/ld+json">
     {
@@ -51,6 +68,36 @@
     }
     </script>
 
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "Virtue Compliance GmbH",
+      "image": "https://www.virtue-compliance.ch/og-image.png",
+      "url": "https://www.virtue-compliance.ch",
+      "telephone": "",
+      "email": "info@virtue-compliance.ch",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Mürtschenstrasse 7",
+        "addressLocality": "Uznach",
+        "postalCode": "8730",
+        "addressCountry": "CH"
+      },
+      "founder": {
+        "@type": "Person",
+        "name": "Elena Scheller",
+        "jobTitle": "Managing Director & Compliance Officer"
+      },
+      "priceRange": "CHF 399 - CHF 2500+/Monat",
+      "openingHoursSpecification": {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"],
+        "opens": "09:00",
+        "closes": "18:00"
+      }
+    }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,500&display=swap" rel="stylesheet">
@@ -318,6 +365,9 @@
 
         /* ─── Products ─── */
         .products-header { margin-bottom: 56px; }
+        .tech-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+        .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-lg); border: 1px solid var(--border); }
+        .table-scroll table { border: none; }
         .products-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
         .product-card {
             background: var(--surface-0); border: 1px solid var(--border);
@@ -471,80 +521,18 @@
         .blog-section { padding: 100px 32px; background: var(--surface-1); }
         .blog-inner { max-width: 1080px; margin: 0 auto; }
         .blog-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 48px; }
-        .blog-card {
-            background: var(--surface-0); border-radius: 16px; padding: 32px 28px;
-            text-decoration: none; color: var(--ink); transition: all 0.3s ease;
-            border: 1px solid var(--surface-2); display: flex; flex-direction: column;
-        }
+        .blog-card { background: var(--surface-0); border-radius: 16px; padding: 32px 28px; text-decoration: none; color: var(--ink); transition: all 0.3s ease; border: 1px solid var(--surface-2); display: flex; flex-direction: column; }
         .blog-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.08); border-color: var(--accent); }
-        .blog-card-category {
-            font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
-            color: var(--accent); margin-bottom: 16px;
-        }
-        .blog-card-title {
-            font-family: var(--font-serif); font-size: 18px; font-weight: 700;
-            line-height: 1.4; color: var(--ink); margin-bottom: 14px;
-        }
-        .blog-card-excerpt {
-            font-size: 14px; line-height: 1.7; color: var(--ink-3); flex: 1;
-            margin-bottom: 20px;
-        }
-        .blog-card-meta {
-            display: flex; align-items: center; gap: 8px;
-            font-size: 12.5px; color: var(--ink-4); padding-top: 16px;
-            border-top: 1px solid var(--surface-2);
-        }
+        .blog-card-category { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent); margin-bottom: 16px; }
+        .blog-card-title { font-family: var(--font-serif); font-size: 18px; font-weight: 700; line-height: 1.4; color: var(--ink); margin-bottom: 14px; }
+        .blog-card-excerpt { font-size: 14px; line-height: 1.7; color: var(--ink-3); flex: 1; margin-bottom: 20px; }
+        .blog-card-meta { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-4); padding-top: 16px; border-top: 1px solid var(--surface-2); }
         .blog-card-author { font-weight: 600; color: var(--ink-2); }
         .blog-card-dot { color: var(--ink-4); }
-        .blog-card-badge {
-            font-size: 11px; font-weight: 600; color: var(--accent);
-            background: var(--accent-surface); padding: 4px 12px; border-radius: 20px;
-        }
+        .blog-card-badge { font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-surface); padding: 4px 12px; border-radius: 20px; }
         .blog-card-soon { opacity: 0.7; }
         .blog-card-soon:hover { transform: none; box-shadow: none; border-color: var(--surface-2); cursor: default; }
-        @media (max-width: 768px) {
-            .blog-grid { grid-template-columns: 1fr; gap: 20px; }
-        }
-
-        /* ─── Blog ─── */
-        .blog-section { padding: 100px 32px; background: var(--surface-1); }
-        .blog-inner { max-width: 1080px; margin: 0 auto; }
-        .blog-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 48px; }
-        .blog-card {
-            background: var(--surface-0); border-radius: 16px; padding: 32px 28px;
-            text-decoration: none; color: var(--ink); transition: all 0.3s ease;
-            border: 1px solid var(--surface-2); display: flex; flex-direction: column;
-        }
-        .blog-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.08); border-color: var(--accent); }
-        .blog-card-category {
-            font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
-            color: var(--accent); margin-bottom: 16px;
-        }
-        .blog-card-title {
-            font-family: var(--font-serif); font-size: 18px; font-weight: 700;
-            line-height: 1.4; color: var(--ink); margin-bottom: 14px;
-        }
-        .blog-card-excerpt {
-            font-size: 14px; line-height: 1.7; color: var(--ink-3); flex: 1;
-            margin-bottom: 20px;
-        }
-        .blog-card-meta {
-            display: flex; align-items: center; gap: 8px;
-            font-size: 12.5px; color: var(--ink-4); padding-top: 16px;
-            border-top: 1px solid var(--surface-2);
-        }
-        .blog-card-author { font-weight: 600; color: var(--ink-2); }
-        .blog-card-dot { color: var(--ink-4); }
-        .blog-card-badge {
-            font-size: 11px; font-weight: 600; color: var(--accent);
-            background: var(--accent-surface); padding: 4px 12px; border-radius: 20px;
-        }
-        .blog-card-soon { opacity: 0.7; }
-        .blog-card-soon:hover { transform: none; box-shadow: none; border-color: var(--surface-2); cursor: default; }
-        @media (max-width: 768px) {
-            .blog-grid { grid-template-columns: 1fr; gap: 20px; }
-        }
-
+        @media (max-width: 768px) { .blog-grid { grid-template-columns: 1fr; gap: 20px; } }
         /* ─── FAQ ─── */
         .faq { background: var(--surface-1); }
         .faq-header { text-align: center; margin-bottom: 48px; }
@@ -791,6 +779,8 @@
             .hero-content { max-width: 100%; }
             .hero { min-height: auto; padding: 140px 32px 72px; }
             .products-grid { grid-template-columns: 1fr; }
+            .tech-grid { grid-template-columns: 1fr; gap: 40px; }
+
             .services-grid { grid-template-columns: 1fr 1fr; }
             .benefits-layout { grid-template-columns: 1fr; gap: 40px; }
             .testimonials-grid { grid-template-columns: 1fr; }
@@ -820,9 +810,115 @@
             .footer-top { grid-template-columns: 1fr; gap: 28px; }
             .footer-bottom { flex-direction: column; gap: 14px; text-align: center; }
             .trust-bar-inner { flex-direction: column; gap: 20px; }
+            /* Technology section */
+            .tech-grid { grid-template-columns: 1fr; gap: 32px; }
+            
+            /* Products grid - force single column */
+            .products-grid { grid-template-columns: 1fr !important; }
+            
+            /* Pricing table scroll hint */
+            .table-scroll { margin: 0 -16px; padding: 0 16px; }
+            .table-scroll::after { content: '→ Wischen'; display: block; text-align: right; font-size: 11px; color: var(--ink-4); padding: 8px 4px 0; }
+            
+            /* Hero card in technology section */
+            .tech-grid .hero-card { max-width: 100%; }
+
             .stats-grid { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr; } }
+
+
+        @media (min-width: 769px) {
+            .table-scroll::after { display: none; }
+        }
+        /* ─── Enhanced Mobile Optimizations ─── */
+        
+        /* Touch targets - minimum 44px */
+        @media (max-width: 768px) {
+            .nav-toggle { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+            .btn-primary, .btn-ghost { padding: 16px 28px; font-size: 15px; min-height: 48px; }
+            .btn-white, .btn-form-submit { min-height: 48px; font-size: 15px; }
+            .cookie-btn { padding: 10px 20px; font-size: 13.5px; min-height: 44px; }
+            .faq-question { padding: 18px 0; }
+            
+            /* Typography scaling */
+            .hero h1 { font-size: clamp(28px, 7vw, 42px); }
+            .hero-sub { font-size: 15px; line-height: 1.7; }
+            .section-title { font-size: clamp(24px, 5.5vw, 36px); }
+            .section-desc { font-size: 15px; }
+            .product-card h3 { font-size: 17px; }
+            .product-card > p { font-size: 14px; }
+            .service-card h3 { font-size: 15.5px; }
+            .service-card p { font-size: 13.5px; }
+            .cta-card h2 { font-size: clamp(22px, 5vw, 32px); }
+            
+            /* Spacing */
+            .section { padding: 56px 16px; }
+            .hero { padding: 120px 16px 48px; }
+            .nav-inner { padding: 0 16px; }
+            .trust-bar { padding: 28px 16px; }
+            .trust-logos { gap: 24px; justify-content: center; }
+            .trust-label { text-align: center; width: 100%; margin-bottom: 4px; }
+            
+            /* Cards */
+            .product-card { padding: 24px; }
+            .service-card { padding: 24px; }
+            .process-step { padding: 0; }
+            .benefit-item { padding: 0; }
+            
+            /* Images in trust bar */
+            .trust-logo-img { height: 20px !important; }
+            
+            /* Testimonials */
+            .testimonial-card { padding: 24px; }
+            
+            /* Stats */
+            .stats-grid { gap: 12px; }
+            .stat-card { padding: 20px 16px; }
+            
+            /* Footer */
+            .footer { padding: 48px 16px 28px; }
+            
+            /* Smooth scrolling for iOS */
+            html { -webkit-overflow-scrolling: touch; }
+            
+            /* Prevent horizontal scroll */
+            body { overflow-x: hidden; }
+            
+            /* Better mobile nav menu */
+            .nav-links[style*="display: flex"] {
+                animation: slideDown 0.25s ease;
+            }
+        }
+        
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Small phones */
+        @media (max-width: 380px) {
+            .hero h1 { font-size: 26px; }
+            .hero { padding: 110px 14px 40px; }
+            .section { padding: 48px 14px; }
+            .cta-card { padding: 32px 16px; }
+            .nav-logo-text { font-size: 14px; }
+            .hero-actions { gap: 8px; }
+            .btn-primary, .btn-ghost { padding: 14px 20px; font-size: 14px; width: 100%; justify-content: center; }
+        }
+
+        /* Landscape phones */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .hero { padding: 100px 32px 48px; min-height: auto; }
+        }
+
+        /* Tablet optimizations */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .hero-inner { gap: 40px; }
+            .products-grid { gap: 12px; }
+            .services-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+            .trust-logos { gap: 32px; }
+        }
     </style>
 
     <!-- Google Analytics - only activates after cookie consent -->
@@ -878,7 +974,6 @@
             <li><a href="#branchen">Branchen</a></li>
             <li><a href="#blog">Blog</a></li>
             <li><a href="#faq">FAQ</a></li>
-            <li><a href="#blog">Blog</a></li>
             <li><a href="#kontakt">Kontakt</a></li>
             <li><a href="https://calendly.com/meet-virtue-compliance" class="nav-cta">Termin buchen</a></li>
         </ul>
@@ -998,7 +1093,7 @@
 <!-- TECHNOLOGIE-PLATTFORM (kompakt) -->
 <section class="section" id="plattform" style="background:var(--surface-1)">
     <div class="section-inner">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center" class="reveal">
+        <div class="tech-grid reveal">
             <div>
                 <div class="section-label"><span class="section-label-line"></span> <span>Technologie</span></div>
                 <h2 class="section-title" style="margin-bottom:16px"><span>Modernste KYC/KYB-Plattform<br><em>als Werkzeug</em></span></h2>
@@ -1108,7 +1203,7 @@
             <h3 style="font-family:var(--font-serif);font-size:20px;font-weight:600;color:var(--ink);margin-bottom:6px">Verifizierungspläne</h3>
             <p style="font-size:14px;color:var(--ink-3);margin-bottom:20px">Technologie-Pläne für automatisierte Kunden- und Geschäftsverifizierung. Kombinierbar mit dem Compliance-Officer-Service.</p>
             <div style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse;background:var(--surface-0);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;font-size:14px">
+            <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--radius-lg);margin:0 -4px;padding:0 4px"><table style="width:100%;border-collapse:collapse;min-width:520px;background:var(--surface-0);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;font-size:14px">
                 <thead>
                     <tr style="background:var(--surface-1)">
                         <th style="padding:14px 20px;text-align:left;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--ink-3);border-bottom:1px solid var(--border)"></th>
@@ -1344,7 +1439,6 @@
         </div>
     </div>
 </section>
-
 <!-- FAQ -->
 <section class="section faq" id="faq">
     <div class="section-inner">
@@ -1383,43 +1477,6 @@
 </section>
 
 <!-- CTA -->
-<!-- Blog -->
-<section class="blog-section" id="blog">
-    <div class="blog-inner reveal">
-        <div class="section-label"><span class="section-label-line"></span> BLOG</div>
-        <h2 class="section-title">Compliance-Wissen aus der Praxis</h2>
-        <p class="section-subtitle">Regulatorische Updates, Best Practices und Strategien — direkt von Elena Scheller.</p>
-        <div class="blog-grid">
-            <a href="blog/aml-compliance-kosten.html" class="blog-card reveal">
-                <div class="blog-card-category">Thought Leadership</div>
-                <h3 class="blog-card-title">Warum AML-Compliance so viele Ressourcen frisst — und was du dagegen tun kannst</h3>
-                <p class="blog-card-excerpt">Anti-Geldwäscherei-Compliance ist längst kein Nebenschauplatz mehr. Wir analysieren die fünf grössten Kostentreiber und zeigen vier Massnahmen, die sofort wirken.</p>
-                <div class="blog-card-meta">
-                    <span class="blog-card-author">Elena Scheller</span>
-                    <span class="blog-card-dot">·</span>
-                    <span class="blog-card-time">8 Min. Lesezeit</span>
-                </div>
-            </a>
-            <a href="#" class="blog-card blog-card-soon reveal">
-                <div class="blog-card-category">Evergreen-Guide</div>
-                <h3 class="blog-card-title">SRO-Registrierung in der Schweiz: Der komplette Guide</h3>
-                <p class="blog-card-excerpt">Alles, was du über die SRO-Registrierung wissen musst — Schritt für Schritt erklärt. Von der Vorbereitung bis zur erfolgreichen Aufnahme.</p>
-                <div class="blog-card-meta">
-                    <span class="blog-card-badge">Demnächst</span>
-                </div>
-            </a>
-            <a href="#" class="blog-card blog-card-soon reveal">
-                <div class="blog-card-category">Regulatorisches Update</div>
-                <h3 class="blog-card-title">GwG-Revision 2025: Was sich ändert und was du jetzt tun musst</h3>
-                <p class="blog-card-excerpt">Die grössten Änderungen durch die GwG-Revision — und konkrete Handlungsempfehlungen für Finanzintermediäre.</p>
-                <div class="blog-card-meta">
-                    <span class="blog-card-badge">Demnächst</span>
-                </div>
-            </a>
-        </div>
-    </div>
-</section>
-
 <section class="cta-section" id="kontakt">
     <div class="cta-card reveal">
         <h2><span>Sprechen Sie direkt mit<br><em>Ihrer Compliance-Expertin</em></span></h2>
@@ -1490,9 +1547,7 @@
                     <li><a href="#plattform">Plattform</a></li>
                     <li><a href="#pricing">Pricing</a></li>
                     <li><a href="#branchen">Branchen</a></li>
-            <li><a href="#blog">Blog</a></li>
                     <li><a href="#faq">FAQ</a></li>
-            <li><a href="#blog">Blog</a></li>
                 </ul>
             </div>
             <div class="footer-col">
@@ -1543,8 +1598,12 @@ toggle.addEventListener('click', () => {
         display:'flex', flexDirection:'column', position:'absolute',
         top:'100%', left:'0', right:'0', background:'white',
         padding:'16px 24px', boxShadow:'0 8px 32px rgba(0,0,0,0.08)',
-        borderRadius:'0 0 12px 12px'
+        borderRadius:'0 0 12px 12px', zIndex:'999'
     });
+});
+// Close mobile nav when a link is clicked
+links.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => { links.removeAttribute('style'); });
 });
 
 document.querySelectorAll('.faq-question').forEach(btn => {
