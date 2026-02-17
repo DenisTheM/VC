@@ -506,6 +506,45 @@
             .blog-grid { grid-template-columns: 1fr; gap: 20px; }
         }
 
+        /* ─── Blog ─── */
+        .blog-section { padding: 100px 32px; background: var(--surface-1); }
+        .blog-inner { max-width: 1080px; margin: 0 auto; }
+        .blog-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 48px; }
+        .blog-card {
+            background: var(--surface-0); border-radius: 16px; padding: 32px 28px;
+            text-decoration: none; color: var(--ink); transition: all 0.3s ease;
+            border: 1px solid var(--surface-2); display: flex; flex-direction: column;
+        }
+        .blog-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.08); border-color: var(--accent); }
+        .blog-card-category {
+            font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
+            color: var(--accent); margin-bottom: 16px;
+        }
+        .blog-card-title {
+            font-family: var(--font-serif); font-size: 18px; font-weight: 700;
+            line-height: 1.4; color: var(--ink); margin-bottom: 14px;
+        }
+        .blog-card-excerpt {
+            font-size: 14px; line-height: 1.7; color: var(--ink-3); flex: 1;
+            margin-bottom: 20px;
+        }
+        .blog-card-meta {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 12.5px; color: var(--ink-4); padding-top: 16px;
+            border-top: 1px solid var(--surface-2);
+        }
+        .blog-card-author { font-weight: 600; color: var(--ink-2); }
+        .blog-card-dot { color: var(--ink-4); }
+        .blog-card-badge {
+            font-size: 11px; font-weight: 600; color: var(--accent);
+            background: var(--accent-surface); padding: 4px 12px; border-radius: 20px;
+        }
+        .blog-card-soon { opacity: 0.7; }
+        .blog-card-soon:hover { transform: none; box-shadow: none; border-color: var(--surface-2); cursor: default; }
+        @media (max-width: 768px) {
+            .blog-grid { grid-template-columns: 1fr; gap: 20px; }
+        }
+
         /* ─── FAQ ─── */
         .faq { background: var(--surface-1); }
         .faq-header { text-align: center; margin-bottom: 48px; }
@@ -837,6 +876,7 @@
             <li><a href="#plattform">Plattform</a></li>
             <li><a href="#pricing">Pricing</a></li>
             <li><a href="#branchen">Branchen</a></li>
+            <li><a href="#blog">Blog</a></li>
             <li><a href="#faq">FAQ</a></li>
             <li><a href="#blog">Blog</a></li>
             <li><a href="#kontakt">Kontakt</a></li>
@@ -1268,6 +1308,43 @@
     </div>
 </section>
 
+<!-- Blog -->
+<section class="blog-section" id="blog">
+    <div class="blog-inner reveal">
+        <div class="section-label"><span class="section-label-line"></span> BLOG</div>
+        <h2 class="section-title">Compliance-Wissen aus der Praxis</h2>
+        <p class="section-subtitle">Regulatorische Updates, Best Practices und Strategien — direkt von Elena Scheller.</p>
+        <div class="blog-grid">
+            <a href="blog/aml-compliance-kosten.html" class="blog-card reveal">
+                <div class="blog-card-category">Thought Leadership</div>
+                <h3 class="blog-card-title">Warum AML-Compliance so viele Ressourcen frisst — und was du dagegen tun kannst</h3>
+                <p class="blog-card-excerpt">Anti-Geldwäscherei-Compliance ist längst kein Nebenschauplatz mehr. Wir analysieren die fünf grössten Kostentreiber und zeigen vier Massnahmen, die sofort wirken.</p>
+                <div class="blog-card-meta">
+                    <span class="blog-card-author">Elena Scheller</span>
+                    <span class="blog-card-dot">·</span>
+                    <span class="blog-card-time">8 Min. Lesezeit</span>
+                </div>
+            </a>
+            <a href="#" class="blog-card blog-card-soon reveal">
+                <div class="blog-card-category">Evergreen-Guide</div>
+                <h3 class="blog-card-title">SRO-Registrierung in der Schweiz: Der komplette Guide</h3>
+                <p class="blog-card-excerpt">Alles, was du über die SRO-Registrierung wissen musst — Schritt für Schritt erklärt. Von der Vorbereitung bis zur erfolgreichen Aufnahme.</p>
+                <div class="blog-card-meta">
+                    <span class="blog-card-badge">Demnächst</span>
+                </div>
+            </a>
+            <a href="#" class="blog-card blog-card-soon reveal">
+                <div class="blog-card-category">Regulatorisches Update</div>
+                <h3 class="blog-card-title">GwG-Revision 2025: Was sich ändert und was du jetzt tun musst</h3>
+                <p class="blog-card-excerpt">Die grössten Änderungen durch die GwG-Revision — und konkrete Handlungsempfehlungen für Finanzintermediäre.</p>
+                <div class="blog-card-meta">
+                    <span class="blog-card-badge">Demnächst</span>
+                </div>
+            </a>
+        </div>
+    </div>
+</section>
+
 <!-- FAQ -->
 <section class="section faq" id="faq">
     <div class="section-inner">
@@ -1413,6 +1490,7 @@
                     <li><a href="#plattform">Plattform</a></li>
                     <li><a href="#pricing">Pricing</a></li>
                     <li><a href="#branchen">Branchen</a></li>
+            <li><a href="#blog">Blog</a></li>
                     <li><a href="#faq">FAQ</a></li>
             <li><a href="#blog">Blog</a></li>
                 </ul>
