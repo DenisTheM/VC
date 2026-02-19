@@ -3,272 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blog | Virtue Compliance — AML-Compliance Wissen für Finanzintermediäre</title>
+    <title>Blog | Virtue Compliance – AML-Compliance Wissen für Finanzintermediäre</title>
     <meta name="description" content="Praxiswissen, regulatorische Updates und Strategien für AML-Compliance, KYC/KYB und Geldwäschereibekämpfung in der Schweiz und der EU.">
+    <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://www.virtue-compliance.ch/blog/">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles/tokens.css">
+    <link rel="stylesheet" href="/styles/nav.css">
+    <link rel="stylesheet" href="/styles/components.css">
+    <link rel="stylesheet" href="/styles/footer.css">
+    <link rel="stylesheet" href="/styles/blog.css">
     <meta property="og:title" content="Blog | Virtue Compliance">
     <meta property="og:description" content="Praxiswissen und regulatorische Updates für AML-Compliance in der Schweiz und der EU.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://www.virtue-compliance.ch/blog/">
-    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,600&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --ink: #111827;
-            --ink-2: #374151;
-            --ink-3: #6b7280;
-            --ink-4: #9ca3af;
-            --surface-0: #ffffff;
-            --surface-1: #f9fafb;
-            --surface-2: #f3f4f6;
-            --border: #e5e7eb;
-            --border-light: #f0f1f3;
-            --primary: #1e3a5f;
-            --primary-deep: #132a47;
-            --accent: #16654e;
-            --accent-surface: #ecf5f1;
-            --font-serif: 'Source Serif 4', Georgia, serif;
-            --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-            --radius: 10px;
-            --radius-lg: 16px;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
-            --shadow-md: 0 4px 20px rgba(0,0,0,0.06);
-            --shadow-lg: 0 10px 40px rgba(0,0,0,0.08);
-        }
-
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-        html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
-        body {
-            font-family: var(--font-sans);
-            color: var(--ink);
-            background: var(--surface-0);
-            line-height: 1.7;
-        }
-
-        /* ─── Navigation ─── */
-        .nav {
-            position: fixed; top: 0; left: 0; right: 0;
-            z-index: 100;
-            padding: 20px 0;
-            transition: all 0.3s ease;
-        }
-        .nav.scrolled {
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(16px);
-            border-bottom: 1px solid var(--border-light);
-            padding: 14px 0;
-        }
-        .nav-inner {
-            max-width: 1140px; margin: 0 auto; padding: 0 32px;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .nav-logo {
-            display: flex; align-items: center; gap: 12px;
-            text-decoration: none; color: var(--ink);
-        }
-        .nav-logo-icon { width: 36px; height: 36px; }
-        .nav-logo-icon img { width: 100%; height: 100%; object-fit: contain; }
-        .nav-logo-text { font-weight: 600; font-size: 16.5px; letter-spacing: -0.2px; }
-        .nav-logo-text span { color: var(--ink-3); font-weight: 400; }
-        .nav-links {
-            display: flex; align-items: center; gap: 4px; list-style: none;
-        }
-        .nav-links a {
-            text-decoration: none; color: var(--ink-2); font-size: 14px; font-weight: 500;
-            padding: 8px 14px; border-radius: 8px; transition: all 0.2s;
-        }
-        .nav-links a:hover { color: var(--ink); background: var(--surface-1); }
-        .nav-links a.active { color: var(--accent); font-weight: 600; }
-        .nav-cta {
-            background: var(--primary) !important; color: white !important;
-            padding: 9px 20px !important; border-radius: 8px !important;
-            font-weight: 600 !important; transition: all 0.2s !important;
-        }
-        .nav-cta:hover { background: var(--primary-deep) !important; }
-        .nav-toggle {
-            display: none; background: none; border: none; cursor: pointer;
-            width: 32px; height: 32px; position: relative;
-        }
-        .nav-toggle span {
-            display: block; width: 20px; height: 1.5px; background: var(--ink);
-            position: absolute; left: 6px; transition: 0.3s;
-        }
-        .nav-toggle span:nth-child(1) { top: 10px; }
-        .nav-toggle span:nth-child(2) { top: 15px; }
-        .nav-toggle span:nth-child(3) { top: 20px; }
-
-        /* ─── Hero ─── */
-        .blog-hero {
-            padding: 130px 32px 72px;
-            background: linear-gradient(180deg, var(--surface-1) 0%, var(--surface-0) 100%);
-            text-align: center;
-        }
-        .blog-hero-inner { max-width: 640px; margin: 0 auto; }
-        .blog-hero .label {
-            display: inline-flex; align-items: center; gap: 6px;
-            font-size: 13px; font-weight: 600; color: var(--accent);
-            letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 18px;
-        }
-        .blog-hero .label-line { width: 20px; height: 1.5px; background: var(--accent); border-radius: 2px; }
-        .blog-hero h1 {
-            font-family: var(--font-serif);
-            font-size: clamp(30px, 5vw, 44px);
-            font-weight: 700; line-height: 1.2;
-            color: var(--ink); margin-bottom: 18px;
-        }
-        .blog-hero h1 em { font-style: italic; color: var(--accent); }
-        .blog-hero p {
-            font-size: 17px; color: var(--ink-3); line-height: 1.7;
-            max-width: 520px; margin: 0 auto;
-        }
-
-        /* ─── Blog Grid ─── */
-        .blog-section { padding: 0 32px 100px; }
-        .blog-section-inner { max-width: 1140px; margin: 0 auto; }
-        .blog-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 28px;
-        }
-        .blog-card {
-            background: var(--surface-0);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            overflow: hidden;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            display: flex; flex-direction: column;
-            text-decoration: none;
-        }
-        .blog-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-lg);
-        }
-        .blog-card-image {
-            width: 100%; height: 200px;
-            background: linear-gradient(135deg, #1e3a5f 0%, #16654e 100%);
-            display: flex; align-items: center; justify-content: center;
-            padding: 24px; position: relative; overflow: hidden;
-        }
-        .blog-card-image::before {
-            content: '';
-            position: absolute; inset: 0;
-            background:
-                radial-gradient(circle at 20% 80%, rgba(255,255,255,0.05) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(255,255,255,0.03) 0%, transparent 50%);
-        }
-        .blog-card-image .blog-icon {
-            width: 48px; height: 48px;
-            stroke: rgba(255,255,255,0.8); stroke-width: 1.5; fill: none;
-        }
-        .blog-card-image .blog-tag {
-            position: absolute; top: 16px; left: 16px;
-            background: rgba(255,255,255,0.15);
-            backdrop-filter: blur(8px);
-            color: rgba(255,255,255,0.9);
-            font-size: 11px; font-weight: 600;
-            letter-spacing: 0.5px; text-transform: uppercase;
-            padding: 5px 12px; border-radius: 20px;
-        }
-        .blog-card-body {
-            padding: 28px; flex: 1;
-            display: flex; flex-direction: column;
-        }
-        .blog-card-body h3 {
-            font-family: var(--font-serif);
-            font-size: 20px; font-weight: 600;
-            color: var(--ink); line-height: 1.4;
-            margin-bottom: 12px;
-        }
-        .blog-card-body p {
-            font-size: 14px; line-height: 1.7;
-            color: var(--ink-3); flex: 1; margin-bottom: 20px;
-        }
-        .blog-card-footer {
-            display: flex; align-items: center; justify-content: space-between;
-            padding-top: 16px; border-top: 1px solid var(--border-light);
-        }
-        .blog-card-meta { font-size: 12px; color: var(--ink-4); }
-        .blog-card-link {
-            font-size: 13px; font-weight: 600; color: var(--accent);
-            display: flex; align-items: center; gap: 4px;
-            transition: gap 0.2s ease;
-        }
-        .blog-card:hover .blog-card-link { gap: 8px; }
-        .blog-card-link svg {
-            width: 14px; height: 14px;
-            stroke: currentColor; stroke-width: 2; fill: none;
-        }
-        .blog-card.coming-soon { opacity: 0.7; }
-        .blog-card.coming-soon:hover { transform: none; box-shadow: none; cursor: default; }
-
-        /* ─── Newsletter CTA ─── */
-        .newsletter-section {
-            padding: 80px 32px;
-            background: var(--surface-1);
-        }
-        .newsletter-inner {
-            max-width: 600px; margin: 0 auto; text-align: center;
-        }
-        .newsletter-inner h2 {
-            font-family: var(--font-serif);
-            font-size: 28px; font-weight: 700;
-            color: var(--ink); margin-bottom: 12px;
-        }
-        .newsletter-inner h2 em { font-style: italic; color: var(--accent); }
-        .newsletter-inner p {
-            font-size: 16px; color: var(--ink-3); margin-bottom: 28px; line-height: 1.7;
-        }
-        .newsletter-inner a {
-            display: inline-flex; align-items: center; gap: 8px;
-            background: var(--primary); color: white;
-            font-size: 15px; font-weight: 600;
-            padding: 14px 28px; border-radius: 50px;
-            text-decoration: none; transition: background 0.2s;
-        }
-        .newsletter-inner a:hover { background: var(--primary-deep); }
-        .newsletter-inner a svg {
-            width: 18px; height: 18px;
-            stroke: currentColor; stroke-width: 2; fill: none;
-        }
-
-        /* ─── Footer ─── */
-        .blog-footer {
-            background: var(--ink); color: rgba(255,255,255,0.4);
-            padding: 40px 32px; text-align: center; font-size: 14px;
-        }
-        .blog-footer a {
-            color: rgba(255,255,255,0.6); text-decoration: none;
-            margin: 0 10px;
-        }
-        .blog-footer a:hover { color: white; }
-
-        /* ─── Responsive ─── */
-        @media (max-width: 768px) {
-            .blog-grid { grid-template-columns: 1fr; gap: 20px; }
-            .blog-hero { padding: 110px 20px 56px; }
-            .blog-section { padding: 0 20px 72px; }
-            .nav-links { display: none; }
-            .nav-toggle { display: block; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
-            .nav-inner { padding: 0 16px; }
-            .nav-logo-text { font-size: 14px; }
-            .nav-links[style*="display: flex"] {
-                animation: slideDown 0.25s ease;
-            }
-        }
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        @media (min-width: 769px) and (max-width: 1024px) {
-            .blog-grid { grid-template-columns: 1fr 1fr; }
-        }
-
-        /* ─── Reveal animation ─── */
-        .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
-        .reveal.visible { opacity: 1; transform: translateY(0); }
-    </style>
+    <!-- Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-BT672TKMSL"></script>
     <script>
     window.dataLayer = window.dataLayer || [];
@@ -300,7 +53,7 @@
             <li><a href="/#kontakt">Kontakt</a></li>
             <li><a href="https://calendly.com/meet-virtue-compliance" class="nav-cta">Termin buchen</a></li>
         </ul>
-        <button class="nav-toggle" id="navToggle" aria-label="Menü öffnen">
+        <button class="nav-toggle" id="navToggle" aria-label="MenÃ¼ Ã¶ffnen">
             <span></span><span></span><span></span>
         </button>
     </div>
@@ -311,7 +64,7 @@
     <div class="blog-hero-inner reveal">
         <div class="label"><div class="label-line"></div>Blog</div>
         <h1>Aktuelles aus der <em>Compliance-Welt</em></h1>
-        <p>Praxiswissen, regulatorische Updates und Strategien für Finanzintermediäre in der Schweiz und der EU.</p>
+        <p>Praxiswissen, regulatorische Updates und Strategien fÃ¼r FinanzintermediÃ¤re in der Schweiz und der EU.</p>
     </div>
 </header>
 
@@ -320,7 +73,7 @@
     <div class="blog-section-inner">
         <div class="blog-grid">
 
-            <!-- Artikel 1 — Live -->
+            <!-- Artikel 1 â€” Live -->
             <a href="/blog/aml-compliance-kosten.html" class="blog-card reveal">
                 <div class="blog-card-image">
                     <div class="blog-tag">Analyse</div>
@@ -328,15 +81,15 @@
                 </div>
                 <div class="blog-card-body">
                     <h3>Warum AML-Compliance so viele Ressourcen frisst</h3>
-                    <p>274 Milliarden USD weltweit, 98% steigende Kosten: Die fünf grössten Kostentreiber — und vier Massnahmen, die sofort wirken.</p>
+                    <p>274 Milliarden USD weltweit, 98% steigende Kosten: Die fÃ¼nf grÃ¶ssten Kostentreiber â€” und vier Massnahmen, die sofort wirken.</p>
                     <div class="blog-card-footer">
-                        <span class="blog-card-meta">Februar 2026 · 9 Min.</span>
+                        <span class="blog-card-meta">Februar 2026 Â· 9 Min.</span>
                         <span class="blog-card-link">Lesen <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
                     </div>
                 </div>
             </a>
 
-            <!-- Artikel 2 — Geplant -->
+            <!-- Artikel 2 â€” Geplant -->
             <div class="blog-card coming-soon reveal">
                 <div class="blog-card-image" style="background: linear-gradient(135deg, #16654e 0%, #1e3a5f 100%);">
                     <div class="blog-tag">Guide</div>
@@ -344,26 +97,26 @@
                 </div>
                 <div class="blog-card-body">
                     <h3>SRO-Registrierung in der Schweiz: Der komplette Guide</h3>
-                    <p>Schritt für Schritt zur SRO-Mitgliedschaft — von der Analyse über die Dokumentation bis zur Genehmigung.</p>
+                    <p>Schritt fÃ¼r Schritt zur SRO-Mitgliedschaft â€” von der Analyse Ã¼ber die Dokumentation bis zur Genehmigung.</p>
                     <div class="blog-card-footer">
-                        <span class="blog-card-meta">Demnächst</span>
-                        <span class="blog-card-link" style="color: var(--ink-4);">Bald verfügbar</span>
+                        <span class="blog-card-meta">DemnÃ¤chst</span>
+                        <span class="blog-card-link" style="color: var(--ink-4);">Bald verfÃ¼gbar</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Artikel 3 — Geplant -->
+            <!-- Artikel 3 â€” Geplant -->
             <div class="blog-card coming-soon reveal">
                 <div class="blog-card-image" style="background: linear-gradient(135deg, #132a47 0%, #16654e 100%);">
                     <div class="blog-tag">Update</div>
                     <svg class="blog-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 </div>
                 <div class="blog-card-body">
-                    <h3>GwG-Revision 2025: Was sich ändert und was Sie jetzt tun müssen</h3>
-                    <p>Transparenzregister, neue Beraterpflichten, Embargo-Compliance — die wichtigsten Änderungen für Finanzintermediäre.</p>
+                    <h3>GwG-Revision 2025: Was sich Ã¤ndert und was Sie jetzt tun mÃ¼ssen</h3>
+                    <p>Transparenzregister, neue Beraterpflichten, Embargo-Compliance â€” die wichtigsten Ã„nderungen fÃ¼r FinanzintermediÃ¤re.</p>
                     <div class="blog-card-footer">
-                        <span class="blog-card-meta">Demnächst</span>
-                        <span class="blog-card-link" style="color: var(--ink-4);">Bald verfügbar</span>
+                        <span class="blog-card-meta">DemnÃ¤chst</span>
+                        <span class="blog-card-link" style="color: var(--ink-4);">Bald verfÃ¼gbar</span>
                     </div>
                 </div>
             </div>
@@ -376,9 +129,9 @@
 <section class="newsletter-section">
     <div class="newsletter-inner reveal">
         <h2>Fragen zu einem <em>Thema?</em></h2>
-        <p>Elena berät Sie persönlich — zu AML-Compliance, SRO-Registrierung, KYC-Prozessen oder regulatorischen Änderungen.</p>
+        <p>Elena berÃ¤t Sie persÃ¶nlich â€” zu AML-Compliance, SRO-Registrierung, KYC-Prozessen oder regulatorischen Ã„nderungen.</p>
         <a href="https://calendly.com/meet-virtue-compliance">
-            Kostenloses Beratungsgespräch buchen
+            Kostenloses BeratungsgesprÃ¤ch buchen
             <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </a>
     </div>
@@ -386,7 +139,7 @@
 
 <!-- FOOTER -->
 <footer class="blog-footer">
-    <p>&copy; 2026 Virtue Compliance GmbH · <a href="/">Startseite</a> · <a href="/impressum.html">Impressum</a> · <a href="/datenschutz.html">Datenschutz</a></p>
+    <p>&copy; 2026 Virtue Compliance GmbH Â· <a href="/">Startseite</a> Â· <a href="/impressum.html">Impressum</a> Â· <a href="/datenschutz.html">Datenschutz</a></p>
 </footer>
 
 <!-- Reveal Animation -->
@@ -463,5 +216,8 @@ document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
   };
 })();
 </script>
+
+    <script src="/js/main.js"></script>
+    <script src="/js/cookie-consent.js"></script>
 </body>
 </html>
