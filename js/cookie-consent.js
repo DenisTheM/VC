@@ -6,7 +6,7 @@
 (function () {
     // Returning visitor – bereits entschieden
     if (document.cookie.indexOf('vc_consent=') !== -1) {
-        if (document.cookie.indexOf('vc_consent=1') !== -1) {
+        if (document.cookie.indexOf('vc_consent=1') !== -1 && typeof gtag === 'function') {
             gtag('consent', 'update', { 'analytics_storage': 'granted' });
         }
         return;
@@ -31,18 +31,20 @@
         + '<button onclick="vcDecline()" style="flex:1;min-width:140px;background:#f9fafb;color:#6b7280;border:1px solid #f3f4f6;border-radius:10px;padding:13px 24px;font-size:14px;font-weight:500;cursor:pointer;font-family:DM Sans,-apple-system,sans-serif;">Nur notwendige</button>'
         + '</div>';
 
-    document.body.appendChild(overlay);
-    document.body.appendChild(b);
-
     function closeBanner() { b.remove(); overlay.remove(); }
 
     window.vcAccept = function () {
         document.cookie = 'vc_consent=1;path=/;max-age=31536000;SameSite=Lax';
-        gtag('consent', 'update', { 'analytics_storage': 'granted' });
+        if (typeof gtag === 'function') {
+            gtag('consent', 'update', { 'analytics_storage': 'granted' });
+        }
         closeBanner();
     };
     window.vcDecline = function () {
         document.cookie = 'vc_consent=0;path=/;max-age=31536000;SameSite=Lax';
         closeBanner();
     };
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(b);
 })();
