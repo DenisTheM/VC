@@ -1,0 +1,51 @@
+/* ============================================================================
+   VIRTUE COMPLIANCE — Section Primitives & Buttons
+   Wiederverwendbare Layout- und Button-Klassen.
+   ============================================================================ */
+
+/* — Sections — */
+.section       { padding: 100px 32px; }
+.section-inner { max-width: 1140px; margin: 0 auto; }
+
+.section-label {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--accent); margin-bottom: 14px;
+}
+.section-label-line { width: 20px; height: 1.5px; background: var(--accent); border-radius: 2px; }
+
+.section-title {
+    font-family: var(--font-serif);
+    font-size: clamp(28px, 3.2vw, 42px); line-height: 1.18;
+    font-weight: 600; color: var(--ink); margin-bottom: 14px; letter-spacing: -0.3px;
+}
+.section-title em { font-style: italic; color: var(--accent); }
+.section-desc      { font-size: 16px; color: var(--ink-2); max-width: 520px; line-height: 1.75; }
+
+/* — Buttons — */
+.btn-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 28px; background: var(--primary); color: white;
+    text-decoration: none; font-weight: 600; font-size: 14.5px;
+    border-radius: var(--radius); transition: all 0.25s; border: none; cursor: pointer;
+}
+.btn-primary:hover      { background: var(--primary-deep); transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+.btn-primary .icon      { width: 16px; height: 16px; transition: transform 0.25s; }
+.btn-primary:hover .icon { transform: translateX(2px); }
+
+.btn-secondary {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 14px 24px; background: transparent; color: var(--ink);
+    text-decoration: none; font-weight: 600; font-size: 14.5px;
+    border-radius: var(--radius); border: 1.5px solid var(--border); transition: all 0.25s;
+}
+.btn-secondary:hover { border-color: var(--ink-3); background: var(--surface-1); }
+
+/* — Scroll-Reveal — */
+.reveal         { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* — Animations — */
+@keyframes fadeUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+@keyframes pulse  { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+@keyframes float  { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
