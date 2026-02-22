@@ -33,22 +33,11 @@ function DocGenInner() {
     return p;
   });
 
-  // Load organizations on mount
+  // Load organizations on mount (without pre-selecting one)
   useEffect(() => {
     loadOrganizations().then((orgs) => {
       setOrganizations(orgs);
-      if (orgs.length > 0) {
-        const org = orgs[0];
-        setOrgId(org.id);
-        loadCompanyProfile(org.id).then((cp) => {
-          if (cp?.data && typeof cp.data === "object") {
-            setProfile((prev) => ({ ...prev, ...(cp.data as Record<string, unknown>) }));
-          }
-          setProfileLoaded(true);
-        });
-      } else {
-        setProfileLoaded(true);
-      }
+      setProfileLoaded(true);
     });
   }, []);
 
@@ -134,6 +123,16 @@ function DocGenInner() {
     return v !== undefined && v !== "" && v !== null && !(Array.isArray(v) && v.length === 0);
   });
 
+  // Reset profile to empty defaults when navigating to profile via sidebar
+  const handleNav = useCallback((id: string) => {
+    if (id === "profile" && !orgId) {
+      // No org selected — redirect to organizations page
+      setPage("organizations");
+      return;
+    }
+    setPage(id);
+  }, [orgId]);
+
   const sidebarItems = [
     { id: "dashboard", icon: icons.home, label: "Dashboard" },
     { id: "organizations", icon: icons.folder, label: "Kunden" },
@@ -200,7 +199,7 @@ function DocGenInner() {
       <Sidebar
         items={sidebarItems}
         active={page}
-        onNav={setPage}
+        onNav={handleNav}
         title="Virtue"
         subtitle="Document Generator"
         footer={footer}
