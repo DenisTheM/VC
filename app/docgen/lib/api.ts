@@ -196,6 +196,36 @@ export async function loadDocCountsByOrg(): Promise<Record<string, number>> {
   return counts;
 }
 
+// ─── Zefix (Handelsregister) ────────────────────────────────────────
+
+export interface ZefixResult {
+  name: string;
+  uid: string;
+  legalForm: string;
+  legalSeat: string;
+  address: string;
+  foundingYear: number | null;
+  purpose: string | null;
+}
+
+export interface ZefixResponse {
+  results: ZefixResult[];
+  hint: string | null;
+}
+
+export async function searchZefix(query: string): Promise<ZefixResponse> {
+  const { data, error } = await supabase.functions.invoke("zefix-lookup", {
+    body: { query },
+  });
+
+  if (error) {
+    console.error("Zefix lookup failed:", error);
+    return { results: [], hint: "Zefix-Abfrage fehlgeschlagen." };
+  }
+
+  return data as ZefixResponse;
+}
+
 // ─── Dashboard Stats ───────────────────────────────────────────────
 
 export async function loadDashboardStats() {

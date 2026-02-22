@@ -6,7 +6,7 @@ import { AuthGuard } from "@shared/components/AuthGuard";
 import { useAuthContext } from "@shared/components/AuthContext";
 import { signOut } from "@shared/lib/auth";
 import { PROFILE_FIELDS } from "./data/profileFields";
-import { loadOrganizations, loadCompanyProfile, saveCompanyProfile, type Organization } from "./lib/api";
+import { loadOrganizations, loadCompanyProfile, saveCompanyProfile, type Organization, type ZefixResult } from "./lib/api";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { OrganizationsPage } from "./pages/OrganizationsPage";
@@ -82,9 +82,50 @@ function DocGenInner() {
     setPage("profile");
   }, []);
 
-  // Add newly created org to local list
-  const handleOrgCreated = useCallback((org: Organization) => {
+  // Map Zefix legal form abbreviation to our select options
+  const mapLegalForm = (zefixForm: string): string => {
+    const lower = zefixForm.toLowerCase();
+    if (lower.includes("ag") || lower.includes("aktiengesellschaft")) return "AG";
+    if (lower.includes("gmbh") || lower.includes("gesellschaft mit beschränkter")) return "GmbH";
+    if (lower.includes("genossenschaft")) return "Genossenschaft";
+    if (lower.includes("stiftung")) return "Stiftung";
+    if (lower.includes("verein")) return "Verein";
+    if (lower.includes("einzelfirma") || lower.includes("einzelunternehm")) return "Einzelfirma";
+    return "";
+  };
+
+  // Add newly created org to local list + auto-open with Zefix data
+  const handleOrgCreated = useCallback(async (org: Organization, zefixData?: ZefixResult) => {
     setOrganizations((prev) => [...prev, org].sort((a, b) => a.name.localeCompare(b.name)));
+
+    // Auto-open the new org's profile with Zefix data pre-filled
+    setOrgId(org.id);
+    const defaults: Record<string, unknown> = {};
+    PROFILE_FIELDS.forEach((f) => {
+      if (f.default !== undefined) defaults[f.id] = f.default;
+      else defaults[f.id] = f.type === "multi" ? [] : f.type === "toggle" ? false : "";
+    });
+
+    if (zefixData) {
+      if (zefixData.name) defaults.company_name = zefixData.name;
+      if (zefixData.uid) defaults.uid = zefixData.uid;
+      if (zefixData.legalForm) {
+        const mapped = mapLegalForm(zefixData.legalForm);
+        if (mapped) defaults.legal_form = mapped;
+      }
+      if (zefixData.address) defaults.address = zefixData.address;
+      if (zefixData.foundingYear) defaults.founding_year = zefixData.foundingYear;
+      if (zefixData.purpose) defaults.business_detail = zefixData.purpose;
+    }
+
+    setProfile(defaults);
+
+    // Also load any existing profile data (shouldn't exist for a new org, but just in case)
+    const cp = await loadCompanyProfile(org.id);
+    if (cp?.data && typeof cp.data === "object") {
+      setProfile((prev) => ({ ...prev, ...(cp.data as Record<string, unknown>) }));
+    }
+    setPage("profile");
   }, []);
 
   const profOk = PROFILE_FIELDS.filter((f) => f.required !== false).every((f) => {

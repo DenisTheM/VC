@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
-import { createOrganization, loadDocCountsByOrg, type Organization } from "../lib/api";
+import { createOrganization, loadDocCountsByOrg, searchZefix, type Organization, type ZefixResult } from "../lib/api";
 
 const INDUSTRIES = [
   "Fintech",
@@ -19,8 +19,8 @@ const SROS = ["VQF", "PolyReg", "SO-FIT", "ARIF", "OAR-G", "Keine / In Bearbeitu
 
 interface OrganizationsPageProps {
   organizations: Organization[];
-  onSelectOrg: (orgId: string) => void;
-  onOrgCreated: (org: Organization) => void;
+  onSelectOrg: (orgId: string, zefixData?: ZefixResult) => void;
+  onOrgCreated: (org: Organization, zefixData?: ZefixResult) => void;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -41,6 +41,13 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated }: 
   const [creating, setCreating] = useState(false);
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
 
+  // Zefix search state
+  const [zefixQuery, setZefixQuery] = useState("");
+  const [zefixResults, setZefixResults] = useState<ZefixResult[]>([]);
+  const [zefixHint, setZefixHint] = useState<string | null>(null);
+  const [zefixSearching, setZefixSearching] = useState(false);
+  const [selectedZefix, setSelectedZefix] = useState<ZefixResult | null>(null);
+
   useEffect(() => {
     loadDocCountsByOrg().then(setDocCounts).catch(console.error);
   }, []);
@@ -52,6 +59,32 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated }: 
     contact_name: "",
     contact_role: "",
   });
+
+  const handleZefixSearch = async () => {
+    if (zefixQuery.trim().length < 2) return;
+    setZefixSearching(true);
+    setZefixResults([]);
+    setZefixHint(null);
+    try {
+      const res = await searchZefix(zefixQuery.trim());
+      setZefixResults(res.results);
+      setZefixHint(res.hint);
+    } catch {
+      setZefixHint("Zefix-Abfrage fehlgeschlagen.");
+    } finally {
+      setZefixSearching(false);
+    }
+  };
+
+  const handleSelectZefix = (result: ZefixResult) => {
+    setSelectedZefix(result);
+    setNewOrg((p) => ({
+      ...p,
+      name: result.name,
+      short_name: result.name.replace(/\s+(AG|GmbH|SA|Sàrl|Ltd|Inc)\.?$/i, "").trim(),
+    }));
+    setZefixResults([]);
+  };
 
   const handleCreate = async () => {
     if (!newOrg.name.trim()) return;
@@ -65,8 +98,11 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated }: 
         contact_name: newOrg.contact_name.trim() || undefined,
         contact_role: newOrg.contact_role.trim() || undefined,
       });
-      onOrgCreated(created);
+      onOrgCreated(created, selectedZefix || undefined);
       setNewOrg({ name: "", short_name: "", industry: "", sro: "", contact_name: "", contact_role: "" });
+      setSelectedZefix(null);
+      setZefixQuery("");
+      setZefixResults([]);
       setShowForm(false);
     } catch (err) {
       console.error("Failed to create organization:", err);
@@ -138,6 +174,94 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated }: 
           >
             Neuen Kunden anlegen
           </div>
+
+          {/* Zefix search */}
+          <div style={{ marginBottom: 18, padding: "14px 16px", background: T.s1, borderRadius: 10, border: `1px solid ${T.borderL}` }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: T.ink2, fontFamily: T.sans, marginBottom: 8 }}>
+              <Icon d={icons.search} size={13} color={T.ink3} />{" "}
+              Im Handelsregister suchen
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="text"
+                value={zefixQuery}
+                onChange={(e) => setZefixQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleZefixSearch()}
+                placeholder="Firmenname eingeben..."
+                style={{ ...inputStyle, flex: 1, background: "#fff" }}
+              />
+              <button
+                onClick={handleZefixSearch}
+                disabled={zefixSearching || zefixQuery.trim().length < 2}
+                style={{
+                  padding: "8px 18px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: T.primary,
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: zefixSearching || zefixQuery.trim().length < 2 ? "not-allowed" : "pointer",
+                  fontFamily: T.sans,
+                  opacity: zefixSearching || zefixQuery.trim().length < 2 ? 0.6 : 1,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {zefixSearching ? "Suche..." : "Suchen"}
+              </button>
+            </div>
+
+            {/* Zefix hint */}
+            {zefixHint && (
+              <div style={{ fontSize: 12, color: T.amber, fontFamily: T.sans, marginTop: 8 }}>
+                {zefixHint}
+              </div>
+            )}
+
+            {/* Zefix results */}
+            {zefixResults.length > 0 && (
+              <div style={{ marginTop: 10, borderRadius: 8, border: `1px solid ${T.border}`, background: "#fff", overflow: "hidden" }}>
+                {zefixResults.map((r, i) => (
+                  <div
+                    key={r.uid || i}
+                    onClick={() => handleSelectZefix(r)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "10px 14px",
+                      cursor: "pointer",
+                      borderTop: i > 0 ? `1px solid ${T.borderL}` : undefined,
+                      transition: "background 0.1s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = T.accentS; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
+                        {r.name}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans }}>
+                        {r.uid}{r.legalForm ? ` · ${r.legalForm}` : ""}{r.legalSeat ? ` · ${r.legalSeat}` : ""}
+                      </div>
+                    </div>
+                    <Icon d={icons.plus} size={14} color={T.accent} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Selected indicator */}
+            {selectedZefix && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, padding: "8px 12px", borderRadius: 8, background: T.accentS, border: `1px solid ${T.accent}30` }}>
+                <Icon d={icons.check} size={14} color={T.accent} />
+                <span style={{ fontSize: 12.5, fontWeight: 500, color: T.accent, fontFamily: T.sans }}>
+                  {selectedZefix.name} ({selectedZefix.uid}) ausgewählt — Profildaten werden automatisch übernommen
+                </span>
+              </div>
+            )}
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 20px" }}>
             {/* Name */}
             <div>
