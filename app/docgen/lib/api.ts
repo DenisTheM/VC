@@ -148,7 +148,7 @@ export async function loadAlerts(): Promise<DbAlert[]> {
       action_items:alert_action_items(*),
       affected_clients:alert_affected_clients(*, organizations(name))
     `)
-    .not("status", "in", '("draft","dismissed")')
+    .in("status", ["new", "acknowledged", "in_progress", "resolved"])
     .order("created_at", { ascending: false });
 
   if (error) throw error;

@@ -7,7 +7,7 @@ import { useAuthContext } from "@shared/components/AuthContext";
 import { usePageNav } from "@shared/hooks/usePageNav";
 import { signOut } from "@shared/lib/auth";
 import { PROFILE_FIELDS } from "./data/profileFields";
-import { loadOrganizations, loadCompanyProfile, saveCompanyProfile, type Organization, type ZefixResult } from "./lib/api";
+import { loadOrganizations, loadCompanyProfile, saveCompanyProfile, loadDashboardStats, type Organization, type ZefixResult } from "./lib/api";
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
 const ProfilePage = lazy(() => import("./pages/ProfilePage").then((m) => ({ default: m.ProfilePage })));
@@ -26,6 +26,7 @@ function DocGenInner() {
   const [saving, setSaving] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedDocKey, setSelectedDocKey] = useState<string | null>(null);
+  const [dashStats, setDashStats] = useState({ documentCount: 0, alertCount: 0 });
 
   const [profile, setProfile] = useState<Record<string, unknown>>(() => {
     const p: Record<string, unknown> = {};
@@ -35,12 +36,15 @@ function DocGenInner() {
     return p;
   });
 
-  // Load organizations on mount (without pre-selecting one)
+  // Load organizations + dashboard stats in parallel on mount
   useEffect(() => {
-    loadOrganizations().then((orgs) => {
-      setOrganizations(orgs);
-      setProfileLoaded(true);
-    });
+    Promise.all([loadOrganizations(), loadDashboardStats()]).then(
+      ([orgs, stats]) => {
+        setOrganizations(orgs);
+        setDashStats(stats);
+        setProfileLoaded(true);
+      },
+    );
   }, []);
 
   // Save company profile to Supabase
@@ -212,7 +216,7 @@ function DocGenInner() {
       />
       <main style={{ flex: 1, padding: "36px 44px", maxWidth: 960, overflowY: "auto" }}>
         <Suspense fallback={<div style={{ padding: 40, color: T.ink3, fontFamily: T.sans }}>Laden...</div>}>
-          {page === "dashboard" && <DashboardPage onNav={setPage} onGenerateDoc={handleGenerateDoc} profile={profile} profOk={profOk} />}
+          {page === "dashboard" && <DashboardPage onNav={setPage} onGenerateDoc={handleGenerateDoc} profile={profile} profOk={profOk} stats={dashStats} />}
           {(page === "organizations" || page === "new-profile") && (
             <OrganizationsPage
               organizations={organizations}
@@ -243,7 +247,7 @@ function DocGenInner() {
             />
           )}
           {page === "documents" && <DocumentsPage />}
-          {page === "alerts" && <AlertsPage profile={profile} />}
+          {page === "alerts" && <AlertsPage profile={profile} organizations={organizations} />}
         </Suspense>
       </main>
     </div>

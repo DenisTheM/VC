@@ -1,27 +1,21 @@
-import { useState, useEffect } from "react";
 import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import { useAuthContext } from "@shared/components/AuthContext";
 import { DOC_TYPES } from "../data/docTypes";
 import { JURIS } from "../data/jurisdictions";
-import { loadDashboardStats } from "../lib/api";
 
 interface DashboardPageProps {
   onNav: (id: string) => void;
   onGenerateDoc: (docKey: string) => void;
   profile: Record<string, unknown>;
   profOk: boolean;
+  stats: { documentCount: number; alertCount: number };
 }
 
-export function DashboardPage({ onNav, onGenerateDoc, profile, profOk }: DashboardPageProps) {
+export function DashboardPage({ onNav, onGenerateDoc, profile, profOk, stats: dbStats }: DashboardPageProps) {
   const { profile: authProfile } = useAuthContext();
   const firstName = authProfile.full_name?.split(" ")[0] || "User";
-  const [dbStats, setDbStats] = useState({ documentCount: 0, alertCount: 0 });
-
-  useEffect(() => {
-    loadDashboardStats().then(setDbStats).catch(console.error);
-  }, []);
 
   const stats = [
     { label: "Dokumente", value: dbStats.documentCount, icon: icons.doc, color: T.primary },

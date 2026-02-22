@@ -12,9 +12,7 @@ import {
   publishAlert,
   dismissAlert,
   restoreAlert,
-  loadOrganizations,
   type DbAlert,
-  type DbAffectedClient,
   type Organization,
 } from "../lib/api";
 
@@ -22,9 +20,10 @@ type Tab = "active" | "drafts" | "dismissed";
 
 interface AlertsPageProps {
   profile: Record<string, unknown>;
+  organizations: Organization[];
 }
 
-export function AlertsPage({ profile: _profile }: AlertsPageProps) {
+export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps) {
   const [activeTab, setActiveTab] = useState<Tab>("active");
   const [alerts, setAlerts] = useState<DbAlert[]>([]);
   const [draftAlerts, setDraftAlerts] = useState<DbAlert[]>([]);
@@ -33,21 +32,18 @@ export function AlertsPage({ profile: _profile }: AlertsPageProps) {
   const [selectedAlert, setSelectedAlert] = useState<DbAlert | null>(null);
   const [filterJuris, setFilterJuris] = useState<string | null>(null);
   const [draftDetail, setDraftDetail] = useState<DbAlert | null>(null);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
 
   const reload = async () => {
     setLoading(true);
     try {
-      const [active, drafts, dismissed, orgs] = await Promise.all([
+      const [active, drafts, dismissed] = await Promise.all([
         loadAlerts(),
         loadDraftAlerts(),
         loadDismissedAlerts(),
-        loadOrganizations(),
       ]);
       setAlerts(active);
       setDraftAlerts(drafts);
       setDismissedAlerts(dismissed);
-      setOrganizations(orgs);
     } catch (err) {
       console.error("Failed to load alerts:", err);
     } finally {
