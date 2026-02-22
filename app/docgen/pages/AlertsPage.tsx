@@ -67,7 +67,12 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
 
   useEffect(() => { reload(); }, []);
 
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
   const handleCreateAlert = async () => {
+    setCreating(true);
+    setCreateError(null);
     try {
       const newAlert = await createAlert({
         title: "Neuer Alert",
@@ -78,6 +83,9 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
       setActiveTab("drafts");
     } catch (err) {
       console.error("Failed to create alert:", err);
+      setCreateError(err instanceof Error ? err.message : "Alert konnte nicht erstellt werden.");
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -227,6 +235,7 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
         ))}
         <button
           onClick={handleCreateAlert}
+          disabled={creating}
           style={{
             marginLeft: "auto",
             padding: "8px 16px",
@@ -236,17 +245,45 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
             color: "#fff",
             fontSize: 12.5,
             fontWeight: 600,
-            cursor: "pointer",
+            cursor: creating ? "default" : "pointer",
             fontFamily: T.sans,
             display: "flex",
             alignItems: "center",
             gap: 6,
+            opacity: creating ? 0.6 : 1,
           }}
         >
           <Icon d={icons.plus} size={14} color="#fff" />
-          Neuer Alert
+          {creating ? "Wird erstellt..." : "Neuer Alert"}
         </button>
       </div>
+
+      {/* Create error banner */}
+      {createError && (
+        <div
+          style={{
+            padding: "10px 16px",
+            marginBottom: 16,
+            borderRadius: 8,
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            color: "#dc2626",
+            fontSize: 13,
+            fontFamily: T.sans,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span>{createError}</span>
+          <button
+            onClick={() => setCreateError(null)}
+            style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 16, padding: 0 }}
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       {/* Active Tab */}
       {activeTab === "active" && (
