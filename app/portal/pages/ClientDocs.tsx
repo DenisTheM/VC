@@ -7,6 +7,8 @@ import { loadClientDocuments, approveDocument, type ClientOrg, type PortalDoc } 
 
 interface ClientDocsProps {
   org: ClientOrg | null;
+  initialDocName?: string | null;
+  onDocConsumed?: () => void;
 }
 
 type StatusFilter = "all" | PortalDoc["status"];
@@ -30,7 +32,7 @@ function downloadDoc(doc: PortalDoc) {
   URL.revokeObjectURL(url);
 }
 
-export function ClientDocs({ org }: ClientDocsProps) {
+export function ClientDocs({ org, initialDocName, onDocConsumed }: ClientDocsProps) {
   const [docs, setDocs] = useState<PortalDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -39,6 +41,7 @@ export function ClientDocs({ org }: ClientDocsProps) {
   const [activeStatus, setActiveStatus] = useState<StatusFilter>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [showAlertOnly, setShowAlertOnly] = useState(false);
 
   const orgShort = org?.short_name || org?.name || "Ihr Unternehmen";
 
@@ -57,6 +60,17 @@ export function ClientDocs({ org }: ClientDocsProps) {
 
   useEffect(() => { load(); }, [org]);
 
+  // Deep-link: auto-expand document when navigated from alerts
+  useEffect(() => {
+    if (initialDocName && docs.length > 0 && !expanded) {
+      const match = docs.find((d) => d.name === initialDocName);
+      if (match) {
+        setExpanded(match.id);
+        onDocConsumed?.();
+      }
+    }
+  }, [initialDocName, docs]);
+
   /* -- Derived data ------------------------------------------------ */
   const categories = [...new Set(docs.map((d) => d.category))];
 
@@ -72,7 +86,8 @@ export function ClientDocs({ org }: ClientDocsProps) {
     const matchSearch = !search || d.name.toLowerCase().includes(search.toLowerCase()) || d.desc.toLowerCase().includes(search.toLowerCase());
     const matchCat = !activeCategory || d.category === activeCategory;
     const matchStatus = activeStatus === "all" || d.status === activeStatus;
-    return matchSearch && matchCat && matchStatus;
+    const matchAlert = !showAlertOnly || !!d.alert;
+    return matchSearch && matchCat && matchStatus && matchAlert;
   });
 
   const grouped = categories
@@ -173,6 +188,8 @@ export function ClientDocs({ org }: ClientDocsProps) {
             label="Mit Hinweisen"
             bg="#fef2f2"
             color="#dc2626"
+            active={showAlertOnly}
+            onClick={() => setShowAlertOnly(!showAlertOnly)}
           />
         )}
       </div>

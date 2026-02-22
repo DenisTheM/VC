@@ -9,6 +9,7 @@ interface ClientAlertsProps {
   org: ClientOrg | null;
   initialAlertId?: string | null;
   onAlertConsumed?: () => void;
+  onDocNav?: (docName: string) => void;
 }
 
 type SeverityFilter = "all" | PortalAlert["severity"];
@@ -21,7 +22,7 @@ const SEVERITY_FILTERS: { key: SeverityFilter; label: string }[] = [
   { key: "info", label: "Info" },
 ];
 
-export function ClientAlerts({ org, initialAlertId, onAlertConsumed }: ClientAlertsProps) {
+export function ClientAlerts({ org, initialAlertId, onAlertConsumed, onDocNav }: ClientAlertsProps) {
   const [alerts, setAlerts] = useState<PortalAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -100,6 +101,7 @@ export function ClientAlerts({ org, initialAlertId, onAlertConsumed }: ClientAle
         alert={selected}
         orgShort={orgShort}
         onBack={() => setSelected(null)}
+        onDocNav={onDocNav}
         onActionsUpdated={(updatedActions) => {
           // Update both selected and alerts list
           const updated = { ...selected, actions: updatedActions };
@@ -473,11 +475,13 @@ function AlertDetail({
   alert,
   orgShort,
   onBack,
+  onDocNav,
   onActionsUpdated,
 }: {
   alert: PortalAlert;
   orgShort: string;
   onBack: () => void;
+  onDocNav?: (docName: string) => void;
   onActionsUpdated: (actions: PortalAlert["actions"]) => void;
 }) {
   const sev = SEV[alert.severity] ?? SEV.info;
@@ -887,12 +891,17 @@ function AlertDetail({
               {alert.relatedDocs.map((doc, i) => (
                 <div
                   key={i}
+                  onClick={() => onDocNav?.(doc.name)}
                   style={{
                     background: "#fff",
                     borderRadius: T.r,
                     padding: "12px 14px",
                     border: `1px solid ${T.border}`,
+                    cursor: onDocNav ? "pointer" : "default",
+                    transition: "box-shadow 0.15s, transform 0.15s",
                   }}
+                  onMouseOver={(e) => { if (onDocNav) { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shMd; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)"; } }}
+                  onMouseOut={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "none"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                     <Icon d={icons.doc} size={14} color={T.ink4} />
