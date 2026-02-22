@@ -341,33 +341,24 @@ export async function createAlert(data: {
   deadline?: string;
   elena_comment?: string;
 }): Promise<DbAlert> {
-  // Step 1: Insert and get the new row's id
+  const row = {
+    ...data,
+    status: "draft" as const,
+    jurisdiction: data.jurisdiction || "CH",
+    severity: data.severity || "medium",
+  };
+
+  // Step 1: Insert and get all columns back (no joins — they fail on insert)
   const { data: inserted, error: insertErr } = await supabase
     .from("regulatory_alerts")
-    .insert({
-      ...data,
-      status: "draft",
-      jurisdiction: data.jurisdiction || "CH",
-      severity: data.severity || "medium",
-    })
-    .select("id")
+    .insert(row)
+    .select("*")
     .single();
 
   if (insertErr) throw insertErr;
 
-  // Step 2: Load full alert with joins
-  const { data: alert, error: loadErr } = await supabase
-    .from("regulatory_alerts")
-    .select(`
-      *,
-      action_items:alert_action_items(*),
-      affected_clients:alert_affected_clients(*, organizations(name))
-    `)
-    .eq("id", inserted.id)
-    .single();
-
-  if (loadErr) throw loadErr;
-  return alert as unknown as DbAlert;
+  // Return with empty relations (new alert has none yet)
+  return { ...inserted, action_items: [], affected_clients: [] } as unknown as DbAlert;
 }
 
 export async function updateAlertStatus(

@@ -81,9 +81,11 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
       });
       setDraftDetail(newAlert);
       setActiveTab("drafts");
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Failed to create alert:", err);
-      setCreateError(err instanceof Error ? err.message : "Alert konnte nicht erstellt werden.");
+      const e = err as Record<string, unknown> | null;
+      const msg = e?.message ?? e?.code ?? "Unbekannter Fehler";
+      setCreateError(`Alert konnte nicht erstellt werden: ${msg}`);
     } finally {
       setCreating(false);
     }

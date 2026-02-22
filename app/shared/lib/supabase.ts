@@ -13,7 +13,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     fetch: (url, options) => {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
+      const ms = options?.method === "POST" || options?.method === "PATCH" || options?.method === "DELETE" ? 30000 : 15000;
+      const timeout = setTimeout(() => controller.abort(), ms);
       return fetch(url, { ...options, signal: controller.signal }).finally(() =>
         clearTimeout(timeout),
       );
