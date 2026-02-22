@@ -59,6 +59,12 @@ export default defineConfig({
         docgen: resolve(__dirname, "app/docgen/index.html"),
         portal: resolve(__dirname, "app/portal/index.html"),
       },
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom"],
+          supabase: ["@supabase/supabase-js"],
+        },
+      },
     },
     outDir: "dist",
   },

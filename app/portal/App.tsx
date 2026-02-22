@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { AuthGuard } from "@shared/components/AuthGuard";
 import { useAuthContext } from "@shared/components/AuthContext";
 import { signOut } from "@shared/lib/auth";
 import { loadUserOrganization, type ClientOrg } from "./lib/api";
-import { ClientDashboard } from "./pages/ClientDashboard";
-import { ClientAlerts } from "./pages/ClientAlerts";
-import { ClientDocs } from "./pages/ClientDocs";
+
+const ClientDashboard = lazy(() => import("./pages/ClientDashboard").then((m) => ({ default: m.ClientDashboard })));
+const ClientAlerts = lazy(() => import("./pages/ClientAlerts").then((m) => ({ default: m.ClientAlerts })));
+const ClientDocs = lazy(() => import("./pages/ClientDocs").then((m) => ({ default: m.ClientDocs })));
 
 /* ------------------------------------------------------------------ */
 /*  Client Sidebar                                                    */
@@ -295,9 +296,11 @@ function PortalContent() {
     <div style={{ display: "flex", minHeight: "100vh", background: T.s1, fontFamily: T.sans }}>
       <ClientSidebar active={page} onNav={setPage} org={org} />
       <div style={{ flex: 1, overflow: "auto" }}>
-        {page === "dashboard" && <ClientDashboard onNav={setPage} org={org} />}
-        {page === "alerts" && <ClientAlerts org={org} />}
-        {page === "docs" && <ClientDocs org={org} />}
+        <Suspense fallback={<div style={{ padding: 40, color: T.ink3, fontFamily: T.sans }}>Laden...</div>}>
+          {page === "dashboard" && <ClientDashboard onNav={setPage} org={org} />}
+          {page === "alerts" && <ClientAlerts org={org} />}
+          {page === "docs" && <ClientDocs org={org} />}
+        </Suspense>
       </div>
     </div>
   );

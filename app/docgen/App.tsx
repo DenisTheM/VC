@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { T } from "@shared/styles/tokens";
 import { icons } from "@shared/components/Icon";
 import { Sidebar } from "@shared/components/Sidebar";
@@ -7,12 +7,13 @@ import { useAuthContext } from "@shared/components/AuthContext";
 import { signOut } from "@shared/lib/auth";
 import { PROFILE_FIELDS } from "./data/profileFields";
 import { loadOrganizations, loadCompanyProfile, saveCompanyProfile, type Organization, type ZefixResult } from "./lib/api";
-import { DashboardPage } from "./pages/DashboardPage";
-import { ProfilePage } from "./pages/ProfilePage";
-import { OrganizationsPage } from "./pages/OrganizationsPage";
-import { GenerateWizard } from "./pages/GenerateWizard";
-import { DocumentsPage } from "./pages/DocumentsPage";
-import { AlertsPage } from "./pages/AlertsPage";
+
+const DashboardPage = lazy(() => import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
+const ProfilePage = lazy(() => import("./pages/ProfilePage").then((m) => ({ default: m.ProfilePage })));
+const OrganizationsPage = lazy(() => import("./pages/OrganizationsPage").then((m) => ({ default: m.OrganizationsPage })));
+const GenerateWizard = lazy(() => import("./pages/GenerateWizard").then((m) => ({ default: m.GenerateWizard })));
+const DocumentsPage = lazy(() => import("./pages/DocumentsPage").then((m) => ({ default: m.DocumentsPage })));
+const AlertsPage = lazy(() => import("./pages/AlertsPage").then((m) => ({ default: m.AlertsPage })));
 
 function DocGenInner() {
   const { user, profile: authProfile } = useAuthContext();
@@ -205,36 +206,38 @@ function DocGenInner() {
         footer={footer}
       />
       <main style={{ flex: 1, padding: "36px 44px", maxWidth: 960, overflowY: "auto" }}>
-        {page === "dashboard" && <DashboardPage onNav={setPage} profile={profile} profOk={profOk} />}
-        {page === "organizations" && (
-          <OrganizationsPage
-            organizations={organizations}
-            onSelectOrg={handleSelectOrg}
-            onOrgCreated={handleOrgCreated}
-          />
-        )}
-        {page === "profile" && (
-          <ProfilePage
-            profile={profile}
-            setProfile={setProfile}
-            onSave={handleSaveProfile}
-            saving={saving}
-            orgId={orgId}
-            orgName={organizations.find((o) => o.id === orgId)?.name}
-            onBack={() => setPage("organizations")}
-            onGenerate={() => setPage("generate")}
-          />
-        )}
-        {page === "generate" && (
-          <GenerateWizard
-            profile={profile}
-            onNav={setPage}
-            orgId={orgId}
-            orgName={organizations.find((o) => o.id === orgId)?.name}
-          />
-        )}
-        {page === "documents" && <DocumentsPage />}
-        {page === "alerts" && <AlertsPage profile={profile} />}
+        <Suspense fallback={<div style={{ padding: 40, color: T.ink3, fontFamily: T.sans }}>Laden...</div>}>
+          {page === "dashboard" && <DashboardPage onNav={setPage} profile={profile} profOk={profOk} />}
+          {page === "organizations" && (
+            <OrganizationsPage
+              organizations={organizations}
+              onSelectOrg={handleSelectOrg}
+              onOrgCreated={handleOrgCreated}
+            />
+          )}
+          {page === "profile" && (
+            <ProfilePage
+              profile={profile}
+              setProfile={setProfile}
+              onSave={handleSaveProfile}
+              saving={saving}
+              orgId={orgId}
+              orgName={organizations.find((o) => o.id === orgId)?.name}
+              onBack={() => setPage("organizations")}
+              onGenerate={() => setPage("generate")}
+            />
+          )}
+          {page === "generate" && (
+            <GenerateWizard
+              profile={profile}
+              onNav={setPage}
+              orgId={orgId}
+              orgName={organizations.find((o) => o.id === orgId)?.name}
+            />
+          )}
+          {page === "documents" && <DocumentsPage />}
+          {page === "alerts" && <AlertsPage profile={profile} />}
+        </Suspense>
       </main>
     </div>
   );
