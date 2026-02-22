@@ -126,6 +126,7 @@ export interface PortalDoc {
   pages: number;
   legalBasis: string;
   alert: string | null;
+  content: string | null;
 }
 
 function formatDate(dateStr: string): string {
@@ -164,7 +165,17 @@ export async function loadClientDocuments(organizationId: string): Promise<Porta
     pages: doc.pages ?? 0,
     legalBasis: doc.legal_basis ?? "",
     alert: doc.alert_notice ?? null,
+    content: doc.content ?? null,
   }));
+}
+
+export async function approveDocument(docId: string): Promise<void> {
+  const { error } = await supabase
+    .from("documents")
+    .update({ status: "current" })
+    .eq("id", docId);
+
+  if (error) throw error;
 }
 
 // ─── Dashboard Stats ────────────────────────────────────────────────

@@ -717,6 +717,7 @@ function AlertDetail({
               </div>
             </div>
             <button
+              onClick={() => { window.location.href = "mailto:es@virtue-compliance.ch?subject=" + encodeURIComponent("Frage zu: " + alert.title); }}
               style={{
                 background: T.accent,
                 color: "#fff",

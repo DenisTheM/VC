@@ -165,6 +165,7 @@ function ClientSidebar({
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             <button
+              onClick={() => { window.location.href = "mailto:es@virtue-compliance.ch"; }}
               style={{
                 flex: 1,
                 background: "rgba(255,255,255,0.08)",
@@ -186,6 +187,7 @@ function ClientSidebar({
               E-Mail
             </button>
             <button
+              onClick={() => { window.location.href = "tel:+41799433644"; }}
               style={{
                 flex: 1,
                 background: "rgba(255,255,255,0.08)",
