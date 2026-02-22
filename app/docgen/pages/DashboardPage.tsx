@@ -204,7 +204,7 @@ export function DashboardPage({ onNav, onGenerateDoc, profile, profOk }: Dashboa
               Neues Dokument generieren
             </div>
             <p style={{ fontSize: 13, opacity: 0.8, fontFamily: T.sans, margin: "0 0 18px", lineHeight: 1.5 }}>
-              Wählen Sie einen Kunden und Dokumenttyp — Elena erstellt das massgeschneiderte Compliance-Dokument.
+              Wählen Sie einen Kunden und Dokumenttyp — der DocGen erstellt das massgeschneiderte Compliance-Dokument.
             </p>
             <button
               onClick={() => onNav("generate")}
@@ -239,27 +239,27 @@ export function DashboardPage({ onNav, onGenerateDoc, profile, profOk }: Dashboa
             }}
           >
             <div style={{ fontSize: 15, fontWeight: 600, color: T.ink, fontFamily: T.sans, marginBottom: 14 }}>
-              So funktioniert Elena
+              So funktioniert der DocGen
             </div>
             {[
               {
                 step: "1",
-                title: "Kundenprofil anlegen",
-                desc: "Erfassen Sie die Unternehmensdaten Ihres Kunden — Rechtsform, Branche, SRO und regulatorischen Kontext.",
+                title: "Kunde erfassen",
+                desc: "Legen Sie einen neuen Kunden an — Stammdaten werden automatisch aus dem Handelsregister übernommen.",
                 color: T.primary,
                 nav: "organizations",
               },
               {
                 step: "2",
-                title: "Dokumentspezifische Angaben",
-                desc: "Beantworten Sie wenige Fragen zum gewünschten Dokument — Elena kennt die relevanten Rechtsgrundlagen.",
+                title: "Dokumenttyp & Angaben wählen",
+                desc: "Wählen Sie den Dokumenttyp und beantworten Sie wenige spezifische Fragen zu Jurisdiktion und Kontext.",
                 color: T.accent,
                 nav: "generate",
               },
               {
                 step: "3",
-                title: "Dokument generieren",
-                desc: "Elena erstellt das Compliance-Dokument mit korrekten Rechtsverweisen, massgeschneidert auf den Kunden.",
+                title: "Dokument generieren & prüfen",
+                desc: "Der DocGen erstellt das Compliance-Dokument mit korrekten Rechtsverweisen — bereit zum Download und zur Prüfung.",
                 color: T.amber,
                 nav: "documents",
               },

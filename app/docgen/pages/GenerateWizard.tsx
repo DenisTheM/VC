@@ -44,7 +44,7 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
           Dokument generieren{orgName ? ` für ${orgName}` : ""}
         </h1>
         <p style={{ fontSize: 14.5, color: T.ink3, fontFamily: T.sans, margin: "0 0 24px" }}>
-          Wählen Sie den Dokumenttyp, den Elena {orgName ? `für ${orgName} ` : ""}erstellen soll.
+          Wählen Sie den Dokumenttyp{orgName ? ` für ${orgName}` : ""}.
         </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
@@ -370,7 +370,7 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
           {doc.name} — Fragen
         </h1>
         <p style={{ fontSize: 14.5, color: T.ink3, fontFamily: T.sans, margin: "0 0 24px" }}>
-          Beantworten Sie die folgenden Fragen, damit Elena Ihr Dokument optimal erstellen kann.
+          Beantworten Sie die folgenden Fragen, damit der DocGen Ihr Dokument optimal erstellen kann.
         </p>
 
         <div
@@ -473,7 +473,7 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
               margin: "0 0 8px",
             }}
           >
-            Elena generiert Ihr Dokument...
+            Dokument wird generiert...
           </h2>
           <p style={{ fontSize: 14, color: T.ink3, fontFamily: T.sans, margin: "0 0 24px", textAlign: "center" }}>
             {doc.name} &middot; {JURIS[jurisdiction!]?.flag} {JURIS[jurisdiction!]?.name}
