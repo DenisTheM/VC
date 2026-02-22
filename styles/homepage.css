@@ -250,6 +250,7 @@
 .cta-left h2 { font-family: var(--font-serif); font-size: clamp(24px, 2.5vw, 32px); color: white; font-weight: 600; margin-bottom: 14px; line-height: 1.25; }
 .cta-left h2 em { font-style: italic; color: var(--glow); }
 .cta-left p  { font-size: 15px; color: rgba(255,255,255,0.55); line-height: 1.75; margin-bottom: 28px; }
+.cta-subtext { font-size: 14px; color: rgba(255,255,255,0.45); line-height: 1.7; margin-top: 20px; margin-bottom: 0; }
 .cta-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .btn-white {
     display: inline-flex; align-items: center; gap: 8px;
