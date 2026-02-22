@@ -123,20 +123,19 @@ function DocGenInner() {
     return v !== undefined && v !== "" && v !== null && !(Array.isArray(v) && v.length === 0);
   });
 
-  // Reset profile to empty defaults when navigating to profile via sidebar
   const handleNav = useCallback((id: string) => {
-    if (id === "profile" && !orgId) {
-      // No org selected — redirect to organizations page
-      setPage("organizations");
+    if (id === "new-profile") {
+      // "Firmenprofil anlegen" → open organizations page with new-customer form
+      setPage("new-profile");
       return;
     }
     setPage(id);
-  }, [orgId]);
+  }, []);
 
   const sidebarItems = [
     { id: "dashboard", icon: icons.home, label: "Dashboard" },
     { id: "organizations", icon: icons.folder, label: "Kunden" },
-    { id: "profile", icon: icons.building, label: "Firmenprofil anlegen", dot: !profOk },
+    { id: "new-profile", icon: icons.building, label: "Firmenprofil anlegen" },
     { id: "generate", icon: icons.plus, label: "Neues Dokument" },
     { id: "documents", icon: icons.doc, label: "Dokumente" },
     { id: "alerts", icon: icons.alert, label: "Reg. Alerts", badge: 2 },
@@ -207,11 +206,12 @@ function DocGenInner() {
       <main style={{ flex: 1, padding: "36px 44px", maxWidth: 960, overflowY: "auto" }}>
         <Suspense fallback={<div style={{ padding: 40, color: T.ink3, fontFamily: T.sans }}>Laden...</div>}>
           {page === "dashboard" && <DashboardPage onNav={setPage} profile={profile} profOk={profOk} />}
-          {page === "organizations" && (
+          {(page === "organizations" || page === "new-profile") && (
             <OrganizationsPage
               organizations={organizations}
               onSelectOrg={handleSelectOrg}
               onOrgCreated={handleOrgCreated}
+              initialShowForm={page === "new-profile"}
             />
           )}
           {page === "profile" && (

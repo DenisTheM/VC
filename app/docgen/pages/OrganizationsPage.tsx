@@ -21,6 +21,7 @@ interface OrganizationsPageProps {
   organizations: Organization[];
   onSelectOrg: (orgId: string, zefixData?: ZefixResult) => void;
   onOrgCreated: (org: Organization, zefixData?: ZefixResult) => void;
+  initialShowForm?: boolean;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -36,8 +37,8 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated }: OrganizationsPageProps) {
-  const [showForm, setShowForm] = useState(false);
+export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, initialShowForm = false }: OrganizationsPageProps) {
+  const [showForm, setShowForm] = useState(initialShowForm);
   const [creating, setCreating] = useState(false);
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
 
