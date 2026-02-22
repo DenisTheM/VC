@@ -327,6 +327,156 @@ export async function restoreAlert(alertId: string): Promise<void> {
   if (error) throw error;
 }
 
+// ─── Alert CRUD ─────────────────────────────────────────────────────
+
+export async function createAlert(data: {
+  title: string;
+  source?: string;
+  jurisdiction?: string;
+  date?: string;
+  severity?: string;
+  category?: string;
+  summary?: string;
+  legal_basis?: string;
+  deadline?: string;
+  elena_comment?: string;
+}): Promise<DbAlert> {
+  const { data: alert, error } = await supabase
+    .from("regulatory_alerts")
+    .insert({
+      ...data,
+      status: "draft",
+      jurisdiction: data.jurisdiction || "CH",
+      severity: data.severity || "medium",
+    })
+    .select(`
+      *,
+      action_items:alert_action_items(*),
+      affected_clients:alert_affected_clients(*, organizations(name))
+    `)
+    .single();
+
+  if (error) throw error;
+  return alert as unknown as DbAlert;
+}
+
+export async function updateAlertStatus(
+  alertId: string,
+  newStatus: "new" | "acknowledged" | "in_progress" | "resolved" | "draft",
+): Promise<void> {
+  const { error } = await supabase
+    .from("regulatory_alerts")
+    .update({ status: newStatus, updated_at: new Date().toISOString() })
+    .eq("id", alertId);
+
+  if (error) throw error;
+}
+
+// ─── Action Items ───────────────────────────────────────────────────
+
+export async function addActionItem(
+  alertId: string,
+  item: { text: string; priority?: string; due?: string },
+): Promise<DbActionItem> {
+  const { data, error } = await supabase
+    .from("alert_action_items")
+    .insert({
+      alert_id: alertId,
+      text: item.text,
+      priority: item.priority || "medium",
+      due: item.due || null,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as DbActionItem;
+}
+
+export async function updateActionItem(
+  itemId: string,
+  updates: { status?: string; text?: string; priority?: string; due?: string },
+): Promise<void> {
+  const { error } = await supabase
+    .from("alert_action_items")
+    .update(updates)
+    .eq("id", itemId);
+
+  if (error) throw error;
+}
+
+export async function deleteActionItem(itemId: string): Promise<void> {
+  const { error } = await supabase
+    .from("alert_action_items")
+    .delete()
+    .eq("id", itemId);
+
+  if (error) throw error;
+}
+
+// ─── Client Actions (Admin View) ────────────────────────────────────
+
+export interface ClientActionGroup {
+  affectedClientId: string;
+  orgName: string;
+  actions: { id: string; text: string; due: string | null; status: string }[];
+}
+
+export async function loadClientActionsForAlert(
+  alertId: string,
+): Promise<ClientActionGroup[]> {
+  const { data, error } = await supabase
+    .from("alert_affected_clients")
+    .select(`
+      id,
+      organizations(name),
+      client_alert_actions(id, text, due, status)
+    `)
+    .eq("alert_id", alertId);
+
+  if (error) throw error;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((row: any) => ({
+    affectedClientId: row.id,
+    orgName: row.organizations?.name ?? "Unbekannt",
+    actions: (row.client_alert_actions ?? []).map((a: any) => ({
+      id: a.id,
+      text: a.text,
+      due: a.due,
+      status: a.status,
+    })),
+  }));
+}
+
+export async function addClientAction(
+  affectedClientId: string,
+  action: { text: string; due?: string },
+): Promise<void> {
+  const { error } = await supabase
+    .from("client_alert_actions")
+    .insert({
+      alert_affected_client_id: affectedClientId,
+      text: action.text,
+      due: action.due || null,
+      status: "offen",
+    });
+
+  if (error) throw error;
+}
+
+export async function updateClientAction(
+  actionId: string,
+  updates: { status?: string; text?: string; due?: string },
+): Promise<void> {
+  const { error } = await supabase
+    .from("client_alert_actions")
+    .update(updates)
+    .eq("id", actionId);
+
+  if (error) throw error;
+}
+
 // ─── Documents ─────────────────────────────────────────────────────
 
 export interface DbDocument {
@@ -414,13 +564,21 @@ export async function searchZefix(query: string): Promise<ZefixResponse> {
 // ─── Dashboard Stats ───────────────────────────────────────────────
 
 export async function loadDashboardStats() {
-  const [docsRes, alertsRes] = await Promise.all([
+  const [docsRes, activeAlertsRes, draftAlertsRes] = await Promise.all([
     supabase.from("documents").select("id", { count: "exact", head: true }),
-    supabase.from("regulatory_alerts").select("id", { count: "exact", head: true }),
+    supabase
+      .from("regulatory_alerts")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["new", "acknowledged", "in_progress", "resolved"]),
+    supabase
+      .from("regulatory_alerts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "draft"),
   ]);
 
   return {
     documentCount: docsRes.count ?? 0,
-    alertCount: alertsRes.count ?? 0,
+    alertCount: activeAlertsRes.count ?? 0,
+    draftAlertCount: draftAlertsRes.count ?? 0,
   };
 }

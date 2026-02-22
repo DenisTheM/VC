@@ -39,7 +39,7 @@ export interface PortalAlert {
   legalBasis: string;
   deadline: string;
   elenaComment: string;
-  actions: { text: string; due: string; status: string }[];
+  actions: { id: string; text: string; due: string; status: string }[];
   relatedDocs: { name: string; type: string; date: string }[];
 }
 
@@ -55,7 +55,7 @@ export async function loadClientAlerts(organizationId: string): Promise<PortalAl
         id, title, source, date, severity, status,
         category, summary, legal_basis, deadline
       ),
-      client_alert_actions(text, due, status),
+      client_alert_actions(id, text, due, status),
       alert_related_documents(name, type, date)
     `)
     .eq("organization_id", organizationId)
@@ -85,6 +85,7 @@ export async function loadClientAlerts(organizationId: string): Promise<PortalAl
       deadline: alert?.deadline ?? "",
       elenaComment: row.elena_comment ?? "",
       actions: (row.client_alert_actions ?? []).map((a: any) => ({
+        id: a.id,
         text: a.text,
         due: a.due ?? "",
         status: a.status ?? "offen",
@@ -96,6 +97,18 @@ export async function loadClientAlerts(organizationId: string): Promise<PortalAl
       })),
     };
   });
+}
+
+export async function updateClientActionStatus(
+  actionId: string,
+  newStatus: "offen" | "erledigt",
+): Promise<void> {
+  const { error } = await supabase
+    .from("client_alert_actions")
+    .update({ status: newStatus })
+    .eq("id", actionId);
+
+  if (error) throw error;
 }
 
 // ─── Client Documents ───────────────────────────────────────────────

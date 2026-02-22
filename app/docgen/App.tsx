@@ -26,7 +26,7 @@ function DocGenInner() {
   const [saving, setSaving] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedDocKey, setSelectedDocKey] = useState<string | null>(null);
-  const [dashStats, setDashStats] = useState({ documentCount: 0, alertCount: 0 });
+  const [dashStats, setDashStats] = useState({ documentCount: 0, alertCount: 0, draftAlertCount: 0 });
 
   const [profile, setProfile] = useState<Record<string, unknown>>(() => {
     const p: Record<string, unknown> = {};
@@ -149,7 +149,7 @@ function DocGenInner() {
     { id: "new-profile", icon: icons.building, label: "Firmenprofil anlegen" },
     { id: "generate", icon: icons.plus, label: "Neues Dokument" },
     { id: "documents", icon: icons.doc, label: "Dokumente" },
-    { id: "alerts", icon: icons.alert, label: "Reg. Alerts", badge: 2 },
+    { id: "alerts", icon: icons.alert, label: "Reg. Alerts", badge: dashStats.draftAlertCount || undefined },
   ];
 
   const footer = (

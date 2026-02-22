@@ -12,8 +12,17 @@ import {
   publishAlert,
   dismissAlert,
   restoreAlert,
+  createAlert,
+  updateAlertStatus,
+  addActionItem,
+  updateActionItem,
+  deleteActionItem,
+  loadClientActionsForAlert,
+  addClientAction,
   type DbAlert,
+  type DbActionItem,
   type Organization,
+  type ClientActionGroup,
 } from "../lib/api";
 
 type Tab = "active" | "drafts" | "dismissed";
@@ -32,6 +41,7 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
   const [selectedAlert, setSelectedAlert] = useState<DbAlert | null>(null);
   const [filterJuris, setFilterJuris] = useState<string | null>(null);
   const [draftDetail, setDraftDetail] = useState<DbAlert | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const reload = async () => {
     setLoading(true);
@@ -52,6 +62,20 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
   };
 
   useEffect(() => { reload(); }, []);
+
+  const handleCreateAlert = async () => {
+    try {
+      const newAlert = await createAlert({
+        title: "Neuer Alert",
+        jurisdiction: "CH",
+        date: new Date().toLocaleDateString("de-CH", { day: "numeric", month: "short", year: "numeric" }),
+      });
+      setDraftDetail(newAlert);
+      setActiveTab("drafts");
+    } catch (err) {
+      console.error("Failed to create alert:", err);
+    }
+  };
 
   if (loading) {
     return (
@@ -75,12 +99,33 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
 
   /* ——— Active Alert Detail View ——— */
   if (selectedAlert) {
-    return <AlertDetailView alert={selectedAlert} onBack={() => setSelectedAlert(null)} />;
+    return (
+      <AlertDetailView
+        alert={selectedAlert}
+        onBack={() => { setSelectedAlert(null); reload(); }}
+        onEdit={(a) => {
+          setSelectedAlert(null);
+          setDraftDetail(a);
+          setActiveTab("drafts");
+        }}
+        onStatusChange={async (newStatus) => {
+          setSelectedAlert({ ...selectedAlert, status: newStatus as DbAlert["status"] });
+          const active = await loadAlerts();
+          setAlerts(active);
+        }}
+      />
+    );
   }
 
-  const filtered = filterJuris
-    ? alerts.filter((a) => a.jurisdiction === filterJuris)
-    : alerts;
+  const filtered = alerts.filter((a) => {
+    const matchesJuris = !filterJuris || a.jurisdiction === filterJuris;
+    const matchesSearch =
+      !searchTerm ||
+      a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.category || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.source || "").toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesJuris && matchesSearch;
+  });
 
   const severityCounts = {
     critical: alerts.filter((a) => a.severity === "critical").length,
@@ -109,7 +154,7 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
       </p>
 
       {/* Tab bar */}
-      <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: `2px solid ${T.border}` }}>
+      <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: `2px solid ${T.border}`, alignItems: "center" }}>
         {([
           { key: "active" as Tab, label: "Aktive Alerts", count: alerts.length },
           { key: "drafts" as Tab, label: "Entwuerfe", count: draftAlerts.length },
@@ -151,13 +196,34 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
             )}
           </button>
         ))}
+        <button
+          onClick={handleCreateAlert}
+          style={{
+            marginLeft: "auto",
+            padding: "8px 16px",
+            borderRadius: 8,
+            border: "none",
+            background: T.accent,
+            color: "#fff",
+            fontSize: 12.5,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: T.sans,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <Icon d={icons.plus} size={14} color="#fff" />
+          Neuer Alert
+        </button>
       </div>
 
       {/* Active Tab */}
       {activeTab === "active" && (
         <>
           {/* Severity stats */}
-          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
             {(Object.entries(SEVERITY_CFG) as [keyof typeof SEVERITY_CFG, (typeof SEVERITY_CFG)[keyof typeof SEVERITY_CFG]][]).map(
               ([key, cfg]) => (
                 <div
@@ -182,6 +248,31 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
                 </div>
               ),
             )}
+          </div>
+
+          {/* Search bar */}
+          <div style={{ position: "relative", marginBottom: 16 }}>
+            <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", display: "flex" }}>
+              <Icon d={icons.search} size={16} color={T.ink4} />
+            </div>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Alerts durchsuchen..."
+              style={{
+                width: "100%",
+                padding: "10px 12px 10px 38px",
+                borderRadius: T.r,
+                border: `1px solid ${T.border}`,
+                fontSize: 13,
+                fontFamily: T.sans,
+                color: T.ink,
+                background: "#fff",
+                boxSizing: "border-box",
+                outline: "none",
+              }}
+            />
           </div>
 
           {/* Jurisdiction filter */}
@@ -568,38 +659,387 @@ function AlertCardList({
 }
 
 // =============================================================================
-// Alert Detail View (for active/published alerts — read-only)
+// Status Button — status lifecycle transition
 // =============================================================================
 
-function AlertDetailView({ alert, onBack }: { alert: DbAlert; onBack: () => void }) {
+function StatusButton({
+  label,
+  targetStatus,
+  alertId,
+  onUpdate,
+}: {
+  label: string;
+  targetStatus: "acknowledged" | "in_progress" | "resolved";
+  alertId: string;
+  onUpdate: (newStatus: string) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const handleClick = async () => {
+    setLoading(true);
+    try {
+      await updateAlertStatus(alertId, targetStatus);
+      onUpdate(targetStatus);
+    } catch (err) {
+      console.error("Status update failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={loading}
+      style={{
+        padding: "8px 16px",
+        borderRadius: 8,
+        border: `1px solid ${T.accent}`,
+        background: T.accentS,
+        color: T.accent,
+        fontSize: 12.5,
+        fontWeight: 600,
+        cursor: loading ? "default" : "pointer",
+        fontFamily: T.sans,
+        opacity: loading ? 0.6 : 1,
+      }}
+    >
+      {loading ? "..." : label}
+    </button>
+  );
+}
+
+// =============================================================================
+// Action Item Row — interactive checkbox + delete
+// =============================================================================
+
+function ActionItemRow({
+  item,
+  onToggle,
+  onDelete,
+}: {
+  item: DbActionItem;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
+  const isDone = item.status === "done";
+  const prioColor =
+    item.priority === "high" ? T.red : item.priority === "medium" ? T.amber : T.accent;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 12,
+        padding: "12px 14px",
+        borderRadius: T.r,
+        border: `1px solid ${T.borderL}`,
+        background: T.s1,
+      }}
+    >
+      <div
+        onClick={onToggle}
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: 6,
+          border: `2px solid ${isDone ? T.accent : prioColor}`,
+          background: isDone ? T.accentS : "transparent",
+          flexShrink: 0,
+          marginTop: 1,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {isDone && <Icon d={icons.check} size={12} color={T.accent} />}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 500,
+            color: isDone ? T.ink4 : T.ink,
+            fontFamily: T.sans,
+            textDecoration: isDone ? "line-through" : "none",
+          }}
+        >
+          {item.text}
+        </div>
+        <div style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans, marginTop: 3 }}>
+          Frist: {item.due ?? "\u2014"} &middot;{" "}
+          <span style={{ color: prioColor, fontWeight: 600 }}>
+            {item.priority === "high" ? "Hohe" : item.priority === "medium" ? "Mittlere" : "Niedrige"} Prioritaet
+          </span>
+        </div>
+      </div>
+      <button
+        onClick={onDelete}
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: 6,
+          border: `1px solid ${T.borderL}`,
+          background: "#fff",
+          color: T.red,
+          fontSize: 14,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          lineHeight: 1,
+          padding: 0,
+          flexShrink: 0,
+          marginTop: 1,
+        }}
+        title="Loeschen"
+      >
+        &times;
+      </button>
+    </div>
+  );
+}
+
+// =============================================================================
+// Add Action Item Form — inline form for adding new action items
+// =============================================================================
+
+function AddActionItemForm({
+  alertId,
+  onAdded,
+  onCancel,
+}: {
+  alertId: string;
+  onAdded: (item: DbActionItem) => void;
+  onCancel: () => void;
+}) {
+  const [text, setText] = useState("");
+  const [priority, setPriority] = useState("medium");
+  const [due, setDue] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!text.trim()) return;
+    setSaving(true);
+    try {
+      const item = await addActionItem(alertId, {
+        text: text.trim(),
+        priority,
+        due: due || undefined,
+      });
+      onAdded(item);
+    } catch (err) {
+      console.error("Failed to add action item:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputStyle: React.CSSProperties = {
+    padding: "7px 10px",
+    borderRadius: 6,
+    border: `1px solid ${T.border}`,
+    fontSize: 12.5,
+    fontFamily: T.sans,
+    color: T.ink,
+    background: "#fff",
+    outline: "none",
+  };
+
+  return (
+    <div
+      style={{
+        padding: 12,
+        borderRadius: 8,
+        border: `1px solid ${T.border}`,
+        background: T.s1,
+        marginBottom: 10,
+      }}
+    >
+      <input
+        type="text"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Massnahme beschreiben..."
+        style={{ ...inputStyle, width: "100%", boxSizing: "border-box", marginBottom: 8 }}
+      />
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <select value={priority} onChange={(e) => setPriority(e.target.value)} style={inputStyle}>
+          <option value="high">Hoch</option>
+          <option value="medium">Mittel</option>
+          <option value="low">Niedrig</option>
+        </select>
+        <input
+          type="text"
+          value={due}
+          onChange={(e) => setDue(e.target.value)}
+          placeholder="Frist (z.B. Q2 2026)"
+          style={{ ...inputStyle, flex: 1 }}
+        />
+        <button
+          onClick={handleSubmit}
+          disabled={saving || !text.trim()}
+          style={{
+            padding: "7px 14px",
+            borderRadius: 6,
+            border: "none",
+            background: T.accent,
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: saving ? "default" : "pointer",
+            fontFamily: T.sans,
+            opacity: saving || !text.trim() ? 0.5 : 1,
+          }}
+        >
+          {saving ? "..." : "Hinzufuegen"}
+        </button>
+        <button
+          onClick={onCancel}
+          style={{
+            padding: "7px 12px",
+            borderRadius: 6,
+            border: `1px solid ${T.border}`,
+            background: "#fff",
+            color: T.ink3,
+            fontSize: 12,
+            cursor: "pointer",
+            fontFamily: T.sans,
+          }}
+        >
+          Abbrechen
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// Alert Detail View (for active/published alerts — interactive)
+// =============================================================================
+
+function AlertDetailView({
+  alert,
+  onBack,
+  onEdit,
+  onStatusChange,
+}: {
+  alert: DbAlert;
+  onBack: () => void;
+  onEdit: (alert: DbAlert) => void;
+  onStatusChange: (newStatus: string) => void;
+}) {
   const sev = SEVERITY_CFG[alert.severity];
   const stat = STATUS_CFG[alert.status] ?? STATUS_CFG.new;
+
+  const [actionItems, setActionItems] = useState(alert.action_items);
+  const [showAddAction, setShowAddAction] = useState(false);
+  const [clientActionGroups, setClientActionGroups] = useState<ClientActionGroup[]>([]);
+  const [addClientActionFor, setAddClientActionFor] = useState<string | null>(null);
+  const [newClientActionText, setNewClientActionText] = useState("");
+  const [newClientActionDue, setNewClientActionDue] = useState("");
+  const [savingClientAction, setSavingClientAction] = useState(false);
+
+  useEffect(() => {
+    loadClientActionsForAlert(alert.id)
+      .then(setClientActionGroups)
+      .catch((err) => console.error("Failed to load client actions:", err));
+  }, [alert.id]);
+
+  const handleActionToggle = async (item: DbActionItem) => {
+    const newStatus = item.status === "done" ? "pending" : "done";
+    try {
+      await updateActionItem(item.id, { status: newStatus });
+      setActionItems((items) => items.map((i) => (i.id === item.id ? { ...i, status: newStatus } : i)));
+    } catch (err) {
+      console.error("Failed to update action item:", err);
+    }
+  };
+
+  const handleActionDelete = async (itemId: string) => {
+    try {
+      await deleteActionItem(itemId);
+      setActionItems((items) => items.filter((i) => i.id !== itemId));
+    } catch (err) {
+      console.error("Failed to delete action item:", err);
+    }
+  };
+
+  const handleAddClientAction = async (affectedClientId: string) => {
+    if (!newClientActionText.trim()) return;
+    setSavingClientAction(true);
+    try {
+      await addClientAction(affectedClientId, {
+        text: newClientActionText.trim(),
+        due: newClientActionDue || undefined,
+      });
+      // Reload client actions
+      const updated = await loadClientActionsForAlert(alert.id);
+      setClientActionGroups(updated);
+      setAddClientActionFor(null);
+      setNewClientActionText("");
+      setNewClientActionDue("");
+    } catch (err) {
+      console.error("Failed to add client action:", err);
+    } finally {
+      setSavingClientAction(false);
+    }
+  };
 
   return (
     <div>
       <SectionLabel text="Regulatory Alert" />
-      <button
-        onClick={onBack}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          background: "none",
-          border: "none",
-          color: T.ink3,
-          fontSize: 13,
-          cursor: "pointer",
-          fontFamily: T.sans,
-          padding: 0,
-          marginBottom: 12,
-        }}
-      >
-        <Icon d={icons.back} size={14} color={T.ink3} />
-        Alle Alerts
-      </button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <button
+          onClick={onBack}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            background: "none",
+            border: "none",
+            color: T.ink3,
+            fontSize: 13,
+            cursor: "pointer",
+            fontFamily: T.sans,
+            padding: 0,
+          }}
+        >
+          <Icon d={icons.back} size={14} color={T.ink3} />
+          Alle Alerts
+        </button>
+        <button
+          onClick={async () => {
+            try {
+              await updateAlertStatus(alert.id, "draft");
+              onEdit(alert);
+            } catch (err) {
+              console.error("Failed to switch to edit mode:", err);
+            }
+          }}
+          style={{
+            padding: "8px 16px",
+            borderRadius: 8,
+            border: `1px solid ${T.border}`,
+            background: "#fff",
+            color: T.ink2,
+            fontSize: 12.5,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: T.sans,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <Icon d={icons.settings} size={14} color={T.ink3} />
+          Bearbeiten
+        </button>
+      </div>
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 8 }}>
         <div
           style={{
             width: 44,
@@ -662,6 +1102,21 @@ function AlertDetailView({ alert, onBack }: { alert: DbAlert; onBack: () => void
           </div>
         </div>
       </div>
+
+      {/* Status lifecycle buttons */}
+      {alert.status !== "resolved" && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+          {alert.status === "new" && (
+            <StatusButton label="Als gesehen markieren" targetStatus="acknowledged" alertId={alert.id} onUpdate={onStatusChange} />
+          )}
+          {alert.status === "acknowledged" && (
+            <StatusButton label="In Bearbeitung nehmen" targetStatus="in_progress" alertId={alert.id} onUpdate={onStatusChange} />
+          )}
+          {alert.status === "in_progress" && (
+            <StatusButton label="Als erledigt markieren" targetStatus="resolved" alertId={alert.id} onUpdate={onStatusChange} />
+          )}
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20 }}>
         {/* Main content */}
@@ -744,68 +1199,73 @@ function AlertDetailView({ alert, onBack }: { alert: DbAlert; onBack: () => void
             </div>
           )}
 
-          {/* Action items */}
-          {alert.action_items.length > 0 && (
-            <div
-              style={{
-                background: "#fff",
-                borderRadius: T.rLg,
-                padding: "22px 24px",
-                border: `1px solid ${T.border}`,
-                boxShadow: T.shSm,
-              }}
-            >
-              <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans, marginBottom: 14 }}>
-                Massnahmen ({alert.action_items.length})
+          {/* Action items — interactive */}
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: T.rLg,
+              padding: "22px 24px",
+              border: `1px solid ${T.border}`,
+              boxShadow: T.shSm,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
+                Massnahmen ({actionItems.length})
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {alert.action_items.map((item) => {
-                  const prioColor =
-                    item.priority === "high" ? T.red : item.priority === "medium" ? T.amber : T.accent;
-                  return (
-                    <div
-                      key={item.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 12,
-                        padding: "12px 14px",
-                        borderRadius: T.r,
-                        border: `1px solid ${T.borderL}`,
-                        background: T.s1,
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 22,
-                          height: 22,
-                          borderRadius: 6,
-                          border: `2px solid ${prioColor}`,
-                          flexShrink: 0,
-                          marginTop: 1,
-                        }}
-                      />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: T.ink, fontFamily: T.sans }}>
-                          {item.text}
-                        </div>
-                        <div style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans, marginTop: 3 }}>
-                          Frist: {item.due ?? "\u2014"} &middot;{" "}
-                          <span style={{ color: prioColor, fontWeight: 600 }}>
-                            {item.priority === "high" ? "Hohe" : item.priority === "medium" ? "Mittlere" : "Niedrige"} Prioritaet
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              {!showAddAction && (
+                <button
+                  onClick={() => setShowAddAction(true)}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: "4px 10px",
+                    borderRadius: 8,
+                    border: `1px solid ${T.accent}`,
+                    background: T.accentS,
+                    color: T.accent,
+                    cursor: "pointer",
+                    fontFamily: T.sans,
+                  }}
+                >
+                  + Massnahme
+                </button>
+              )}
             </div>
-          )}
+
+            {showAddAction && (
+              <AddActionItemForm
+                alertId={alert.id}
+                onAdded={(item) => {
+                  setActionItems([...actionItems, item]);
+                  setShowAddAction(false);
+                }}
+                onCancel={() => setShowAddAction(false)}
+              />
+            )}
+
+            {actionItems.length === 0 && !showAddAction ? (
+              <p style={{ fontSize: 12.5, color: T.ink4, fontFamily: T.sans, margin: 0 }}>
+                Keine Massnahmen definiert.
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {actionItems.map((item) => (
+                  <ActionItemRow
+                    key={item.id}
+                    item={item}
+                    onToggle={() => handleActionToggle(item)}
+                    onDelete={() => handleActionDelete(item.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Sidebar: affected clients */}
+        {/* Sidebar */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Affected clients */}
           <div
             style={{
               background: "#fff",
@@ -865,7 +1325,162 @@ function AlertDetailView({ alert, onBack }: { alert: DbAlert; onBack: () => void
             )}
           </div>
 
-          {/* Elena mini-preview */}
+          {/* Client actions (admin view) */}
+          {clientActionGroups.length > 0 && (
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: T.rLg,
+                padding: "20px 22px",
+                border: `1px solid ${T.border}`,
+                boxShadow: T.shSm,
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 600, color: T.ink, fontFamily: T.sans, marginBottom: 12 }}>
+                Kunden-Massnahmen
+              </div>
+              {clientActionGroups.map((group) => (
+                <div key={group.affectedClientId} style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: T.ink2, fontFamily: T.sans, marginBottom: 6 }}>
+                    {group.orgName}
+                  </div>
+                  {group.actions.length === 0 ? (
+                    <p style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans, margin: "0 0 6px" }}>
+                      Keine Massnahmen.
+                    </p>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 6 }}>
+                      {group.actions.map((action) => (
+                        <div
+                          key={action.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "6px 8px",
+                            borderRadius: 6,
+                            background: T.s1,
+                            border: `1px solid ${T.borderL}`,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              padding: "1px 6px",
+                              borderRadius: 4,
+                              background: action.status === "offen" ? "#fffbeb" : T.accentS,
+                              color: action.status === "offen" ? "#d97706" : T.accent,
+                              fontFamily: T.sans,
+                            }}
+                          >
+                            {action.status}
+                          </span>
+                          <span style={{ fontSize: 11.5, color: T.ink2, fontFamily: T.sans, flex: 1 }}>
+                            {action.text}
+                          </span>
+                          {action.due && (
+                            <span style={{ fontSize: 10, color: T.ink4, fontFamily: T.sans }}>
+                              {action.due}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {addClientActionFor === group.affectedClientId ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <input
+                        type="text"
+                        value={newClientActionText}
+                        onChange={(e) => setNewClientActionText(e.target.value)}
+                        placeholder="Massnahme..."
+                        style={{
+                          padding: "6px 8px",
+                          borderRadius: 6,
+                          border: `1px solid ${T.border}`,
+                          fontSize: 11.5,
+                          fontFamily: T.sans,
+                          outline: "none",
+                        }}
+                      />
+                      <input
+                        type="text"
+                        value={newClientActionDue}
+                        onChange={(e) => setNewClientActionDue(e.target.value)}
+                        placeholder="Frist (optional)"
+                        style={{
+                          padding: "6px 8px",
+                          borderRadius: 6,
+                          border: `1px solid ${T.border}`,
+                          fontSize: 11.5,
+                          fontFamily: T.sans,
+                          outline: "none",
+                        }}
+                      />
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          onClick={() => handleAddClientAction(group.affectedClientId)}
+                          disabled={savingClientAction || !newClientActionText.trim()}
+                          style={{
+                            padding: "5px 10px",
+                            borderRadius: 6,
+                            border: "none",
+                            background: T.accent,
+                            color: "#fff",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontFamily: T.sans,
+                            opacity: savingClientAction || !newClientActionText.trim() ? 0.5 : 1,
+                          }}
+                        >
+                          {savingClientAction ? "..." : "Hinzufuegen"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setAddClientActionFor(null);
+                            setNewClientActionText("");
+                            setNewClientActionDue("");
+                          }}
+                          style={{
+                            padding: "5px 10px",
+                            borderRadius: 6,
+                            border: `1px solid ${T.border}`,
+                            background: "#fff",
+                            color: T.ink3,
+                            fontSize: 11,
+                            cursor: "pointer",
+                            fontFamily: T.sans,
+                          }}
+                        >
+                          Abbrechen
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setAddClientActionFor(group.affectedClientId)}
+                      style={{
+                        fontSize: 11,
+                        color: T.accent,
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        fontFamily: T.sans,
+                        fontWeight: 600,
+                        padding: 0,
+                      }}
+                    >
+                      + Massnahme hinzufuegen
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Elena sidebar mini */}
           {alert.elena_comment && (
             <div
               style={{
