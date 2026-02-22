@@ -163,33 +163,28 @@ export function AlertsPage({ profile: _profile }: AlertsPageProps) {
           {/* Severity stats */}
           <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
             {(Object.entries(SEVERITY_CFG) as [keyof typeof SEVERITY_CFG, (typeof SEVERITY_CFG)[keyof typeof SEVERITY_CFG]][]).map(
-              ([key, cfg]) => {
-                if (key === "draft" || key === "dismissed") return null;
-                const count = severityCounts[key as keyof typeof severityCounts];
-                if (count === undefined) return null;
-                return (
-                  <div
-                    key={key}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "8px 16px",
-                      borderRadius: T.r,
-                      background: cfg.bg,
-                      border: `1px solid ${cfg.border}`,
-                    }}
-                  >
-                    <span style={{ fontSize: 14 }}>{cfg.icon}</span>
-                    <span style={{ fontSize: 12.5, fontWeight: 600, color: cfg.color, fontFamily: T.sans }}>
-                      {count}
-                    </span>
-                    <span style={{ fontSize: 12, color: cfg.color, fontFamily: T.sans, opacity: 0.8 }}>
-                      {cfg.label}
-                    </span>
-                  </div>
-                );
-              },
+              ([key, cfg]) => (
+                <div
+                  key={key}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 16px",
+                    borderRadius: T.r,
+                    background: cfg.bg,
+                    border: `1px solid ${cfg.border}`,
+                  }}
+                >
+                  <span style={{ fontSize: 14 }}>{cfg.icon}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: cfg.color, fontFamily: T.sans }}>
+                    {severityCounts[key]}
+                  </span>
+                  <span style={{ fontSize: 12, color: cfg.color, fontFamily: T.sans, opacity: 0.8 }}>
+                    {cfg.label}
+                  </span>
+                </div>
+              ),
             )}
           </div>
 
