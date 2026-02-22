@@ -24,6 +24,7 @@ function DocGenInner() {
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [selectedDocKey, setSelectedDocKey] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<Record<string, unknown>>(() => {
     const p: Record<string, unknown> = {};
@@ -125,11 +126,16 @@ function DocGenInner() {
 
   const handleNav = useCallback((id: string) => {
     if (id === "new-profile") {
-      // "Firmenprofil anlegen" → open organizations page with new-customer form
       setPage("new-profile");
       return;
     }
+    if (id === "generate") setSelectedDocKey(null); // reset when navigating via sidebar
     setPage(id);
+  }, []);
+
+  const handleGenerateDoc = useCallback((docKey: string) => {
+    setSelectedDocKey(docKey);
+    setPage("generate");
   }, []);
 
   const sidebarItems = [
@@ -205,7 +211,7 @@ function DocGenInner() {
       />
       <main style={{ flex: 1, padding: "36px 44px", maxWidth: 960, overflowY: "auto" }}>
         <Suspense fallback={<div style={{ padding: 40, color: T.ink3, fontFamily: T.sans }}>Laden...</div>}>
-          {page === "dashboard" && <DashboardPage onNav={setPage} profile={profile} profOk={profOk} />}
+          {page === "dashboard" && <DashboardPage onNav={setPage} onGenerateDoc={handleGenerateDoc} profile={profile} profOk={profOk} />}
           {(page === "organizations" || page === "new-profile") && (
             <OrganizationsPage
               organizations={organizations}
@@ -232,6 +238,7 @@ function DocGenInner() {
               onNav={setPage}
               orgId={orgId}
               orgName={organizations.find((o) => o.id === orgId)?.name}
+              initialDocKey={selectedDocKey}
             />
           )}
           {page === "documents" && <DocumentsPage />}

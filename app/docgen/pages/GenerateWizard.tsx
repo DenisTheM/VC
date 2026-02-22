@@ -13,11 +13,12 @@ interface GenerateWizardProps {
   onNav: (id: string) => void;
   orgId?: string | null;
   orgName?: string;
+  initialDocKey?: string | null;
 }
 
-export function GenerateWizard({ profile, onNav, orgId, orgName }: GenerateWizardProps) {
-  const [step, setStep] = useState(0);
-  const [docKey, setDocKey] = useState<string | null>(null);
+export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }: GenerateWizardProps) {
+  const [step, setStep] = useState(initialDocKey ? 1 : 0);
+  const [docKey, setDocKey] = useState<string | null>(initialDocKey ?? null);
   const [jurisdiction, setJurisdiction] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [generating, setGenerating] = useState(false);

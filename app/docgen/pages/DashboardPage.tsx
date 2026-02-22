@@ -9,11 +9,12 @@ import { loadDashboardStats } from "../lib/api";
 
 interface DashboardPageProps {
   onNav: (id: string) => void;
+  onGenerateDoc: (docKey: string) => void;
   profile: Record<string, unknown>;
   profOk: boolean;
 }
 
-export function DashboardPage({ onNav, profile, profOk }: DashboardPageProps) {
+export function DashboardPage({ onNav, onGenerateDoc, profile, profOk }: DashboardPageProps) {
   const { profile: authProfile } = useAuthContext();
   const firstName = authProfile.full_name?.split(" ")[0] || "User";
   const [dbStats, setDbStats] = useState({ documentCount: 0, alertCount: 0 });
@@ -135,7 +136,7 @@ export function DashboardPage({ onNav, profile, profOk }: DashboardPageProps) {
             {Object.entries(DOC_TYPES).map(([key, doc]) => (
               <button
                 key={key}
-                onClick={() => onNav("generate")}
+                onClick={() => onGenerateDoc(key)}
                 style={{
                   display: "flex",
                   alignItems: "center",
