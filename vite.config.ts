@@ -34,7 +34,7 @@ function copyStaticFiles() {
       }
 
       // Static directories
-      const staticDirs = ["blog", "styles", "js"];
+      const staticDirs = ["blog", "styles", "js", "assets"];
       for (const dir of staticDirs) {
         const src = resolve(root, dir);
         if (existsSync(src)) {

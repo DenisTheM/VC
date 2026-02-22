@@ -29,52 +29,25 @@
     </script>
 </head>
 <body>
-    <div class="container">
-        <div class="logo">Virtue <span>Compliance</span></div>
-        <div class="code">404</div>
-        <h1>Seite nicht gefunden</h1>
-        <p>Die angeforderte Seite existiert leider nicht oder wurde verschoben.</p>
-        <a href="/" class="btn">â† Zurück zur Startseite</a>
+    <div style="max-width:600px;margin:0 auto;padding:80px 24px;text-align:center;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;">
+        <a href="/" style="text-decoration:none;display:inline-flex;align-items:center;gap:10px;margin-bottom:40px;">
+            <img src="/assets/img/logo-icon.png" alt="Virtue Compliance Logo" width="48" height="48">
+            <span style="font-size:20px;font-weight:700;color:#111827;">Virtue <span style="font-weight:400;">Compliance</span></span>
+        </a>
+        <div style="font-size:80px;font-weight:700;color:#16654e;line-height:1;">404</div>
+        <h1 style="font-size:28px;font-weight:700;color:#111827;margin:16px 0 8px;">Seite nicht gefunden</h1>
+        <p style="font-size:16px;color:#6b7280;line-height:1.6;margin-bottom:32px;">Die angeforderte Seite existiert leider nicht oder wurde verschoben.</p>
+        <a href="/" style="display:inline-block;background:#16654e;color:#fff;padding:14px 32px;border-radius:10px;font-size:16px;font-weight:600;text-decoration:none;margin-bottom:40px;">Zur Startseite</a>
+        <div style="border-top:1px solid #f3f4f6;padding-top:32px;">
+            <p style="font-size:14px;color:#9ca3af;margin-bottom:16px;">Vielleicht finden Sie hier, was Sie suchen:</p>
+            <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;">
+                <a href="/#services" style="padding:10px 20px;border:1px solid #e5e7eb;border-radius:8px;color:#111827;text-decoration:none;font-size:14px;font-weight:500;">Services</a>
+                <a href="/blog/" style="padding:10px 20px;border:1px solid #e5e7eb;border-radius:8px;color:#111827;text-decoration:none;font-size:14px;font-weight:500;">Blog</a>
+                <a href="/#faq" style="padding:10px 20px;border:1px solid #e5e7eb;border-radius:8px;color:#111827;text-decoration:none;font-size:14px;font-weight:500;">FAQ</a>
+                <a href="/#kontakt" style="padding:10px 20px;border:1px solid #e5e7eb;border-radius:8px;color:#111827;text-decoration:none;font-size:14px;font-weight:500;">Kontakt</a>
+            </div>
+        </div>
     </div>
-<!-- Cookie Consent -->
-<script>
-(function(){
-  if(document.cookie.indexOf('vc_consent=')!==-1){
-    if(document.cookie.indexOf('vc_consent=1')!==-1){
-      gtag('consent','update',{'analytics_storage':'granted'});
-    }
-    return;
-  }
-  var overlay=document.createElement('div');
-  overlay.id='vc-cookie-overlay';
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9998;backdrop-filter:blur(2px);';
-  var b=document.createElement('div');
-  b.id='vc-cookie';
-  b.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);width:92%25;max-width:520px;background:#fff;color:#111827;padding:28px 24px;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.18);z-index:9999;font-family:DM Sans,-apple-system,BlinkMacSystemFont,sans-serif;';
-  b.innerHTML=''
-    +'<div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#111827;">Ihre Privatsph\u00e4re ist uns wichtig</div>'
-    +'<div style="font-size:14px;line-height:1.6;color:#6b7280;margin-bottom:20px;">'
-    +'Wir verwenden Cookies, um unsere Website zu verbessern und Ihren Besuch angenehmer zu gestalten. '
-    +'<a href="/datenschutz.html" style="color:#16654e;text-decoration:underline;">Mehr erfahren</a>'
-    +'</div>'
-    +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-    +'<button onclick="vcAccept()" style="flex:1;min-width:140px;background:#16654e;color:#fff;border:none;border-radius:10px;padding:13px 24px;font-size:15px;font-weight:600;cursor:pointer;font-family:DM Sans,-apple-system,sans-serif;">Akzeptieren</button>'
-    +'<button onclick="vcDecline()" style="flex:1;min-width:140px;background:#f9fafb;color:#6b7280;border:1px solid #f3f4f6;border-radius:10px;padding:13px 24px;font-size:14px;font-weight:500;cursor:pointer;font-family:DM Sans,-apple-system,sans-serif;">Nur notwendige</button>'
-    +'</div>';
-  document.body.appendChild(overlay);
-  document.body.appendChild(b);
-  function closeBanner(){b.remove();overlay.remove();}
-  window.vcAccept=function(){
-    document.cookie='vc_consent=1;path=/;max-age=31536000;SameSite=Lax';
-    gtag('consent','update',{'analytics_storage':'granted'});
-    closeBanner();
-  };
-  window.vcDecline=function(){
-    document.cookie='vc_consent=0;path=/;max-age=31536000;SameSite=Lax';
-    closeBanner();
-  };
-})();
-</script>
 
     <script src="/js/main.js"></script>
     <script src="/js/cookie-consent.js"></script>
