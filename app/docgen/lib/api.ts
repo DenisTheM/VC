@@ -18,7 +18,8 @@ export async function saveCompanyProfile(
   organizationId: string,
   profileData: Record<string, unknown>,
   userId: string,
-) {
+): Promise<string> {
+  const now = new Date().toISOString();
   // Upsert: update if exists, insert if not
   const existing = await loadCompanyProfile(organizationId);
 
@@ -27,7 +28,7 @@ export async function saveCompanyProfile(
       .from("company_profiles")
       .update({
         data: profileData,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
         updated_by: userId,
       })
       .eq("id", existing.id);
@@ -40,6 +41,7 @@ export async function saveCompanyProfile(
     });
     if (error) throw error;
   }
+  return now;
 }
 
 // ─── Organizations ─────────────────────────────────────────────────

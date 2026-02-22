@@ -15,19 +15,20 @@ interface FieldProps {
   field: FieldDef;
   value: unknown;
   onChange: (value: unknown) => void;
+  highlight?: boolean;
 }
 
-export function Field({ field, value, onChange }: FieldProps) {
+export function Field({ field, value, onChange, highlight }: FieldProps) {
   const base: React.CSSProperties = {
     width: "100%",
     padding: "10px 14px",
     borderRadius: T.r,
-    border: `1px solid ${T.border}`,
+    border: `1px solid ${highlight ? T.amber : T.border}`,
     fontSize: 14,
     fontFamily: T.sans,
     color: T.ink,
     outline: "none",
-    background: "#fff",
+    background: highlight ? T.amberS : "#fff",
     boxSizing: "border-box",
   };
 
@@ -64,7 +65,7 @@ export function Field({ field, value, onChange }: FieldProps) {
     return (
       <div style={{ marginBottom: 16 }}>
         {lbl}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, ...(highlight ? { padding: 8, borderRadius: T.r, border: `1px solid ${T.amber}`, background: T.amberS } : {}) }}>
           {field.options?.map((o) => {
             const sel = selected.includes(o);
             return (
@@ -100,7 +101,7 @@ export function Field({ field, value, onChange }: FieldProps) {
     return (
       <div style={{ marginBottom: 16 }}>
         {lbl}
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, ...(highlight ? { padding: 8, borderRadius: T.r, border: `1px solid ${T.amber}`, background: T.amberS } : {}) }}>
           {["Ja", "Nein"].map((o) => {
             const sel = (value === true && o === "Ja") || (value === false && o === "Nein");
             return (

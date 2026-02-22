@@ -27,6 +27,7 @@ function DocGenInner() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedDocKey, setSelectedDocKey] = useState<string | null>(null);
   const [dashStats, setDashStats] = useState({ documentCount: 0, alertCount: 0, draftAlertCount: 0 });
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<Record<string, unknown>>(() => {
     const p: Record<string, unknown> = {};
@@ -52,9 +53,11 @@ function DocGenInner() {
     if (!orgId) return;
     setSaving(true);
     try {
-      await saveCompanyProfile(orgId, profile, user.id);
+      const ts = await saveCompanyProfile(orgId, profile, user.id);
+      setUpdatedAt(ts);
     } catch (err) {
       console.error("Failed to save profile:", err);
+      throw err;
     } finally {
       setSaving(false);
     }
@@ -74,6 +77,9 @@ function DocGenInner() {
     const cp = await loadCompanyProfile(selectedOrgId);
     if (cp?.data && typeof cp.data === "object") {
       setProfile((prev) => ({ ...prev, ...(cp.data as Record<string, unknown>) }));
+      setUpdatedAt(cp.updated_at ?? null);
+    } else {
+      setUpdatedAt(null);
     }
     setPage("profile");
   }, []);
@@ -120,6 +126,9 @@ function DocGenInner() {
     const cp = await loadCompanyProfile(org.id);
     if (cp?.data && typeof cp.data === "object") {
       setProfile((prev) => ({ ...prev, ...(cp.data as Record<string, unknown>) }));
+      setUpdatedAt(cp.updated_at ?? null);
+    } else {
+      setUpdatedAt(null);
     }
     setPage("profile");
   }, []);
@@ -235,6 +244,7 @@ function DocGenInner() {
               orgName={organizations.find((o) => o.id === orgId)?.name}
               onBack={() => setPage("organizations")}
               onGenerate={() => setPage("generate")}
+              updatedAt={updatedAt}
             />
           )}
           {page === "generate" && (
