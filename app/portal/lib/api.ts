@@ -64,7 +64,11 @@ export async function loadClientAlerts(organizationId: string): Promise<PortalAl
   if (error) throw error;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data ?? []).map((row: any) => {
+  return (data ?? []).filter((row: any) => {
+    // Exclude draft and dismissed alerts from client portal
+    const status = row.regulatory_alerts?.status;
+    return status && status !== "draft" && status !== "dismissed";
+  }).map((row: any) => {
     const alert = row.regulatory_alerts;
     return {
       id: row.id,
@@ -164,8 +168,13 @@ export async function loadPortalStats(organizationId: string) {
       .eq("organization_id", organizationId),
   ]);
 
-  const alerts = alertsRes.data ?? [];
   const docs = docsRes.data ?? [];
+  // Exclude draft and dismissed alerts from portal stats
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const alerts = (alertsRes.data ?? []).filter((a: any) => {
+    const status = a.regulatory_alerts?.status;
+    return status && status !== "draft" && status !== "dismissed";
+  });
 
   return {
     totalAlerts: alerts.length,

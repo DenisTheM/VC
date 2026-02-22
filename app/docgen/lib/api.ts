@@ -101,7 +101,7 @@ export interface DbAlert {
   jurisdiction: string;
   date: string | null;
   severity: "critical" | "high" | "medium" | "info";
-  status: "new" | "acknowledged" | "in_progress" | "resolved";
+  status: "draft" | "new" | "acknowledged" | "in_progress" | "resolved" | "dismissed";
   category: string | null;
   summary: string | null;
   legal_basis: string | null;
@@ -109,6 +109,14 @@ export interface DbAlert {
   elena_comment: string | null;
   action_items: DbActionItem[];
   affected_clients: DbAffectedClient[];
+  // AI-prepared fields (for drafts)
+  feed_entry_id: string | null;
+  auto_summary: string | null;
+  ai_legal_basis: string | null;
+  ai_severity: string | null;
+  ai_category: string | null;
+  ai_comment: string | null;
+  source_url: string | null;
 }
 
 export interface DbActionItem {
@@ -126,6 +134,10 @@ export interface DbAffectedClient {
   risk: string;
   elena_comment: string | null;
   organizations: { name: string } | null;
+  // AI-prepared fields (for drafts)
+  ai_risk: string | null;
+  ai_reason: string | null;
+  ai_elena_comment: string | null;
 }
 
 export async function loadAlerts(): Promise<DbAlert[]> {
@@ -136,10 +148,183 @@ export async function loadAlerts(): Promise<DbAlert[]> {
       action_items:alert_action_items(*),
       affected_clients:alert_affected_clients(*, organizations(name))
     `)
+    .not("status", "in", '("draft","dismissed")')
     .order("created_at", { ascending: false });
 
   if (error) throw error;
   return (data ?? []) as unknown as DbAlert[];
+}
+
+// ─── Draft & Dismissed Alert Management ───────────────────────────────────
+
+export async function loadDraftAlerts(): Promise<DbAlert[]> {
+  const { data, error } = await supabase
+    .from("regulatory_alerts")
+    .select(`
+      *,
+      action_items:alert_action_items(*),
+      affected_clients:alert_affected_clients(*, organizations(name))
+    `)
+    .eq("status", "draft")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as unknown as DbAlert[];
+}
+
+export async function loadDismissedAlerts(): Promise<DbAlert[]> {
+  const { data, error } = await supabase
+    .from("regulatory_alerts")
+    .select(`
+      *,
+      action_items:alert_action_items(*),
+      affected_clients:alert_affected_clients(*, organizations(name))
+    `)
+    .eq("status", "dismissed")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as unknown as DbAlert[];
+}
+
+export async function saveDraftAlert(
+  alertId: string,
+  updates: {
+    severity?: string;
+    category?: string;
+    legal_basis?: string;
+    deadline?: string;
+    elena_comment?: string;
+    summary?: string;
+    jurisdiction?: string;
+  },
+  affectedClients: {
+    id?: string;
+    organization_id: string;
+    risk: string;
+    reason: string;
+    elena_comment: string;
+  }[],
+): Promise<void> {
+  // Update the alert itself
+  const { error: alertErr } = await supabase
+    .from("regulatory_alerts")
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", alertId);
+
+  if (alertErr) throw alertErr;
+
+  // Delete existing affected clients and re-insert
+  const { error: delErr } = await supabase
+    .from("alert_affected_clients")
+    .delete()
+    .eq("alert_id", alertId);
+
+  if (delErr) throw delErr;
+
+  if (affectedClients.length > 0) {
+    const rows = affectedClients.map((c) => ({
+      alert_id: alertId,
+      organization_id: c.organization_id,
+      risk: c.risk,
+      reason: c.reason,
+      elena_comment: c.elena_comment,
+      ai_risk: c.risk,
+      ai_reason: c.reason,
+      ai_elena_comment: c.elena_comment,
+    }));
+
+    const { error: insErr } = await supabase
+      .from("alert_affected_clients")
+      .insert(rows);
+
+    if (insErr) throw insErr;
+  }
+}
+
+export async function publishAlert(
+  alertId: string,
+  updates: {
+    severity: string;
+    category: string;
+    legal_basis: string;
+    deadline: string;
+    elena_comment: string;
+    summary: string;
+  },
+  affectedClients: {
+    organization_id: string;
+    risk: string;
+    reason: string;
+    elena_comment: string;
+  }[],
+): Promise<void> {
+  // Update alert to 'new' status with final values
+  const { error: alertErr } = await supabase
+    .from("regulatory_alerts")
+    .update({
+      ...updates,
+      status: "new",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", alertId);
+
+  if (alertErr) throw alertErr;
+
+  // Replace affected clients with final values
+  const { error: delErr } = await supabase
+    .from("alert_affected_clients")
+    .delete()
+    .eq("alert_id", alertId);
+
+  if (delErr) throw delErr;
+
+  if (affectedClients.length > 0) {
+    const rows = affectedClients.map((c) => ({
+      alert_id: alertId,
+      organization_id: c.organization_id,
+      risk: c.risk,
+      reason: c.reason,
+      elena_comment: c.elena_comment,
+    }));
+
+    const { error: insErr } = await supabase
+      .from("alert_affected_clients")
+      .insert(rows);
+
+    if (insErr) throw insErr;
+  }
+
+  // Trigger email notification via Edge Function
+  try {
+    await supabase.functions.invoke("notify-alert", {
+      body: { alert_id: alertId },
+    });
+  } catch (notifyErr) {
+    console.error("Failed to send alert notifications:", notifyErr);
+    // Don't throw — the alert is already published
+  }
+}
+
+export async function dismissAlert(alertId: string): Promise<void> {
+  const { error } = await supabase
+    .from("regulatory_alerts")
+    .update({ status: "dismissed", updated_at: new Date().toISOString() })
+    .eq("id", alertId);
+
+  if (error) throw error;
+}
+
+export async function restoreAlert(alertId: string): Promise<void> {
+  const { error } = await supabase
+    .from("regulatory_alerts")
+    .update({ status: "draft", updated_at: new Date().toISOString() })
+    .eq("id", alertId);
+
+  if (error) throw error;
 }
 
 // ─── Documents ─────────────────────────────────────────────────────

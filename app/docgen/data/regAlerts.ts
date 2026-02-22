@@ -7,7 +7,7 @@ export interface RegAlert {
   jurisdiction: string;
   date: string;
   severity: "critical" | "high" | "medium" | "info";
-  status: "new" | "acknowledged" | "in_progress" | "resolved";
+  status: "draft" | "new" | "acknowledged" | "in_progress" | "resolved" | "dismissed";
   category: string;
   summary: string;
   legalBasis: string;
@@ -137,8 +137,10 @@ export const SEVERITY_CFG = {
 } as const;
 
 export const STATUS_CFG = {
+  draft: { label: "Entwurf", bg: "#f3f4f6", color: "#6b7280" },
   new: { label: "Neu", bg: "#fef2f2", color: "#ef4444" },
   acknowledged: { label: "Gesehen", bg: "#fffbeb", color: "#f59e0b" },
   in_progress: { label: "In Bearbeitung", bg: "#eff6ff", color: "#3b82f6" },
   resolved: { label: "Erledigt", bg: "#ecf5f1", color: "#16654e" },
+  dismissed: { label: "Verworfen", bg: "#fafafa", color: "#a1a1aa" },
 } as const;
