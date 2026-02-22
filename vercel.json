@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/app/docgen/(.*)", "destination": "/app/docgen/index.html" },
+    { "source": "/app/portal/(.*)", "destination": "/app/portal/index.html" },
+    { "source": "/app/login", "destination": "/app/login/index.html" }
+  ]
+}
