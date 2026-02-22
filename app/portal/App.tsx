@@ -252,7 +252,7 @@ function ClientSidebar({
           </div>
         </div>
         <button
-          onClick={() => signOut().then(() => (window.location.href = "/app/login"))}
+          onClick={() => signOut().catch(() => {}).finally(() => (window.location.href = "/app/login"))}
           style={{
             width: "100%",
             display: "flex",

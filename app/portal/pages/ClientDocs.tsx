@@ -12,19 +12,27 @@ interface ClientDocsProps {
 export function ClientDocs({ org }: ClientDocsProps) {
   const [docs, setDocs] = useState<PortalDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const orgShort = org?.short_name || org?.name || "Ihr Unternehmen";
 
-  useEffect(() => {
+  const load = () => {
     if (!org) return;
+    setLoading(true);
+    setError(false);
     loadClientDocuments(org.id)
       .then(setDocs)
-      .catch((err) => console.error("Failed to load client docs:", err))
+      .catch((err) => {
+        console.error("Failed to load client docs:", err);
+        setError(true);
+      })
       .finally(() => setLoading(false));
-  }, [org]);
+  };
+
+  useEffect(() => { load(); }, [org]);
 
   /* -- Derived data ------------------------------------------------ */
   const categories = [...new Set(docs.map((d) => d.category))];
@@ -50,6 +58,30 @@ export function ClientDocs({ org }: ClientDocsProps) {
     return (
       <div style={{ padding: "40px 48px", textAlign: "center", color: T.ink3, fontFamily: T.sans }}>
         Dokumente werden geladen...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: "40px 48px", textAlign: "center", fontFamily: T.sans }}>
+        <div style={{ fontSize: 14, color: T.ink3, marginBottom: 12 }}>Dokumente konnten nicht geladen werden.</div>
+        <button
+          onClick={load}
+          style={{
+            padding: "8px 20px",
+            borderRadius: 8,
+            border: `1px solid ${T.border}`,
+            background: "#fff",
+            color: T.ink,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: T.sans,
+          }}
+        >
+          Erneut versuchen
+        </button>
       </div>
     );
   }

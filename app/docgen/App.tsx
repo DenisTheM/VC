@@ -38,13 +38,13 @@ function DocGenInner() {
 
   // Load organizations + dashboard stats in parallel on mount
   useEffect(() => {
-    Promise.all([loadOrganizations(), loadDashboardStats()]).then(
-      ([orgs, stats]) => {
+    Promise.all([loadOrganizations(), loadDashboardStats()])
+      .then(([orgs, stats]) => {
         setOrganizations(orgs);
         setDashStats(stats);
-        setProfileLoaded(true);
-      },
-    );
+      })
+      .catch((err) => console.error("Failed to load initial data:", err))
+      .finally(() => setProfileLoaded(true));
   }, []);
 
   // Save company profile to Supabase
@@ -181,7 +181,7 @@ function DocGenInner() {
         </div>
       </div>
       <button
-        onClick={() => signOut().then(() => (window.location.href = "/app/login"))}
+        onClick={() => signOut().catch(() => {}).finally(() => (window.location.href = "/app/login"))}
         style={{
           width: "100%",
           display: "flex",

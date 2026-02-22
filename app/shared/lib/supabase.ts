@@ -10,4 +10,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: { params: { eventsPerSecond: 0 } },
   auth: { persistSession: true, autoRefreshToken: true },
+  global: {
+    fetch: (url, options) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      return fetch(url, { ...options, signal: controller.signal }).finally(() =>
+        clearTimeout(timeout),
+      );
+    },
+  },
 });

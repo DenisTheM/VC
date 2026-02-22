@@ -38,6 +38,7 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
   const [draftAlerts, setDraftAlerts] = useState<DbAlert[]>([]);
   const [dismissedAlerts, setDismissedAlerts] = useState<DbAlert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState<DbAlert | null>(null);
   const [filterJuris, setFilterJuris] = useState<string | null>(null);
   const [draftDetail, setDraftDetail] = useState<DbAlert | null>(null);
@@ -46,6 +47,7 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
 
   const reload = async () => {
     setLoading(true);
+    setError(false);
     try {
       const [active, drafts, dismissed] = await Promise.all([
         loadAlerts(),
@@ -57,6 +59,7 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
       setDismissedAlerts(dismissed);
     } catch (err) {
       console.error("Failed to load alerts:", err);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -82,6 +85,30 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
     return (
       <div style={{ padding: 40, textAlign: "center", color: T.ink3, fontFamily: T.sans }}>
         Alerts werden geladen...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", fontFamily: T.sans }}>
+        <div style={{ fontSize: 14, color: T.ink3, marginBottom: 12 }}>Alerts konnten nicht geladen werden.</div>
+        <button
+          onClick={reload}
+          style={{
+            padding: "8px 20px",
+            borderRadius: 8,
+            border: `1px solid ${T.border}`,
+            background: "#fff",
+            color: T.ink,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: T.sans,
+          }}
+        >
+          Erneut versuchen
+        </button>
       </div>
     );
   }

@@ -12,17 +12,25 @@ interface ClientAlertsProps {
 export function ClientAlerts({ org }: ClientAlertsProps) {
   const [alerts, setAlerts] = useState<PortalAlert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [selected, setSelected] = useState<PortalAlert | null>(null);
 
   const orgShort = org?.short_name || org?.name || "Ihr Unternehmen";
 
-  useEffect(() => {
+  const load = () => {
     if (!org) return;
+    setLoading(true);
+    setError(false);
     loadClientAlerts(org.id)
       .then(setAlerts)
-      .catch((err) => console.error("Failed to load client alerts:", err))
+      .catch((err) => {
+        console.error("Failed to load client alerts:", err);
+        setError(true);
+      })
       .finally(() => setLoading(false));
-  }, [org]);
+  };
+
+  useEffect(() => { load(); }, [org]);
 
   const criticalCount = alerts.filter((a) => a.severity === "critical").length;
   const highCount = alerts.filter((a) => a.severity === "high").length;
@@ -32,6 +40,30 @@ export function ClientAlerts({ org }: ClientAlertsProps) {
     return (
       <div style={{ padding: "40px 48px", textAlign: "center", color: T.ink3, fontFamily: T.sans }}>
         Meldungen werden geladen...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: "40px 48px", textAlign: "center", fontFamily: T.sans }}>
+        <div style={{ fontSize: 14, color: T.ink3, marginBottom: 12 }}>Meldungen konnten nicht geladen werden.</div>
+        <button
+          onClick={load}
+          style={{
+            padding: "8px 20px",
+            borderRadius: 8,
+            border: `1px solid ${T.border}`,
+            background: "#fff",
+            color: T.ink,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: T.sans,
+          }}
+        >
+          Erneut versuchen
+        </button>
       </div>
     );
   }

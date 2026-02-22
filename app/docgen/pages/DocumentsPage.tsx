@@ -15,14 +15,22 @@ const STATUS_COLORS: Record<string, { bg: string; color: string; label: string }
 export function DocumentsPage() {
   const [documents, setDocuments] = useState<DbDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
+    setError(false);
     loadDocuments()
       .then(setDocuments)
-      .catch((err) => console.error("Failed to load documents:", err))
+      .catch((err) => {
+        console.error("Failed to load documents:", err);
+        setError(true);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { load(); }, []);
 
   return (
     <div>
@@ -37,6 +45,26 @@ export function DocumentsPage() {
       {loading ? (
         <div style={{ padding: 40, textAlign: "center", color: T.ink3, fontFamily: T.sans }}>
           Dokumente werden geladen...
+        </div>
+      ) : error ? (
+        <div style={{ padding: 40, textAlign: "center", fontFamily: T.sans }}>
+          <div style={{ fontSize: 14, color: T.ink3, marginBottom: 12 }}>Dokumente konnten nicht geladen werden.</div>
+          <button
+            onClick={load}
+            style={{
+              padding: "8px 20px",
+              borderRadius: 8,
+              border: `1px solid ${T.border}`,
+              background: "#fff",
+              color: T.ink,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: T.sans,
+            }}
+          >
+            Erneut versuchen
+          </button>
         </div>
       ) : documents.length === 0 ? (
         <div
