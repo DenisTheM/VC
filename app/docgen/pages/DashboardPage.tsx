@@ -203,7 +203,7 @@ export function DashboardPage({ onNav, profile, profOk }: DashboardPageProps) {
               Neues Dokument generieren
             </div>
             <p style={{ fontSize: 13, opacity: 0.8, fontFamily: T.sans, margin: "0 0 18px", lineHeight: 1.5 }}>
-              Elena erstellt regulatorisch konforme Compliance-Dokumente in wenigen Minuten.
+              Wählen Sie einen Kunden und Dokumenttyp — Elena erstellt das massgeschneiderte Compliance-Dokument.
             </p>
             <button
               onClick={() => onNav("generate")}
@@ -242,25 +242,34 @@ export function DashboardPage({ onNav, profile, profOk }: DashboardPageProps) {
             </div>
             {[
               {
-                step: "A",
-                title: "Firmenprofil",
-                desc: "Einmalig Ihre Unternehmensdaten erfassen — Elena kennt Ihren regulatorischen Kontext.",
+                step: "1",
+                title: "Kundenprofil anlegen",
+                desc: "Erfassen Sie die Unternehmensdaten Ihres Kunden — Rechtsform, Branche, SRO und regulatorischen Kontext.",
                 color: T.primary,
+                nav: "organizations",
               },
               {
-                step: "B",
-                title: "Dokument-Fragen",
-                desc: "Pro Dokument wenige spezifische Fragen beantworten — Elena kennt die relevanten Vorschriften.",
+                step: "2",
+                title: "Dokumentspezifische Angaben",
+                desc: "Beantworten Sie wenige Fragen zum gewünschten Dokument — Elena kennt die relevanten Rechtsgrundlagen.",
                 color: T.accent,
+                nav: "generate",
               },
               {
-                step: "C",
-                title: "Generierung",
-                desc: "Elena erstellt Ihr Dokument mit korrekten Rechtsverweisen und Ihrer Firmenidentität.",
+                step: "3",
+                title: "Dokument generieren",
+                desc: "Elena erstellt das Compliance-Dokument mit korrekten Rechtsverweisen, massgeschneidert auf den Kunden.",
                 color: T.amber,
+                nav: "documents",
               },
             ].map((item) => (
-              <div key={item.step} style={{ display: "flex", gap: 14, marginBottom: 16 }}>
+              <div
+                key={item.step}
+                onClick={() => onNav(item.nav)}
+                style={{ display: "flex", gap: 14, marginBottom: 16, cursor: "pointer", borderRadius: 8, padding: "6px 8px", margin: "0 -8px 10px", transition: "background 0.15s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = T.s1; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
                 <div
                   style={{
                     width: 30,
@@ -286,6 +295,9 @@ export function DashboardPage({ onNav, profile, profOk }: DashboardPageProps) {
                   <div style={{ fontSize: 12.5, color: T.ink3, fontFamily: T.sans, lineHeight: 1.45 }}>
                     {item.desc}
                   </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                  <Icon d={icons.arrow} size={13} color={T.ink4} />
                 </div>
               </div>
             ))}
