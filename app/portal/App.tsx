@@ -3,6 +3,7 @@ import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { AuthGuard } from "@shared/components/AuthGuard";
 import { useAuthContext } from "@shared/components/AuthContext";
+import { usePageNav } from "@shared/hooks/usePageNav";
 import { signOut } from "@shared/lib/auth";
 import { loadUserOrganization, type ClientOrg } from "./lib/api";
 
@@ -283,7 +284,7 @@ function ClientSidebar({
 
 function PortalContent() {
   const { user } = useAuthContext();
-  const [page, setPage] = useState("dashboard");
+  const [page, setPage] = usePageNav("dashboard");
   const [org, setOrg] = useState<ClientOrg | null>(null);
 
   useEffect(() => {

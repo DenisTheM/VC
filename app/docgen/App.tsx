@@ -4,6 +4,7 @@ import { icons } from "@shared/components/Icon";
 import { Sidebar } from "@shared/components/Sidebar";
 import { AuthGuard } from "@shared/components/AuthGuard";
 import { useAuthContext } from "@shared/components/AuthContext";
+import { usePageNav } from "@shared/hooks/usePageNav";
 import { signOut } from "@shared/lib/auth";
 import { PROFILE_FIELDS } from "./data/profileFields";
 import { loadOrganizations, loadCompanyProfile, saveCompanyProfile, type Organization, type ZefixResult } from "./lib/api";
@@ -19,7 +20,7 @@ function DocGenInner() {
   const { user, profile: authProfile } = useAuthContext();
   const displayName = authProfile.full_name || "User";
   const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-  const [page, setPage] = useState("dashboard");
+  const [page, setPage] = usePageNav("dashboard");
   const [orgId, setOrgId] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
