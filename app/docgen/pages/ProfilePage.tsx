@@ -143,7 +143,7 @@ export function ProfilePage({ profile, setProfile, onSave, saving, orgId, orgNam
         dirtyRef.current = false;
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus((s) => s === "saved" ? "idle" : s), 3000);
-      } catch {
+      } catch (_e) {
         setSaveStatus("error");
       }
     }, 2000);
@@ -158,7 +158,7 @@ export function ProfilePage({ profile, setProfile, onSave, saving, orgId, orgNam
       dirtyRef.current = false;
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus((s) => s === "saved" ? "idle" : s), 3000);
-    } catch {
+    } catch (_e) {
       setSaveStatus("error");
     }
   };
