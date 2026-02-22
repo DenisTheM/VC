@@ -288,6 +288,7 @@ function PortalContent() {
   const { user } = useAuthContext();
   const [page, setPage] = usePageNav("dashboard");
   const [org, setOrg] = useState<ClientOrg | null>(null);
+  const [pendingAlertId, setPendingAlertId] = useState<string | null>(null);
 
   useEffect(() => {
     loadUserOrganization(user.id)
@@ -295,13 +296,23 @@ function PortalContent() {
       .catch((err) => console.error("Failed to load organization:", err));
   }, [user.id]);
 
+  const handleNav = (id: string) => {
+    if (id !== "alerts") setPendingAlertId(null);
+    setPage(id);
+  };
+
+  const handleAlertNav = (alertId: string) => {
+    setPendingAlertId(alertId);
+    setPage("alerts");
+  };
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: T.s1, fontFamily: T.sans }}>
-      <ClientSidebar active={page} onNav={setPage} org={org} />
+      <ClientSidebar active={page} onNav={handleNav} org={org} />
       <div style={{ flex: 1, overflow: "auto" }}>
         <Suspense fallback={<div style={{ padding: 40, color: T.ink3, fontFamily: T.sans }}>Laden...</div>}>
-          {page === "dashboard" && <ClientDashboard onNav={setPage} org={org} />}
-          {page === "alerts" && <ClientAlerts org={org} />}
+          {page === "dashboard" && <ClientDashboard onNav={handleNav} onAlertNav={handleAlertNav} org={org} />}
+          {page === "alerts" && <ClientAlerts org={org} initialAlertId={pendingAlertId} onAlertConsumed={() => setPendingAlertId(null)} />}
           {page === "docs" && <ClientDocs org={org} />}
         </Suspense>
       </div>

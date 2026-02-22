@@ -7,13 +7,27 @@ import { loadClientAlerts, updateClientActionStatus, type ClientOrg, type Portal
 
 interface ClientAlertsProps {
   org: ClientOrg | null;
+  initialAlertId?: string | null;
+  onAlertConsumed?: () => void;
 }
 
-export function ClientAlerts({ org }: ClientAlertsProps) {
+type SeverityFilter = "all" | PortalAlert["severity"];
+
+const SEVERITY_FILTERS: { key: SeverityFilter; label: string }[] = [
+  { key: "all", label: "Alle" },
+  { key: "critical", label: "Kritisch" },
+  { key: "high", label: "Hoch" },
+  { key: "medium", label: "Mittel" },
+  { key: "info", label: "Info" },
+];
+
+export function ClientAlerts({ org, initialAlertId, onAlertConsumed }: ClientAlertsProps) {
   const [alerts, setAlerts] = useState<PortalAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<PortalAlert | null>(null);
+  const [activeSeverity, setActiveSeverity] = useState<SeverityFilter>("all");
+  const [showNewOnly, setShowNewOnly] = useState(false);
 
   const orgShort = org?.short_name || org?.name || "Ihr Unternehmen";
 
@@ -31,6 +45,17 @@ export function ClientAlerts({ org }: ClientAlertsProps) {
   };
 
   useEffect(() => { load(); }, [org]);
+
+  // Deep-link: auto-select alert when navigated from dashboard
+  useEffect(() => {
+    if (initialAlertId && alerts.length > 0 && !selected) {
+      const match = alerts.find((a) => a.id === initialAlertId);
+      if (match) {
+        setSelected(match);
+        onAlertConsumed?.();
+      }
+    }
+  }, [initialAlertId, alerts]);
 
   const criticalCount = alerts.filter((a) => a.severity === "critical").length;
   const highCount = alerts.filter((a) => a.severity === "high").length;
@@ -106,15 +131,10 @@ export function ClientAlerts({ org }: ClientAlertsProps) {
         Von Elena Hartmann aufbereitete regulatorische Updates mit Einschätzung der Relevanz für {orgShort}.
       </p>
 
-      {/* Summary stats bar */}
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          marginBottom: 24,
-        }}
-      >
+      {/* Summary stats bar — clickable quick-filters */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
         <div
+          onClick={() => setActiveSeverity(activeSeverity === "critical" ? "all" : "critical")}
           style={{
             background: "#fef2f2",
             borderRadius: T.r,
@@ -122,6 +142,10 @@ export function ClientAlerts({ org }: ClientAlertsProps) {
             display: "flex",
             alignItems: "center",
             gap: 8,
+            cursor: "pointer",
+            border: `1.5px solid ${activeSeverity === "critical" ? "#dc2626" : "transparent"}`,
+            boxShadow: activeSeverity === "critical" ? "0 0 0 2px #dc262622" : "none",
+            transition: "all 0.15s ease",
           }}
         >
           <span style={{ fontSize: 18, fontWeight: 700, color: "#dc2626", fontFamily: T.sans }}>
@@ -130,6 +154,7 @@ export function ClientAlerts({ org }: ClientAlertsProps) {
           <span style={{ fontSize: 12, color: "#dc2626", fontFamily: T.sans, fontWeight: 500 }}>Kritisch</span>
         </div>
         <div
+          onClick={() => setActiveSeverity(activeSeverity === "high" ? "all" : "high")}
           style={{
             background: "#fffbeb",
             borderRadius: T.r,
@@ -137,6 +162,10 @@ export function ClientAlerts({ org }: ClientAlertsProps) {
             display: "flex",
             alignItems: "center",
             gap: 8,
+            cursor: "pointer",
+            border: `1.5px solid ${activeSeverity === "high" ? "#d97706" : "transparent"}`,
+            boxShadow: activeSeverity === "high" ? "0 0 0 2px #d9770622" : "none",
+            transition: "all 0.15s ease",
           }}
         >
           <span style={{ fontSize: 18, fontWeight: 700, color: "#d97706", fontFamily: T.sans }}>
@@ -145,6 +174,7 @@ export function ClientAlerts({ org }: ClientAlertsProps) {
           <span style={{ fontSize: 12, color: "#d97706", fontFamily: T.sans, fontWeight: 500 }}>Hoch</span>
         </div>
         <div
+          onClick={() => setShowNewOnly(!showNewOnly)}
           style={{
             background: T.accentS,
             borderRadius: T.r,
@@ -152,6 +182,10 @@ export function ClientAlerts({ org }: ClientAlertsProps) {
             display: "flex",
             alignItems: "center",
             gap: 8,
+            cursor: "pointer",
+            border: `1.5px solid ${showNewOnly ? T.accent : "transparent"}`,
+            boxShadow: showNewOnly ? `0 0 0 2px ${T.accent}22` : "none",
+            transition: "all 0.15s ease",
           }}
         >
           <span style={{ fontSize: 18, fontWeight: 700, color: T.accent, fontFamily: T.sans }}>
@@ -161,14 +195,106 @@ export function ClientAlerts({ org }: ClientAlertsProps) {
         </div>
       </div>
 
-      {/* Alert cards */}
-      {alerts.length === 0 ? (
-        <div style={{ padding: 40, textAlign: "center", color: T.ink3, fontFamily: T.sans }}>
-          Keine Meldungen vorhanden.
+      {/* Severity filter pills */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: T.ink4, fontFamily: T.sans, textTransform: "uppercase", letterSpacing: "0.5px", minWidth: 52 }}>
+          Stufe
+        </span>
+        <div style={{ display: "flex", gap: 4 }}>
+          {SEVERITY_FILTERS.map((f) => {
+            const isActive = activeSeverity === f.key;
+            const count = f.key === "all" ? alerts.length : alerts.filter((a) => a.severity === f.key).length;
+            return (
+              <button
+                key={f.key}
+                onClick={() => setActiveSeverity(isActive && f.key !== "all" ? "all" : f.key)}
+                style={{
+                  background: isActive ? T.primaryDeep : "#fff",
+                  color: isActive ? "#fff" : T.ink3,
+                  border: `1px solid ${isActive ? T.primaryDeep : T.border}`,
+                  borderRadius: 8,
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  fontFamily: T.sans,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  transition: "all 0.15s ease",
+                  whiteSpace: "nowrap" as const,
+                }}
+              >
+                {f.label}
+                {f.key !== "all" && (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      background: isActive ? "rgba(255,255,255,0.2)" : T.s2,
+                      color: isActive ? "rgba(255,255,255,0.85)" : T.ink4,
+                      borderRadius: 4,
+                      padding: "1px 5px",
+                      minWidth: 18,
+                      textAlign: "center" as const,
+                    }}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {alerts.map((alert) => {
+      </div>
+
+      {/* Active filter summary */}
+      {(() => {
+        const filteredAlerts = alerts.filter((a) => {
+          const matchSev = activeSeverity === "all" || a.severity === activeSeverity;
+          const matchNew = !showNewOnly || a.isNew;
+          return matchSev && matchNew;
+        });
+
+        if (filteredAlerts.length === 0 && alerts.length > 0) {
+          return (
+            <div style={{ padding: "40px 0", textAlign: "center", fontFamily: T.sans }}>
+              <div style={{ fontSize: 14, color: T.ink3, marginBottom: 8 }}>Keine Meldungen für diesen Filter.</div>
+              <button
+                onClick={() => { setActiveSeverity("all"); setShowNewOnly(false); }}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: T.accent, fontWeight: 600, fontFamily: T.sans }}
+              >
+                Filter zurücksetzen
+              </button>
+            </div>
+          );
+        }
+
+        if (alerts.length === 0) {
+          return (
+            <div style={{ padding: 40, textAlign: "center", color: T.ink3, fontFamily: T.sans }}>
+              Keine Meldungen vorhanden.
+            </div>
+          );
+        }
+
+        return (
+          <>
+            {(activeSeverity !== "all" || showNewOnly) && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                <span style={{ fontSize: 12, color: T.ink3, fontFamily: T.sans }}>
+                  {filteredAlerts.length} {filteredAlerts.length === 1 ? "Meldung" : "Meldungen"} gefunden
+                </span>
+                <button
+                  onClick={() => { setActiveSeverity("all"); setShowNewOnly(false); }}
+                  style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: T.accent, fontWeight: 600, fontFamily: T.sans, padding: 0 }}
+                >
+                  Filter zurücksetzen
+                </button>
+              </div>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {filteredAlerts.map((alert) => {
             const sev = SEV[alert.severity] ?? SEV.info;
             const imp = IMPACT[alert.impact] ?? IMPACT.medium;
 
@@ -331,8 +457,10 @@ export function ClientAlerts({ org }: ClientAlertsProps) {
               </div>
             );
           })}
-        </div>
-      )}
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }

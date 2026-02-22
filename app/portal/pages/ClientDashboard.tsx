@@ -8,10 +8,11 @@ import { loadClientAlerts, loadPortalStats, type ClientOrg, type PortalAlert } f
 
 interface ClientDashboardProps {
   onNav: (id: string) => void;
+  onAlertNav: (alertId: string) => void;
   org: ClientOrg | null;
 }
 
-export function ClientDashboard({ onNav, org }: ClientDashboardProps) {
+export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps) {
   const { profile: authProfile } = useAuthContext();
   const firstName = authProfile.full_name?.split(" ")[0] || "User";
   const orgShort = org?.short_name || org?.name || "Ihr Unternehmen";
@@ -71,7 +72,7 @@ export function ClientDashboard({ onNav, org }: ClientDashboardProps) {
       {/* Critical alert banner */}
       {criticalAlert && (
         <div
-          onClick={() => onNav("alerts")}
+          onClick={() => onAlertNav(criticalAlert.id)}
           style={{
             background: "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)",
             borderRadius: T.rLg,
@@ -116,13 +117,18 @@ export function ClientDashboard({ onNav, org }: ClientDashboardProps) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 36 }}>
         {/* Neue Updates */}
         <div
+          onClick={() => onNav("alerts")}
           style={{
             background: "#fff",
             borderRadius: T.rLg,
             padding: "22px 24px",
             border: `1px solid ${T.border}`,
             boxShadow: T.shSm,
+            cursor: "pointer",
+            transition: "box-shadow 0.15s, transform 0.15s",
           }}
+          onMouseOver={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shMd; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)"; }}
+          onMouseOut={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shSm; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <div
@@ -150,13 +156,18 @@ export function ClientDashboard({ onNav, org }: ClientDashboardProps) {
 
         {/* Offene Massnahmen */}
         <div
+          onClick={() => onNav("alerts")}
           style={{
             background: "#fff",
             borderRadius: T.rLg,
             padding: "22px 24px",
             border: `1px solid ${T.border}`,
             boxShadow: T.shSm,
+            cursor: "pointer",
+            transition: "box-shadow 0.15s, transform 0.15s",
           }}
+          onMouseOver={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shMd; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)"; }}
+          onMouseOut={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shSm; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <div
@@ -184,13 +195,18 @@ export function ClientDashboard({ onNav, org }: ClientDashboardProps) {
 
         {/* Compliance Status */}
         <div
+          onClick={() => onNav("docs")}
           style={{
             background: "#fff",
             borderRadius: T.rLg,
             padding: "22px 24px",
             border: `1px solid ${T.border}`,
             boxShadow: T.shSm,
+            cursor: "pointer",
+            transition: "box-shadow 0.15s, transform 0.15s",
           }}
+          onMouseOver={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shMd; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)"; }}
+          onMouseOut={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shSm; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <div
@@ -249,7 +265,7 @@ export function ClientDashboard({ onNav, org }: ClientDashboardProps) {
               return (
                 <div
                   key={alert.id}
-                  onClick={() => onNav("alerts")}
+                  onClick={() => onAlertNav(alert.id)}
                   style={{
                     background: "#fff",
                     borderRadius: T.r,
