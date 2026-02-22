@@ -42,6 +42,7 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
   const [filterJuris, setFilterJuris] = useState<string | null>(null);
   const [draftDetail, setDraftDetail] = useState<DbAlert | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterSeverity, setFilterSeverity] = useState<string | null>(null);
 
   const reload = async () => {
     setLoading(true);
@@ -119,12 +120,13 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
 
   const filtered = alerts.filter((a) => {
     const matchesJuris = !filterJuris || a.jurisdiction === filterJuris;
+    const matchesSeverity = !filterSeverity || a.severity === filterSeverity;
     const matchesSearch =
       !searchTerm ||
       a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (a.category || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (a.source || "").toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesJuris && matchesSearch;
+    return matchesJuris && matchesSeverity && matchesSearch;
   });
 
   const severityCounts = {
@@ -222,31 +224,38 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
       {/* Active Tab */}
       {activeTab === "active" && (
         <>
-          {/* Severity stats */}
+          {/* Severity stats — clickable filter */}
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
             {(Object.entries(SEVERITY_CFG) as [keyof typeof SEVERITY_CFG, (typeof SEVERITY_CFG)[keyof typeof SEVERITY_CFG]][]).map(
-              ([key, cfg]) => (
-                <div
-                  key={key}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "8px 16px",
-                    borderRadius: T.r,
-                    background: cfg.bg,
-                    border: `1px solid ${cfg.border}`,
-                  }}
-                >
-                  <span style={{ fontSize: 14 }}>{cfg.icon}</span>
-                  <span style={{ fontSize: 12.5, fontWeight: 600, color: cfg.color, fontFamily: T.sans }}>
-                    {severityCounts[key]}
-                  </span>
-                  <span style={{ fontSize: 12, color: cfg.color, fontFamily: T.sans, opacity: 0.8 }}>
-                    {cfg.label}
-                  </span>
-                </div>
-              ),
+              ([key, cfg]) => {
+                const isActive = filterSeverity === key;
+                return (
+                  <div
+                    key={key}
+                    onClick={() => setFilterSeverity(isActive ? null : key)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 16px",
+                      borderRadius: T.r,
+                      background: cfg.bg,
+                      border: `2px solid ${isActive ? cfg.color : cfg.border}`,
+                      cursor: "pointer",
+                      opacity: filterSeverity && !isActive ? 0.5 : 1,
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    <span style={{ fontSize: 14 }}>{cfg.icon}</span>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: cfg.color, fontFamily: T.sans }}>
+                      {severityCounts[key]}
+                    </span>
+                    <span style={{ fontSize: 12, color: cfg.color, fontFamily: T.sans, opacity: 0.8 }}>
+                      {cfg.label}
+                    </span>
+                  </div>
+                );
+              },
             )}
           </div>
 

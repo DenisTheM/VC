@@ -341,7 +341,8 @@ export async function createAlert(data: {
   deadline?: string;
   elena_comment?: string;
 }): Promise<DbAlert> {
-  const { data: alert, error } = await supabase
+  // Step 1: Insert and get the new row's id
+  const { data: inserted, error: insertErr } = await supabase
     .from("regulatory_alerts")
     .insert({
       ...data,
@@ -349,14 +350,23 @@ export async function createAlert(data: {
       jurisdiction: data.jurisdiction || "CH",
       severity: data.severity || "medium",
     })
+    .select("id")
+    .single();
+
+  if (insertErr) throw insertErr;
+
+  // Step 2: Load full alert with joins
+  const { data: alert, error: loadErr } = await supabase
+    .from("regulatory_alerts")
     .select(`
       *,
       action_items:alert_action_items(*),
       affected_clients:alert_affected_clients(*, organizations(name))
     `)
+    .eq("id", inserted.id)
     .single();
 
-  if (error) throw error;
+  if (loadErr) throw loadErr;
   return alert as unknown as DbAlert;
 }
 
