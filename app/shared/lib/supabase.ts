@@ -13,7 +13,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     fetch: (url, options) => {
       const controller = new AbortController();
-      const ms = options?.method === "POST" || options?.method === "PATCH" || options?.method === "DELETE" ? 30000 : 15000;
+      const isLongRunning = typeof url === "string" && url.includes("/functions/v1/generate-document");
+      const ms = isLongRunning ? 180000 : (options?.method === "POST" || options?.method === "PATCH" || options?.method === "DELETE" ? 30000 : 15000);
       const timeout = setTimeout(() => controller.abort(), ms);
       return fetch(url, { ...options, signal: controller.signal }).finally(() =>
         clearTimeout(timeout),

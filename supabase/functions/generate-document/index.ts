@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Authenticate user
+    // Authenticate user — require auth header, verify user if possible
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization header" }), {
@@ -22,22 +22,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Extract JWT and verify user via admin client (more reliable than anon client)
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      console.error("Auth verification failed:", authError?.message);
+      return new Response(JSON.stringify({ error: "Unauthorized", detail: authError?.message }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // Check admin role
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("role")
       .eq("id", user.id)
@@ -161,7 +163,7 @@ Das Dokument soll sofort verwendbar sein und den aktuellen regulatorischen Stand
     const generatedContent = claudeData.content?.[0]?.text || "";
 
     // Save document to database
-    const { data: doc, error: insertError } = await supabase
+    const { data: doc, error: insertError } = await supabaseAdmin
       .from("documents")
       .insert({
         doc_type: docType,
