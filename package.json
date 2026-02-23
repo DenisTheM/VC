@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
+    "@types/diff": "^7.0.2",
+    "diff": "^8.0.3",
     "jspdf": "^4.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

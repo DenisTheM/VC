@@ -682,6 +682,27 @@ export async function searchZefix(query: string): Promise<ZefixResponse> {
   return data as ZefixResponse;
 }
 
+// ─── Document Versions ──────────────────────────────────────────────
+
+export interface DocVersion {
+  id: string;
+  version: string;
+  name: string;
+  content: string | null;
+  created_at: string;
+}
+
+export async function loadDocumentVersions(docId: string): Promise<DocVersion[]> {
+  const { data, error } = await supabase
+    .from("document_versions")
+    .select("id, version, name, content, created_at")
+    .eq("document_id", docId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as DocVersion[];
+}
+
 // ─── Document Audit Log ─────────────────────────────────────────────
 
 export interface AuditEntry {

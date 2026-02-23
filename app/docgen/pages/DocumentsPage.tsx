@@ -6,13 +6,16 @@ import { DOC_TYPES } from "../data/docTypes";
 import {
   loadDocuments,
   loadDocumentAuditLog,
+  loadDocumentVersions,
   updateDocumentStatus,
   bulkUpdateDocumentStatus,
   type DbDocument,
   type AuditEntry,
+  type DocVersion,
   type Organization,
 } from "../lib/api";
 import { exportDocumentAsPdf } from "@shared/lib/pdfExport";
+import { VersionHistory } from "@shared/components/VersionHistory";
 
 const STATUS_COLORS: Record<string, { bg: string; color: string; label: string }> = {
   draft: { bg: T.s2, color: T.ink3, label: "Entwurf" },
@@ -436,6 +439,16 @@ function DocDetailView({
   const fmt = FORMAT_COLORS[doc.format] ?? FORMAT_COLORS.DOCX;
   const date = new Date(doc.updated_at).toLocaleDateString("de-CH", { day: "numeric", month: "short", year: "numeric" });
   const [changingStatus, setChangingStatus] = useState(false);
+  const [versions, setVersions] = useState<DocVersion[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(true);
+
+  useEffect(() => {
+    setVersionsLoading(true);
+    loadDocumentVersions(doc.id)
+      .then(setVersions)
+      .catch((err) => console.error("Failed to load versions:", err))
+      .finally(() => setVersionsLoading(false));
+  }, [doc.id]);
 
   const handleStatusChange = async (newStatus: DbDocument["status"]) => {
     setChangingStatus(true);
@@ -596,6 +609,14 @@ function DocDetailView({
 
       {/* Audit Timeline */}
       <AdminAuditTimeline docId={doc.id} />
+
+      {/* Version History */}
+      <VersionHistory
+        versions={versions}
+        currentContent={doc.content}
+        currentVersion={doc.version}
+        loading={versionsLoading}
+      />
     </div>
   );
 }

@@ -3,7 +3,8 @@ import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import { DOC_STATUS, FORMAT_COLORS, SEV } from "../data/clientData";
-import { loadClientDocuments, approveDocument, loadDocumentAuditLog, loadDocAlerts, type ClientOrg, type PortalDoc, type AuditEntry, type LinkedAlert } from "../lib/api";
+import { loadClientDocuments, approveDocument, loadDocumentAuditLog, loadDocAlerts, loadDocumentVersions, type ClientOrg, type PortalDoc, type AuditEntry, type LinkedAlert, type DocVersion } from "../lib/api";
+import { VersionHistory } from "@shared/components/VersionHistory";
 import { exportDocumentAsPdf } from "@shared/lib/pdfExport";
 
 interface ClientDocsProps {
@@ -621,6 +622,17 @@ function DocDetail({
   const st = DOC_STATUS[doc.status] ?? DOC_STATUS.draft;
   const fmt = FORMAT_COLORS[doc.format] ?? FORMAT_COLORS.DOCX;
 
+  const [versions, setVersions] = useState<DocVersion[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(true);
+
+  useEffect(() => {
+    setVersionsLoading(true);
+    loadDocumentVersions(doc.id)
+      .then(setVersions)
+      .catch((err) => console.error("Failed to load versions:", err))
+      .finally(() => setVersionsLoading(false));
+  }, [doc.id]);
+
   return (
     <div style={{ padding: "40px 48px", maxWidth: 960 }}>
       {/* Back button */}
@@ -773,6 +785,14 @@ function DocDetail({
 
       {/* Audit Trail */}
       <AuditTimeline docId={doc.id} />
+
+      {/* Version History */}
+      <VersionHistory
+        versions={versions}
+        currentContent={doc.content}
+        currentVersion={doc.version}
+        loading={versionsLoading}
+      />
 
       {/* Document Preview */}
       {doc.content && <DocPreview doc={doc} orgName={org?.name || undefined} />}
