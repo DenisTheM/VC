@@ -62,43 +62,149 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
     }
   };
 
-  const renderText = (text: string, fontSize: number, style: "normal" | "bold" | "italic" = "normal", extraSpaceBefore = 0) => {
+  // ── Rich text: render inline **bold** and *italic* segments ──
+  const renderRichLine = (text: string, fontSize: number, startX: number, availWidth: number) => {
     doc.setFontSize(fontSize);
-    doc.setFont("helvetica", style);
-    doc.setTextColor(17, 24, 39);
+    const lh = fontSize * 0.55;
 
-    const lines = doc.splitTextToSize(text, maxWidth);
-    const lh = fontSize * 0.45;
-
-    y += extraSpaceBefore;
-    for (const line of lines) {
-      ensureSpace(lh);
-      doc.text(line, MARGIN_LEFT, y);
-      y += lh;
+    // Split text into segments: { text, style }
+    const segments: { text: string; style: "normal" | "bold" | "italic" }[] = [];
+    const regex = /\*\*(.+?)\*\*|__(.+?)__|\*(.+?)\*|_(.+?)_/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push({ text: text.slice(lastIndex, match.index), style: "normal" });
+      }
+      if (match[1] || match[2]) {
+        segments.push({ text: match[1] || match[2], style: "bold" });
+      } else {
+        segments.push({ text: match[3] || match[4], style: "italic" });
+      }
+      lastIndex = regex.lastIndex;
     }
-    y += 1;
+    if (lastIndex < text.length) {
+      segments.push({ text: text.slice(lastIndex), style: "normal" });
+    }
+    if (segments.length === 0) {
+      segments.push({ text, style: "normal" });
+    }
+
+    // Word-wrap and render segments
+    let x = startX;
+    let lineStarted = false;
+    for (const seg of segments) {
+      doc.setFont("helvetica", seg.style);
+      const words = seg.text.split(/( +)/);
+      for (const word of words) {
+        if (word === "") continue;
+        const wordWidth = doc.getTextWidth(word);
+        if (lineStarted && x + wordWidth > startX + availWidth) {
+          // Wrap to next line
+          y += lh;
+          ensureSpace(lh);
+          x = startX;
+          lineStarted = false;
+        }
+        if (!lineStarted) {
+          ensureSpace(lh);
+          lineStarted = true;
+        }
+        doc.text(word, x, y);
+        x += wordWidth;
+      }
+    }
+    y += lh;
+    // Reset to normal after rich line
+    doc.setFont("helvetica", "normal");
   };
 
-  const renderListItem = (text: string, indent = 0) => {
+  const renderText = (text: string, fontSize: number, style: "normal" | "bold" | "italic" = "normal", extraSpaceBefore = 0) => {
+    doc.setFontSize(fontSize);
+    doc.setTextColor(17, 24, 39);
+
+    y += extraSpaceBefore;
+
+    // For headings and explicitly styled text, use simple rendering
+    if (style !== "normal") {
+      doc.setFont("helvetica", style);
+      const lines = doc.splitTextToSize(text, maxWidth);
+      const lh = fontSize * 0.55;
+      for (const line of lines) {
+        ensureSpace(lh);
+        doc.text(line, MARGIN_LEFT, y);
+        y += lh;
+      }
+    } else {
+      // For body text, use rich rendering for inline bold/italic
+      renderRichLine(text, fontSize, MARGIN_LEFT, maxWidth);
+    }
+    y += 3;
+  };
+
+  const renderListItem = (text: string, indent = 0, bullet = "\u2022") => {
     doc.setFontSize(FONT_SIZE_BODY);
-    doc.setFont("helvetica", "normal");
     doc.setTextColor(17, 24, 39);
 
     const bulletX = MARGIN_LEFT + indent;
     const textX = bulletX + 5;
     const textWidth = maxWidth - indent - 5;
-
-    const lines = doc.splitTextToSize(text, textWidth);
-    const lh = FONT_SIZE_BODY * 0.45;
+    const lh = FONT_SIZE_BODY * 0.55;
 
     ensureSpace(lh);
-    doc.text("\u2022", bulletX, y);
-    for (const line of lines) {
-      ensureSpace(lh);
-      doc.text(line, textX, y);
-      y += lh;
-    }
+    doc.setFont("helvetica", "normal");
+    doc.text(bullet, bulletX, y);
+    renderRichLine(text, FONT_SIZE_BODY, textX, textWidth);
     y += 1;
+  };
+
+  // ── Table rendering ──
+  const renderTable = (tableLines: string[]) => {
+    // Parse header and data rows
+    const rows = tableLines
+      .filter((l) => !/^\s*\|[\s\-:|]+\|\s*$/.test(l)) // skip separator rows
+      .map((l) =>
+        l.split("|").slice(1, -1).map((cell) => cell.trim())
+      );
+    if (rows.length === 0) return;
+
+    const numCols = rows[0].length;
+    if (numCols === 0) return;
+    const colWidth = maxWidth / numCols;
+    const cellPad = 2;
+    const rowHeight = FONT_SIZE_BODY * 0.55 + 3;
+
+    doc.setFontSize(FONT_SIZE_BODY);
+
+    for (let r = 0; r < rows.length; r++) {
+      ensureSpace(rowHeight + 2);
+      const isHeader = r === 0;
+
+      if (isHeader) {
+        doc.setFont("helvetica", "bold");
+        // Header background
+        doc.setFillColor(249, 250, 251);
+        doc.rect(MARGIN_LEFT, y - FONT_SIZE_BODY * 0.4, maxWidth, rowHeight, "F");
+      } else {
+        doc.setFont("helvetica", "normal");
+      }
+
+      doc.setTextColor(17, 24, 39);
+      for (let c = 0; c < numCols; c++) {
+        const cellText = rows[r][c] || "";
+        const cellX = MARGIN_LEFT + c * colWidth + cellPad;
+        const truncated = doc.splitTextToSize(cellText, colWidth - cellPad * 2);
+        doc.text(truncated[0] || "", cellX, y);
+      }
+
+      // Row border
+      doc.setDrawColor(229, 231, 235);
+      doc.setLineWidth(isHeader ? 0.4 : 0.15);
+      doc.line(MARGIN_LEFT, y + 2, MARGIN_LEFT + maxWidth, y + 2);
+
+      y += rowHeight;
+    }
+    y += 3;
   };
 
   // Start rendering
@@ -111,7 +217,7 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
   const titleLines = doc.splitTextToSize(opts.name, maxWidth);
   for (const line of titleLines) {
     doc.text(line, MARGIN_LEFT, y);
-    y += FONT_SIZE_H1 * 0.45;
+    y += FONT_SIZE_H1 * 0.55;
   }
   y += 2;
 
@@ -133,8 +239,23 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
   // Parse content line by line
   const contentLines = opts.content.split("\n");
 
-  for (const rawLine of contentLines) {
+  let i = 0;
+  while (i < contentLines.length) {
+    const rawLine = contentLines[i];
     const line = rawLine.trimEnd();
+
+    // ── Markdown table detection: collect consecutive "|" lines ──
+    if (/^\s*\|.+\|/.test(line)) {
+      const tableLines: string[] = [];
+      while (i < contentLines.length && /^\s*\|.+\|/.test(contentLines[i].trimEnd())) {
+        tableLines.push(contentLines[i].trimEnd());
+        i++;
+      }
+      renderTable(tableLines);
+      continue;
+    }
+
+    i++;
 
     // ── Separator lines: %%%, ---, === (3+ chars) ──
     if (/^[%\-=]{3,}$/.test(line.trim())) {
@@ -168,7 +289,7 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
       const cbLines = doc.splitTextToSize(text, maxWidth - Math.min(indent, 10) - 8);
       for (const l of cbLines) {
         doc.text(l, boxX + 6, y);
-        y += FONT_SIZE_BODY * 0.45;
+        y += FONT_SIZE_BODY * 0.55;
       }
       y += 1;
       continue;
@@ -189,7 +310,7 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
       const cbLines = doc.splitTextToSize(text, maxWidth - Math.min(indent, 10) - 8);
       for (const l of cbLines) {
         doc.text(l, boxX + 6, y);
-        y += FONT_SIZE_BODY * 0.45;
+        y += FONT_SIZE_BODY * 0.55;
       }
       y += 1;
       continue;
@@ -220,11 +341,11 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
 
     // Headings
     if (line.startsWith("### ")) {
-      renderText(line.slice(4), FONT_SIZE_H3, "bold", 4);
+      renderText(line.slice(4), FONT_SIZE_H3, "bold", 6);
     } else if (line.startsWith("## ")) {
-      renderText(line.slice(3), FONT_SIZE_H2, "bold", 6);
+      renderText(line.slice(3), FONT_SIZE_H2, "bold", 8);
     } else if (line.startsWith("# ")) {
-      renderText(line.slice(2), FONT_SIZE_H1, "bold", 8);
+      renderText(line.slice(2), FONT_SIZE_H1, "bold", 12);
     }
     // List items
     else if (/^\s*[-*]\s/.test(line)) {
@@ -232,20 +353,21 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
       const text = line.replace(/^\s*[-*]\s+/, "");
       renderListItem(text, Math.min(indent, 10));
     }
-    // Numbered lists
-    else if (/^\s*\d+[.)]\s/.test(line)) {
+    // Numbered lists — preserve the number
+    else if (/^\s*(\d+)[.)]\s/.test(line)) {
+      const numMatch = line.match(/^\s*(\d+)[.)]\s/);
+      const num = numMatch ? numMatch[1] + "." : "\u2022";
       const text = line.replace(/^\s*\d+[.)]\s+/, "");
-      renderListItem(text);
+      const indent = line.search(/\S/);
+      renderListItem(text, Math.min(indent, 10), num);
     }
     // Empty line
     else if (line.trim() === "") {
       y += LINE_HEIGHT * 0.6;
     }
-    // Regular paragraph
+    // Regular paragraph — render with inline bold/italic
     else {
-      // Strip bold/italic markdown markers for PDF
-      const cleaned = line.replace(/\*\*(.+?)\*\*/g, "$1").replace(/__(.+?)__/g, "$1").replace(/\*(.+?)\*/g, "$1");
-      renderText(cleaned, FONT_SIZE_BODY);
+      renderText(line, FONT_SIZE_BODY);
     }
   }
 

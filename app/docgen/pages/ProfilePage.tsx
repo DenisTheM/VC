@@ -6,6 +6,7 @@ import { Field } from "@shared/components/Field";
 import { PROFILE_FIELDS } from "../data/profileFields";
 import { loadDocumentsByOrg, type DbDocument } from "../lib/api";
 import { DOC_TYPES } from "../data/docTypes";
+import { MarkdownContent } from "@shared/components/MarkdownContent";
 
 interface ProfilePageProps {
   profile: Record<string, unknown>;
@@ -605,18 +606,7 @@ export function ProfilePage({ profile, setProfile, onSave, saving, orgId, orgNam
                           overflow: "auto",
                         }}
                       >
-                        <pre
-                          style={{
-                            fontFamily: T.sans,
-                            fontSize: 13,
-                            color: T.ink2,
-                            whiteSpace: "pre-wrap",
-                            lineHeight: 1.65,
-                            margin: 0,
-                          }}
-                        >
-                          {doc.content}
-                        </pre>
+                        <MarkdownContent content={doc.content} variant="compact" />
                       </div>
                     )}
                   </div>

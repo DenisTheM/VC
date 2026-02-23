@@ -5,6 +5,7 @@ import { SectionLabel } from "@shared/components/SectionLabel";
 import { DOC_STATUS, FORMAT_COLORS, SEV } from "../data/clientData";
 import { loadClientDocuments, approveDocument, loadDocumentAuditLog, loadDocAlerts, loadDocumentVersions, type ClientOrg, type PortalDoc, type AuditEntry, type LinkedAlert, type DocVersion } from "../lib/api";
 import { VersionHistory } from "@shared/components/VersionHistory";
+import { MarkdownContent } from "@shared/components/MarkdownContent";
 import { exportDocumentAsPdf } from "@shared/lib/pdfExport";
 
 interface ClientDocsProps {
@@ -1173,16 +1174,9 @@ function DocPreview({ doc, orgName }: { doc: PortalDoc; orgName?: string }) {
                 boxShadow: "0 2px 12px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04)",
                 maxWidth: 680,
                 margin: "0 auto",
-                fontFamily: "'Source Serif 4', Georgia, serif",
-                fontSize: 12.5,
-                lineHeight: 1.75,
-                color: T.ink2,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                letterSpacing: "0.01em",
               }}
             >
-              {doc.content}
+              <MarkdownContent content={doc.content!} />
             </div>
           </div>
         </div>

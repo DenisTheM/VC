@@ -8,6 +8,7 @@ import type { DocType } from "../data/docTypes";
 import { JURIS } from "../data/jurisdictions";
 import { supabase } from "@shared/lib/supabase";
 import { useAutosave, readAutosave } from "@shared/hooks/useAutosave";
+import { MarkdownContent } from "@shared/components/MarkdownContent";
 
 interface GenerateWizardProps {
   profile: Record<string, unknown>;
@@ -697,18 +698,7 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
               overflow: "auto",
             }}
           >
-            <pre
-              style={{
-                fontFamily: T.sans,
-                fontSize: 13,
-                color: T.ink2,
-                whiteSpace: "pre-wrap",
-                lineHeight: 1.65,
-                margin: 0,
-              }}
-            >
-              {result}
-            </pre>
+            <MarkdownContent content={result} />
           </div>
 
           {/* Actions */}

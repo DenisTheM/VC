@@ -8,7 +8,9 @@ import {
   loadDocumentAuditLog,
   loadDocumentVersions,
   updateDocumentStatus,
+  updateDocumentContent,
   bulkUpdateDocumentStatus,
+  notifyApproval,
   type DbDocument,
   type AuditEntry,
   type DocVersion,
@@ -16,6 +18,7 @@ import {
 } from "../lib/api";
 import { exportDocumentAsPdf } from "@shared/lib/pdfExport";
 import { VersionHistory } from "@shared/components/VersionHistory";
+import { MarkdownContent } from "@shared/components/MarkdownContent";
 
 const STATUS_COLORS: Record<string, { bg: string; color: string; label: string }> = {
   draft: { bg: T.s2, color: T.ink3, label: "Entwurf" },
@@ -442,6 +445,17 @@ function DocDetailView({
   const [versions, setVersions] = useState<DocVersion[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(true);
 
+  // Content editing state (only for draft documents)
+  const [editContent, setEditContent] = useState(doc.content ?? "");
+  const [savingContent, setSavingContent] = useState(false);
+  const [contentSaved, setContentSaved] = useState(false);
+  const isDraft = doc.status === "draft";
+  const contentDirty = editContent !== (doc.content ?? "");
+
+  useEffect(() => {
+    setEditContent(doc.content ?? "");
+  }, [doc.id, doc.content]);
+
   useEffect(() => {
     setVersionsLoading(true);
     loadDocumentVersions(doc.id)
@@ -450,11 +464,39 @@ function DocDetailView({
       .finally(() => setVersionsLoading(false));
   }, [doc.id]);
 
+  const handleSaveContent = async () => {
+    setSavingContent(true);
+    setContentSaved(false);
+    try {
+      await updateDocumentContent(doc.id, editContent);
+      doc.content = editContent;
+      setContentSaved(true);
+      setTimeout(() => setContentSaved(false), 3000);
+    } catch (err) {
+      console.error("Content save failed:", err);
+    } finally {
+      setSavingContent(false);
+    }
+  };
+
   const handleStatusChange = async (newStatus: DbDocument["status"]) => {
+    // When moving from draft → review, send notification to CO
+    const wasInDraft = doc.status === "draft";
     setChangingStatus(true);
     try {
       await updateDocumentStatus(doc.id, newStatus);
       onStatusChange(newStatus);
+      // Notify CO when status changes to review from draft
+      if (wasInDraft && newStatus === "review") {
+        try {
+          const result = await notifyApproval(doc.id, doc.organization_id);
+          if (!result.success) {
+            console.warn("CO notification failed:", result.message);
+          }
+        } catch {
+          // Don't block the status change if notification fails
+        }
+      }
     } catch (err) {
       console.error("Status change failed:", err);
     } finally {
@@ -548,20 +590,21 @@ function DocDetailView({
         })}
       </div>
 
-      {/* Content preview */}
-      {doc.content && (
+      {/* Content preview / editor */}
+      {(doc.content || isDraft) && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
             <button
               onClick={() => {
                 exportDocumentAsPdf({
                   name: doc.name,
                   version: doc.version,
-                  content: doc.content!,
+                  content: isDraft ? editContent : doc.content!,
                   legalBasis: doc.legal_basis || undefined,
                   orgName: doc.organizations?.name || undefined,
                 });
               }}
+              disabled={!(isDraft ? editContent : doc.content)}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -580,30 +623,72 @@ function DocDetailView({
               <Icon d={icons.download} size={13} color="#fff" />
               PDF Download
             </button>
+            {isDraft && (
+              <>
+                <button
+                  onClick={handleSaveContent}
+                  disabled={savingContent || !contentDirty}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "8px 16px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: contentDirty ? T.accent : T.s2,
+                    color: contentDirty ? "#fff" : T.ink4,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    cursor: savingContent || !contentDirty ? "default" : "pointer",
+                    fontFamily: T.sans,
+                    opacity: savingContent ? 0.6 : 1,
+                  }}
+                >
+                  {savingContent ? "Speichern..." : "Inhalt speichern"}
+                </button>
+                {contentSaved && (
+                  <span style={{ fontSize: 12, color: T.accent, fontWeight: 500, fontFamily: T.sans }}>
+                    Gespeichert
+                  </span>
+                )}
+              </>
+            )}
           </div>
-          <div
-            style={{
-              maxHeight: 400,
-              overflow: "auto",
-              background: "#fff",
-              borderRadius: T.r,
-              border: `1px solid ${T.border}`,
-              padding: "24px 28px",
-            }}
-          >
-            <pre
+          {isDraft ? (
+            <textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
               style={{
+                width: "100%",
+                minHeight: 500,
+                maxHeight: 800,
+                resize: "vertical",
                 fontFamily: T.sans,
                 fontSize: 13,
                 color: T.ink2,
-                whiteSpace: "pre-wrap",
                 lineHeight: 1.65,
-                margin: 0,
+                padding: "24px 28px",
+                background: "#fff",
+                borderRadius: T.r,
+                border: `1px solid ${contentDirty ? T.accent : T.border}`,
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                maxHeight: 400,
+                overflow: "auto",
+                background: "#fff",
+                borderRadius: T.r,
+                border: `1px solid ${T.border}`,
+                padding: "24px 28px",
               }}
             >
-              {doc.content}
-            </pre>
-          </div>
+              <MarkdownContent content={doc.content!} />
+            </div>
+          )}
         </div>
       )}
 
