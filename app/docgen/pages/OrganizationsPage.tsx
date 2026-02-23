@@ -3,6 +3,7 @@ import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import { createOrganization, deleteOrganization, loadDocCountsByOrg, searchZefix, loadOrgMembers, updateOrgMemberRole, removeOrgMember, inviteMember, type Organization, type ZefixResult, type OrgMember, type OrgRole } from "../lib/api";
+import { useAutosave, readAutosave } from "@shared/hooks/useAutosave";
 
 const INDUSTRIES = [
   "Fintech",
@@ -55,14 +56,9 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
   useEffect(() => {
     loadDocCountsByOrg().then(setDocCounts).catch(console.error);
   }, []);
-  const [newOrg, setNewOrg] = useState({
-    name: "",
-    short_name: "",
-    industry: "",
-    sro: "",
-    contact_name: "",
-    contact_role: "",
-  });
+  const orgDefaults = { name: "", short_name: "", industry: "", sro: "", contact_name: "", contact_role: "" };
+  const [newOrg, setNewOrg] = useState(() => readAutosave<typeof orgDefaults>("vc:docgen:create-org") ?? orgDefaults);
+  const orgAutosave = useAutosave({ key: "vc:docgen:create-org", data: newOrg, enabled: showForm });
 
   const handleZefixSearch = async () => {
     if (zefixQuery.trim().length < 2) return;
@@ -103,6 +99,7 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
         contact_role: newOrg.contact_role.trim() || undefined,
       });
       onOrgCreated(created, selectedZefix || undefined);
+      orgAutosave.clear();
       setNewOrg({ name: "", short_name: "", industry: "", sro: "", contact_name: "", contact_role: "" });
       setSelectedZefix(null);
       setZefixQuery("");
@@ -626,11 +623,14 @@ function OrgMembersPanel({
   const [updating, setUpdating] = useState<string | null>(null);
 
   // Invite form state
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteName, setInviteName] = useState("");
-  const [inviteRole, setInviteRole] = useState<OrgRole>("editor");
+  const inviteAutosaveKey = `vc:docgen:invite:${orgId}`;
+  const inviteSaved = readAutosave<{ email: string; name: string; role: OrgRole }>(inviteAutosaveKey);
+  const [inviteEmail, setInviteEmail] = useState(inviteSaved?.email ?? "");
+  const [inviteName, setInviteName] = useState(inviteSaved?.name ?? "");
+  const [inviteRole, setInviteRole] = useState<OrgRole>(inviteSaved?.role ?? "editor");
   const [inviting, setInviting] = useState(false);
   const [inviteResult, setInviteResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const inviteAutosave = useAutosave({ key: inviteAutosaveKey, data: { email: inviteEmail, name: inviteName, role: inviteRole } });
 
   const load = () => {
     setLoading(true);
@@ -675,6 +675,7 @@ function OrgMembersPanel({
       const result = await inviteMember(orgId, inviteEmail.trim(), inviteName.trim(), inviteRole);
       setInviteResult({ ok: result.success, msg: result.message });
       if (result.success) {
+        inviteAutosave.clear();
         setInviteEmail("");
         setInviteName("");
         setInviteRole("editor");

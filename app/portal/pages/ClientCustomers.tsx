@@ -6,6 +6,7 @@ import { SectionLabel } from "@shared/components/SectionLabel";
 import { useAuthContext } from "@shared/components/AuthContext";
 import { searchZefix, type ZefixResult } from "@shared/lib/zefix";
 import { exportCustomerDocumentAsPdf, exportAuditTrailAsPdf } from "@shared/lib/pdfExport";
+import { useAutosave, readAutosave } from "@shared/hooks/useAutosave";
 import type { ClientOrg } from "../lib/api";
 import {
   loadCustomers, loadCustomer, createCustomer, updateCustomer, archiveCustomer,
@@ -321,10 +322,13 @@ const filterStyle: React.CSSProperties = {
 // =================================================================
 
 function CreateCustomerModal({ org, onClose, onCreate }: { org: ClientOrg; onClose: () => void; onCreate: () => void }) {
-  const [step, setStep] = useState<"type" | "form">("type");
-  const [customerType, setCustomerType] = useState<"natural_person" | "legal_entity">("natural_person");
-  const [form, setForm] = useState<Record<string, string>>({});
+  const autosaveKey = `vc:portal:create-customer:${org.id}`;
+  const saved = readAutosave<{ step: "type" | "form"; customerType: "natural_person" | "legal_entity"; form: Record<string, string> }>(autosaveKey);
+  const [step, setStep] = useState<"type" | "form">(saved?.step ?? "type");
+  const [customerType, setCustomerType] = useState<"natural_person" | "legal_entity">(saved?.customerType ?? "natural_person");
+  const [form, setForm] = useState<Record<string, string>>(saved?.form ?? {});
   const [saving, setSaving] = useState(false);
+  const autosave = useAutosave({ key: autosaveKey, data: { step, customerType, form } });
 
   // Zefix
   const [zefixQuery, setZefixQuery] = useState("");
@@ -373,6 +377,7 @@ function CreateCustomerModal({ org, onClose, onCreate }: { org: ClientOrg; onClo
           zefix_data: form.uid_number ? { uid: form.uid_number } : undefined,
         }),
       });
+      autosave.clear();
       onCreate();
     } catch (err) {
       console.error("Create customer:", err);
@@ -552,6 +557,9 @@ function CustomerDetail({ org, role, customerId, onBack, onOpenDoc }: {
   const [showContactForm, setShowContactForm] = useState(false);
   const [editingContact, setEditingContact] = useState<CustomerContact | null>(null);
 
+  const editAutosaveKey = `vc:portal:edit-customer:${customerId}`;
+  const editAutosave = useAutosave({ key: editAutosaveKey, data: editForm, enabled: editing });
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -615,6 +623,7 @@ function CustomerDetail({ org, role, customerId, onBack, onOpenDoc }: {
         notes: editForm.notes,
         risk_level: (editForm.risk_level as Customer["risk_level"]) || customer.risk_level,
       });
+      editAutosave.clear();
       setEditing(false);
       load();
     } catch (err) {
@@ -658,7 +667,7 @@ function CustomerDetail({ org, role, customerId, onBack, onOpenDoc }: {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {canEdit(role) && (
-            <button onClick={() => { setEditing(true); setTab("profile"); setEditForm(customer as unknown as Record<string, string>); }} style={btnSecondary}>
+            <button onClick={() => { setEditing(true); setTab("profile"); setEditForm(readAutosave<Record<string, string>>(editAutosaveKey) ?? customer as unknown as Record<string, string>); }} style={btnSecondary}>
               Bearbeiten
             </button>
           )}
@@ -797,7 +806,7 @@ function CustomerDetail({ org, role, customerId, onBack, onOpenDoc }: {
                 </div>
                 <FormInput label="Notizen" value={editForm.notes} onChange={(v) => setEditForm((p) => ({ ...p, notes: v }))} multiline />
                 <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
-                  <button onClick={() => setEditing(false)} style={btnSecondary}>Abbrechen</button>
+                  <button onClick={() => { editAutosave.clear(); setEditing(false); }} style={btnSecondary}>Abbrechen</button>
                   <button onClick={handleEditSave} style={btnPrimary}>Speichern</button>
                 </div>
               </>
@@ -1008,6 +1017,10 @@ function DocumentForm({ org, role, docId, customerId, onBack }: {
   const [rejectReason, setRejectReason] = useState("");
   const [showReject, setShowReject] = useState(false);
 
+  const autosaveKey = `vc:portal:docform:${docId}`;
+  const isReadOnlyForAutosave = doc ? (doc.status === "approved" || doc.status === "outdated") : true;
+  const autosave = useAutosave({ key: autosaveKey, data: formData, enabled: !isReadOnlyForAutosave && !loading });
+
   useEffect(() => {
     setLoading(true);
     Promise.all([
@@ -1016,7 +1029,8 @@ function DocumentForm({ org, role, docId, customerId, onBack }: {
     ]).then(([d, c]) => {
       setDoc(d);
       setCustomer(c);
-      if (d) setFormData(d.data || {});
+      const saved = readAutosave<Record<string, unknown>>(autosaveKey);
+      if (d) setFormData(saved ?? d.data ?? {});
     }).catch((err) => console.error("Load doc:", err))
       .finally(() => setLoading(false));
   }, [docId, customerId]);
@@ -1043,6 +1057,7 @@ function DocumentForm({ org, role, docId, customerId, onBack }: {
     setSaving(true);
     try {
       await saveCustomerDocumentData(docId, formData);
+      autosave.clear();
       alert("Gespeichert.");
     } catch (err) {
       console.error("Save:", err);
@@ -1058,6 +1073,7 @@ function DocumentForm({ org, role, docId, customerId, onBack }: {
     try {
       await saveCustomerDocumentData(docId, formData);
       await submitForReview(docId);
+      autosave.clear();
       const updated = await loadCustomerDocuments(customerId);
       setDoc(updated.find((d) => d.id === docId) || null);
     } catch (err) {
@@ -1266,15 +1282,18 @@ function ContactFormModal({ org, customerId, contact, onClose, onSaved }: {
   org: ClientOrg; customerId: string; contact: CustomerContact | null;
   onClose: () => void; onSaved: () => void;
 }) {
-  const [form, setForm] = useState({
+  const autosaveKey = `vc:portal:contact:${customerId}:${contact?.id ?? "new"}`;
+  const defaults = {
     role: contact?.role || CONTACT_ROLES[0],
     first_name: contact?.first_name || "",
     last_name: contact?.last_name || "",
     email: contact?.email || "",
     phone: contact?.phone || "",
     notes: contact?.notes || "",
-  });
+  };
+  const [form, setForm] = useState(() => readAutosave<typeof defaults>(autosaveKey) ?? defaults);
   const [saving, setSaving] = useState(false);
+  const autosave = useAutosave({ key: autosaveKey, data: form });
 
   const handleSave = async () => {
     if (!form.first_name.trim() || !form.last_name.trim()) {
@@ -1304,6 +1323,7 @@ function ContactFormModal({ org, customerId, contact, onClose, onSaved }: {
           notes: form.notes || undefined,
         });
       }
+      autosave.clear();
       onSaved();
     } catch (err) {
       console.error("Save contact:", err);

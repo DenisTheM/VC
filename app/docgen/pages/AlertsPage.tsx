@@ -4,6 +4,7 @@ import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import { SEVERITY_CFG, STATUS_CFG } from "../data/regAlerts";
 import { JURIS } from "../data/jurisdictions";
+import { useAutosave, readAutosave } from "@shared/hooks/useAutosave";
 import {
   loadAlerts,
   loadDraftAlerts,
@@ -1826,17 +1827,22 @@ interface DraftDetailViewProps {
 }
 
 function DraftDetailView({ alert, organizations, onBack, onPublished }: DraftDetailViewProps) {
-  const [severity, setSeverity] = useState(alert.ai_severity || alert.severity || "medium");
-  const [category, setCategory] = useState(alert.ai_category || alert.category || "");
-  const [legalBasis, setLegalBasis] = useState(alert.ai_legal_basis || alert.legal_basis || "");
-  const [deadline, setDeadline] = useState(alert.deadline || "");
-  const [summary, setSummary] = useState(alert.auto_summary || alert.summary || "");
-  const [elenaComment, setElenaComment] = useState(alert.ai_comment || alert.elena_comment || "");
-  const [jurisdiction, setJurisdiction] = useState(alert.jurisdiction || "CH");
+  const autosaveKey = `vc:docgen:alert-draft:${alert.id}`;
+  type DraftFormData = { severity: string; category: string; legalBasis: string; deadline: string; summary: string; elenaComment: string; jurisdiction: string; affectedClients: { id?: string; organization_id: string; risk: string; reason: string; elena_comment: string; org_name: string }[] };
+  const saved = readAutosave<DraftFormData>(autosaveKey);
+
+  const [severity, setSeverity] = useState(saved?.severity ?? (alert.ai_severity || alert.severity || "medium"));
+  const [category, setCategory] = useState(saved?.category ?? (alert.ai_category || alert.category || ""));
+  const [legalBasis, setLegalBasis] = useState(saved?.legalBasis ?? (alert.ai_legal_basis || alert.legal_basis || ""));
+  const [deadline, setDeadline] = useState(saved?.deadline ?? (alert.deadline || ""));
+  const [summary, setSummary] = useState(saved?.summary ?? (alert.auto_summary || alert.summary || ""));
+  const [elenaComment, setElenaComment] = useState(saved?.elenaComment ?? (alert.ai_comment || alert.elena_comment || ""));
+  const [jurisdiction, setJurisdiction] = useState(saved?.jurisdiction ?? (alert.jurisdiction || "CH"));
 
   const [affectedClients, setAffectedClients] = useState<
     { id?: string; organization_id: string; risk: string; reason: string; elena_comment: string; org_name: string }[]
   >(
+    saved?.affectedClients ??
     alert.affected_clients.map((c) => ({
       id: c.id,
       organization_id: c.organization_id,
@@ -1850,6 +1856,7 @@ function DraftDetailView({ alert, organizations, onBack, onPublished }: DraftDet
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [showAddClient, setShowAddClient] = useState(false);
+  const autosave = useAutosave({ key: autosaveKey, data: { severity, category, legalBasis, deadline, summary, elenaComment, jurisdiction, affectedClients } });
 
   const usedOrgIds = new Set(affectedClients.map((c) => c.organization_id));
   const availableOrgs = organizations.filter((o) => !usedOrgIds.has(o.id));
@@ -1868,6 +1875,7 @@ function DraftDetailView({ alert, organizations, onBack, onPublished }: DraftDet
           elena_comment: c.elena_comment,
         })),
       );
+      autosave.clear();
       onBack();
     } catch (err) {
       console.error("Save draft failed:", err);
@@ -1889,6 +1897,7 @@ function DraftDetailView({ alert, organizations, onBack, onPublished }: DraftDet
           elena_comment: c.elena_comment,
         })),
       );
+      autosave.clear();
       onPublished(result as unknown as { sent: number; errors: number } | undefined);
     } catch (err) {
       console.error("Publish alert failed:", err);
@@ -1900,6 +1909,7 @@ function DraftDetailView({ alert, organizations, onBack, onPublished }: DraftDet
   const handleDismiss = async () => {
     try {
       await dismissAlert(alert.id);
+      autosave.clear();
       onBack();
     } catch (err) {
       console.error("Dismiss alert failed:", err);

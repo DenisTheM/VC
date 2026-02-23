@@ -7,6 +7,7 @@ import { DOC_TYPES } from "../data/docTypes";
 import type { DocType } from "../data/docTypes";
 import { JURIS } from "../data/jurisdictions";
 import { supabase } from "@shared/lib/supabase";
+import { useAutosave, readAutosave } from "@shared/hooks/useAutosave";
 
 interface GenerateWizardProps {
   profile: Record<string, unknown>;
@@ -17,13 +18,16 @@ interface GenerateWizardProps {
 }
 
 export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }: GenerateWizardProps) {
-  const [step, setStep] = useState(initialDocKey ? 1 : 0);
-  const [docKey, setDocKey] = useState<string | null>(initialDocKey ?? null);
-  const [jurisdiction, setJurisdiction] = useState<string | null>(null);
-  const [answers, setAnswers] = useState<Record<string, unknown>>({});
+  const autosaveKey = `vc:docgen:wizard:${orgId ?? "none"}`;
+  const saved = !initialDocKey ? readAutosave<{ step: number; docKey: string | null; jurisdiction: string | null; answers: Record<string, unknown> }>(autosaveKey) : null;
+  const [step, setStep] = useState(saved?.step ?? (initialDocKey ? 1 : 0));
+  const [docKey, setDocKey] = useState<string | null>(saved?.docKey ?? initialDocKey ?? null);
+  const [jurisdiction, setJurisdiction] = useState<string | null>(saved?.jurisdiction ?? null);
+  const [answers, setAnswers] = useState<Record<string, unknown>>(saved?.answers ?? {});
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const autosave = useAutosave({ key: autosaveKey, data: { step, docKey, jurisdiction, answers }, enabled: step < 3 });
 
   const doc: DocType | null = docKey ? DOC_TYPES[docKey] : null;
 
@@ -442,6 +446,7 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
             } else {
               const content = data?.document?.content;
               setResult(content || (typeof data === "string" ? data : "Dokument wurde generiert, aber kein Inhalt erhalten."));
+              autosave.clear();
             }
           })
           .catch((err: Error) => {
