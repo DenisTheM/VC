@@ -663,10 +663,10 @@ export async function inviteMember(
   });
 
   if (error) {
-    const msg =
-      typeof error === "object" && "message" in error
-        ? error.message
-        : String(error);
+    // Supabase FunctionsHttpError wraps the actual response in error.context
+    const ctx = (error as unknown as { context?: unknown }).context;
+    const ctxError = typeof ctx === "object" && ctx !== null && "error" in ctx ? (ctx as { error: string }).error : null;
+    const msg = ctxError || (typeof error === "object" && "message" in error ? error.message : String(error));
     return { success: false, message: msg };
   }
 
