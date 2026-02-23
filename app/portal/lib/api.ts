@@ -122,6 +122,7 @@ export interface PortalDoc {
   status: "current" | "review" | "draft" | "outdated";
   updatedBy: string;
   updatedAt: string;
+  approvedAt: string | null;
   format: "DOCX" | "PDF" | "PPTX" | "XLSX";
   pages: number;
   legalBasis: string;
@@ -166,16 +167,30 @@ export async function loadClientDocuments(organizationId: string): Promise<Porta
     legalBasis: doc.legal_basis ?? "",
     alert: doc.alert_notice ?? null,
     content: doc.content ?? null,
+    approvedAt: doc.approved_at ? formatDate(doc.approved_at) : null,
   }));
 }
 
 export async function approveDocument(docId: string): Promise<void> {
-  const { error } = await supabase
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert");
+
+  const { data, error } = await supabase
     .from("documents")
-    .update({ status: "current" })
-    .eq("id", docId);
+    .update({
+      status: "current",
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", docId)
+    .eq("status", "review")
+    .select("id");
 
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error("Freigabe nicht möglich — Dokument ist nicht im Status 'Review'.");
+  }
 }
 
 // ─── Dashboard Stats ────────────────────────────────────────────────

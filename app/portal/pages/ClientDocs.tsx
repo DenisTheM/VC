@@ -576,6 +576,27 @@ export function ClientDocs({ org, initialDocName, onDocConsumed }: ClientDocsPro
                             </div>
                           </div>
 
+                          {/* Approval info */}
+                          {doc.status === "current" && doc.approvedAt && (
+                            <div
+                              style={{
+                                background: "#ecf5f1",
+                                borderRadius: 8,
+                                padding: "10px 14px",
+                                marginBottom: 14,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                border: "1px solid #16654e22",
+                              }}
+                            >
+                              <Icon d={icons.check} size={14} color="#16654e" />
+                              <span style={{ fontSize: 12.5, color: "#16654e", fontFamily: T.sans, fontWeight: 500 }}>
+                                Freigegeben am {doc.approvedAt}
+                              </span>
+                            </div>
+                          )}
+
                           {/* Alert notice */}
                           {doc.alert && (
                             <div
@@ -631,14 +652,15 @@ export function ClientDocs({ org, initialDocName, onDocConsumed }: ClientDocsPro
                               <button
                                 disabled={approvingId === doc.id}
                                 onClick={async () => {
-                                  if (!window.confirm("Dokument «" + doc.name + "» freigeben?")) return;
+                                  if (!window.confirm("Ich habe das Dokument «" + doc.name + "» geprüft und gebe es hiermit frei.")) return;
                                   setApprovingId(doc.id);
                                   try {
                                     await approveDocument(doc.id);
-                                    setDocs((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: "current" } : d));
+                                    const now = new Date().toLocaleDateString("de-CH", { day: "numeric", month: "short", year: "numeric" });
+                                    setDocs((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: "current" as const, approvedAt: now, updatedAt: now } : d));
                                   } catch (err) {
                                     console.error("Failed to approve document:", err);
-                                    alert("Freigabe fehlgeschlagen. Bitte versuchen Sie es erneut.");
+                                    alert(err instanceof Error ? err.message : "Freigabe fehlgeschlagen. Bitte versuchen Sie es erneut.");
                                   } finally {
                                     setApprovingId(null);
                                   }
