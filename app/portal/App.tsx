@@ -12,6 +12,8 @@ import { loadUserOrganization, type ClientOrg } from "./lib/api";
 const ClientDashboard = lazy(() => import("./pages/ClientDashboard").then((m) => ({ default: m.ClientDashboard })));
 const ClientAlerts = lazy(() => import("./pages/ClientAlerts").then((m) => ({ default: m.ClientAlerts })));
 const ClientDocs = lazy(() => import("./pages/ClientDocs").then((m) => ({ default: m.ClientDocs })));
+const ClientCustomers = lazy(() => import("./pages/ClientCustomers").then((m) => ({ default: m.ClientCustomers })));
+const ClientHelp = lazy(() => import("./pages/ClientHelp").then((m) => ({ default: m.ClientHelp })));
 
 /* ------------------------------------------------------------------ */
 /*  Client Sidebar                                                    */
@@ -21,6 +23,8 @@ const NAV_ITEMS = [
   { id: "dashboard", icon: icons.home, label: "Dashboard" },
   { id: "alerts", icon: icons.alert, label: "Meldungen" },
   { id: "docs", icon: icons.doc, label: "Dokumente" },
+  { id: "customers", icon: icons.users, label: "Kunden" },
+  { id: "help", icon: icons.mail, label: "Hilfe" },
 ] as const;
 
 function ClientSidebar({
@@ -417,6 +421,8 @@ function PortalContent() {
           {page === "dashboard" && <ClientDashboard onNav={handleNav} onAlertNav={handleAlertNav} org={org} />}
           {page === "alerts" && <ClientAlerts org={org} initialAlertId={pendingAlertId} onAlertConsumed={() => setPendingAlertId(null)} onDocNav={handleDocNav} />}
           {page === "docs" && <ClientDocs org={org} initialDocName={pendingDocName} onDocConsumed={() => setPendingDocName(null)} onAlertNav={handleAlertNav} />}
+          {page === "customers" && <ClientCustomers org={org} onNav={handleNav} />}
+          {page === "help" && <ClientHelp org={org} />}
         </Suspense>
       </div>
     </div>

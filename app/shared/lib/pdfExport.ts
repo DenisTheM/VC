@@ -170,3 +170,161 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
   addFooter();
   doc.save(`${opts.name}.pdf`);
 }
+
+// ─── Customer Document PDF Export ───────────────────────────────────
+
+interface CustomerDocPdfOpts {
+  templateName: string;
+  customerName: string;
+  version: string;
+  status: string;
+  legalBasis: string;
+  orgName: string;
+  approvedAt?: string;
+  sections: { title: string; fields: { id: string; label: string; type: string; options?: string[] }[] }[];
+  data: Record<string, unknown>;
+}
+
+export function exportCustomerDocumentAsPdf(opts: CustomerDocPdfOpts) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const maxWidth = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
+  let y = MARGIN_TOP;
+  let pageNum = 1;
+  const fileName = `${opts.templateName} — ${opts.customerName}`;
+
+  const addHeader = () => {
+    doc.setFontSize(8);
+    doc.setTextColor(15, 61, 46);
+    doc.setFont("helvetica", "bold");
+    doc.text("Virtue Compliance", MARGIN_LEFT, 12);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(156, 163, 175);
+    doc.text(opts.orgName, PAGE_WIDTH - MARGIN_RIGHT, 12, { align: "right" });
+    doc.setDrawColor(229, 231, 235);
+    doc.line(MARGIN_LEFT, 16, PAGE_WIDTH - MARGIN_RIGHT, 16);
+  };
+
+  const addFooter = () => {
+    doc.setFontSize(7.5);
+    doc.setTextColor(156, 163, 175);
+    doc.setDrawColor(229, 231, 235);
+    doc.line(MARGIN_LEFT, 282, PAGE_WIDTH - MARGIN_RIGHT, 282);
+    doc.text(`${fileName} — ${opts.version}`, MARGIN_LEFT, 287);
+    doc.text(
+      new Date().toLocaleDateString("de-CH", { day: "numeric", month: "long", year: "numeric" }),
+      PAGE_WIDTH / 2, 287, { align: "center" },
+    );
+    doc.text(`Seite ${pageNum}`, PAGE_WIDTH - MARGIN_RIGHT, 287, { align: "right" });
+  };
+
+  const ensureSpace = (needed: number) => {
+    if (y + needed > 297 - MARGIN_BOTTOM) {
+      addFooter();
+      doc.addPage();
+      pageNum++;
+      y = MARGIN_TOP;
+      addHeader();
+    }
+  };
+
+  // Start
+  addHeader();
+
+  // Title
+  doc.setFontSize(FONT_SIZE_H1);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 61, 46);
+  const titleLines = doc.splitTextToSize(opts.templateName, maxWidth);
+  for (const line of titleLines) {
+    doc.text(line, MARGIN_LEFT, y);
+    y += FONT_SIZE_H1 * 0.45;
+  }
+  y += 2;
+
+  // Subtitle: customer, version, status
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(107, 114, 128);
+  const subtitle = [opts.customerName, opts.version, opts.status];
+  if (opts.approvedAt) {
+    try {
+      subtitle.push("Freigabe: " + new Date(opts.approvedAt).toLocaleDateString("de-CH"));
+    } catch { /* ignore */ }
+  }
+  doc.text(subtitle.join("  |  "), MARGIN_LEFT, y);
+  y += 5;
+  doc.text(`Rechtsgrundlage: ${opts.legalBasis}`, MARGIN_LEFT, y);
+  y += LINE_HEIGHT + 4;
+
+  // Separator
+  doc.setDrawColor(229, 231, 235);
+  doc.line(MARGIN_LEFT, y - 2, PAGE_WIDTH - MARGIN_RIGHT, y - 2);
+  y += 6;
+
+  // Render sections and fields
+  for (const section of opts.sections) {
+    ensureSpace(14);
+    doc.setFontSize(FONT_SIZE_H2);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(17, 24, 39);
+    doc.text(section.title, MARGIN_LEFT, y);
+    y += FONT_SIZE_H2 * 0.45 + 4;
+
+    for (const field of section.fields) {
+      const rawValue = opts.data[field.id];
+      let displayValue = "—";
+
+      if (rawValue !== undefined && rawValue !== null && rawValue !== "") {
+        if (typeof rawValue === "boolean") {
+          displayValue = rawValue ? "Ja" : "Nein";
+        } else if (Array.isArray(rawValue)) {
+          displayValue = rawValue.join(", ") || "—";
+        } else {
+          displayValue = String(rawValue);
+        }
+      }
+
+      // Label
+      ensureSpace(10);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(107, 114, 128);
+      doc.text(field.label, MARGIN_LEFT, y);
+
+      // Value — right-aligned or below for long text
+      if (displayValue.length > 50) {
+        y += 4;
+        doc.setFontSize(FONT_SIZE_BODY);
+        doc.setTextColor(17, 24, 39);
+        const lines = doc.splitTextToSize(displayValue, maxWidth);
+        for (const line of lines) {
+          ensureSpace(5);
+          doc.text(line, MARGIN_LEFT, y);
+          y += FONT_SIZE_BODY * 0.45;
+        }
+        y += 2;
+      } else {
+        // Dots + value on same line
+        doc.setFontSize(FONT_SIZE_BODY);
+        doc.setTextColor(17, 24, 39);
+        const labelWidth = doc.getTextWidth(field.label);
+        const valueWidth = doc.getTextWidth(displayValue);
+        const dotsWidth = maxWidth - labelWidth - valueWidth - 4;
+        if (dotsWidth > 10) {
+          const dotCount = Math.floor(dotsWidth / doc.getTextWidth("."));
+          doc.setTextColor(200, 200, 200);
+          doc.text(".".repeat(Math.max(dotCount, 3)), MARGIN_LEFT + labelWidth + 2, y);
+        }
+        doc.setTextColor(17, 24, 39);
+        doc.setFont("helvetica", "bold");
+        doc.text(displayValue, PAGE_WIDTH - MARGIN_RIGHT, y, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        y += FONT_SIZE_BODY * 0.45 + 2;
+      }
+    }
+    y += 4;
+  }
+
+  addFooter();
+  doc.save(`${fileName}.pdf`);
+}

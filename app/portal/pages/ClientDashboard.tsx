@@ -5,6 +5,7 @@ import { SectionLabel } from "@shared/components/SectionLabel";
 import { useAuthContext } from "@shared/components/AuthContext";
 import { SEV } from "../data/clientData";
 import { loadClientAlerts, loadPortalStats, type ClientOrg, type PortalAlert } from "../lib/api";
+import { loadCustomerStats, type CustomerStats } from "../lib/customerApi";
 
 interface ClientDashboardProps {
   onNav: (id: string) => void;
@@ -19,6 +20,7 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
 
   const [alerts, setAlerts] = useState<PortalAlert[]>([]);
   const [stats, setStats] = useState({ totalAlerts: 0, newAlerts: 0, totalDocs: 0, currentDocs: 0 });
+  const [custStats, setCustStats] = useState<CustomerStats>({ total: 0, active: 0, reviewDue: 0, docsDraft: 0, docsReview: 0, docsApproved: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,10 +28,12 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
     Promise.all([
       loadClientAlerts(org.id),
       loadPortalStats(org.id),
+      loadCustomerStats(org.id),
     ])
-      .then(([alertsData, statsData]) => {
+      .then(([alertsData, statsData, custStatsData]) => {
         setAlerts(alertsData);
         setStats(statsData);
+        setCustStats(custStatsData);
       })
       .catch((err) => console.error("Dashboard load error:", err))
       .finally(() => setLoading(false));
@@ -232,6 +236,86 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
           </div>
         </div>
       </div>
+
+      {/* Customer stat cards */}
+      {custStats.total > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 36 }}>
+          {/* Kunden */}
+          <div
+            onClick={() => onNav("customers")}
+            style={{
+              background: "#fff", borderRadius: T.rLg, padding: "22px 24px",
+              border: `1px solid ${T.border}`, boxShadow: T.shSm, cursor: "pointer",
+              transition: "box-shadow 0.15s, transform 0.15s",
+            }}
+            onMouseOver={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shMd; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)"; }}
+            onMouseOut={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shSm; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon d={icons.users} size={16} color="#3b82f6" />
+              </div>
+              <span style={{ fontSize: 12.5, color: T.ink3, fontFamily: T.sans, fontWeight: 500 }}>Kunden</span>
+            </div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: T.ink, fontFamily: T.sans, letterSpacing: "-1px" }}>
+              {custStats.active}
+            </div>
+            <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
+              aktiv von {custStats.total} gesamt
+            </div>
+          </div>
+
+          {/* Überprüfung fällig */}
+          <div
+            onClick={() => onNav("customers")}
+            style={{
+              background: "#fff", borderRadius: T.rLg, padding: "22px 24px",
+              border: `1px solid ${T.border}`, boxShadow: T.shSm, cursor: "pointer",
+              transition: "box-shadow 0.15s, transform 0.15s",
+            }}
+            onMouseOver={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shMd; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)"; }}
+            onMouseOut={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shSm; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#fffbeb", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon d={icons.clock} size={16} color="#d97706" />
+              </div>
+              <span style={{ fontSize: 12.5, color: T.ink3, fontFamily: T.sans, fontWeight: 500 }}>Überprüfung fällig</span>
+            </div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: custStats.reviewDue > 0 ? "#d97706" : T.ink, fontFamily: T.sans, letterSpacing: "-1px" }}>
+              {custStats.reviewDue}
+            </div>
+            <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
+              in den nächsten 30 Tagen
+            </div>
+          </div>
+
+          {/* Kundendokumente */}
+          <div
+            onClick={() => onNav("customers")}
+            style={{
+              background: "#fff", borderRadius: T.rLg, padding: "22px 24px",
+              border: `1px solid ${T.border}`, boxShadow: T.shSm, cursor: "pointer",
+              transition: "box-shadow 0.15s, transform 0.15s",
+            }}
+            onMouseOver={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shMd; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)"; }}
+            onMouseOut={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shSm; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: T.accentS, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Icon d={icons.doc} size={16} color={T.accent} />
+              </div>
+              <span style={{ fontSize: 12.5, color: T.ink3, fontFamily: T.sans, fontWeight: 500 }}>Kundendokumente</span>
+            </div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: T.accent, fontFamily: T.sans, letterSpacing: "-1px" }}>
+              {custStats.docsApproved}
+            </div>
+            <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
+              freigegeben &middot; {custStats.docsDraft} Entwürfe &middot; {custStats.docsReview} zur Prüfung
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Latest alerts preview */}
       {latestAlerts.length > 0 && (
