@@ -5,6 +5,9 @@
 //
 // Trigger: Called from the frontend when admin clicks "Freigeben & Veroeffentlichen"
 // Expects: { alert_id: string }
+//
+// Tracks all email sends in alert_notification_log and updates
+// alert_affected_clients.notified_at + notification_status.
 // =============================================================================
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
@@ -90,6 +93,9 @@ serve(async (req) => {
         .select("id, full_name")
         .in("id", userIds);
 
+      let orgSentCount = 0;
+      let orgFailCount = 0;
+
       for (const profile of profiles ?? []) {
         // Get the user's email from auth.users
         const { data: authUser } = await supabase.auth.admin.getUserById(profile.id);
@@ -107,10 +113,51 @@ serve(async (req) => {
               profile.full_name || "Sehr geehrte Damen und Herren",
             ),
           });
+          orgSentCount++;
           sentCount++;
+
+          // Log successful send
+          await supabase.from("alert_notification_log").insert({
+            alert_id: alert_id,
+            organization_id: client.organization_id,
+            recipient_email: email,
+            recipient_name: profile.full_name || null,
+            status: "sent",
+          });
         } catch (emailErr) {
-          errors.push(`${email}: ${String(emailErr)}`);
+          orgFailCount++;
+          const errMsg = String(emailErr);
+          errors.push(`${email}: ${errMsg}`);
+
+          // Log failed send
+          await supabase.from("alert_notification_log").insert({
+            alert_id: alert_id,
+            organization_id: client.organization_id,
+            recipient_email: email,
+            recipient_name: profile.full_name || null,
+            status: "failed",
+            error_message: errMsg,
+          });
         }
+      }
+
+      // Update affected client's notification status
+      const status = orgFailCount === 0 && orgSentCount > 0
+        ? "sent"
+        : orgSentCount > 0 && orgFailCount > 0
+          ? "partial"
+          : orgFailCount > 0
+            ? "failed"
+            : null;
+
+      if (status) {
+        await supabase
+          .from("alert_affected_clients")
+          .update({
+            notified_at: new Date().toISOString(),
+            notification_status: status,
+          })
+          .eq("id", client.id);
       }
     }
 

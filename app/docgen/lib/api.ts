@@ -140,6 +140,9 @@ export interface DbAffectedClient {
   ai_risk: string | null;
   ai_reason: string | null;
   ai_elena_comment: string | null;
+  // Notification tracking
+  notified_at: string | null;
+  notification_status: "sent" | "partial" | "failed" | null;
 }
 
 export async function loadAlerts(): Promise<DbAlert[]> {
@@ -263,7 +266,7 @@ export async function publishAlert(
     reason: string;
     elena_comment: string;
   }[],
-): Promise<void> {
+): Promise<{ sent: number; errors: number } | undefined> {
   // Update alert to 'new' status with final values
   const { error: alertErr } = await supabase
     .from("regulatory_alerts")
@@ -301,14 +304,17 @@ export async function publishAlert(
   }
 
   // Trigger email notification via Edge Function
+  let emailResult: { sent: number; errors: number } | undefined;
   try {
-    await supabase.functions.invoke("notify-alert", {
+    const { data } = await supabase.functions.invoke("notify-alert", {
       body: { alert_id: alertId },
     });
+    emailResult = data as { sent: number; errors: number };
   } catch (notifyErr) {
     console.error("Failed to send alert notifications:", notifyErr);
     // Don't throw — the alert is already published
   }
+  return emailResult;
 }
 
 export async function dismissAlert(alertId: string): Promise<void> {
@@ -606,6 +612,49 @@ export async function loadDocumentAuditLog(docId: string): Promise<AuditEntry[]>
     changedBy: e.profiles?.full_name ?? "System",
     details: e.details,
   }));
+}
+
+// ─── Notification Tracking ─────────────────────────────────────────
+
+export interface NotificationLogEntry {
+  id: string;
+  organization_id: string;
+  recipient_email: string;
+  recipient_name: string | null;
+  status: "sent" | "failed";
+  error_message: string | null;
+  sent_at: string;
+  org_name?: string;
+}
+
+export async function loadNotificationLog(alertId: string): Promise<NotificationLogEntry[]> {
+  const { data, error } = await supabase
+    .from("alert_notification_log")
+    .select("*, organizations(name)")
+    .eq("alert_id", alertId)
+    .order("sent_at", { ascending: false });
+
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((e: any) => ({
+    id: e.id,
+    organization_id: e.organization_id,
+    recipient_email: e.recipient_email,
+    recipient_name: e.recipient_name,
+    status: e.status,
+    error_message: e.error_message,
+    sent_at: e.sent_at,
+    org_name: e.organizations?.name ?? "Unbekannt",
+  }));
+}
+
+export async function resendAlertNotification(alertId: string): Promise<{ sent: number; errors: number }> {
+  const { data, error } = await supabase.functions.invoke("notify-alert", {
+    body: { alert_id: alertId },
+  });
+
+  if (error) throw error;
+  return data as { sent: number; errors: number };
 }
 
 // ─── Dashboard Stats ───────────────────────────────────────────────

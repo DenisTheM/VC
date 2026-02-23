@@ -19,10 +19,13 @@ import {
   deleteActionItem,
   loadClientActionsForAlert,
   addClientAction,
+  loadNotificationLog,
+  resendAlertNotification,
   type DbAlert,
   type DbActionItem,
   type Organization,
   type ClientActionGroup,
+  type NotificationLogEntry,
 } from "../lib/api";
 
 type Tab = "active" | "drafts" | "dismissed";
@@ -69,6 +72,7 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
 
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [publishBanner, setPublishBanner] = useState<{ sent: number; errors: number } | null>(null);
 
   const handleCreateAlert = async () => {
     setCreating(true);
@@ -130,7 +134,12 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
         alert={draftDetail}
         organizations={organizations}
         onBack={() => { setDraftDetail(null); reload(); }}
-        onPublished={() => { setDraftDetail(null); setActiveTab("active"); reload(); }}
+        onPublished={(emailResult) => {
+          setDraftDetail(null);
+          setActiveTab("active");
+          if (emailResult) setPublishBanner(emailResult);
+          reload();
+        }}
       />
     );
   }
@@ -259,6 +268,38 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
           {creating ? "Wird erstellt..." : "Neuer Alert"}
         </button>
       </div>
+
+      {/* Publish success banner */}
+      {publishBanner && (
+        <div
+          style={{
+            padding: "10px 16px",
+            marginBottom: 16,
+            borderRadius: 8,
+            background: publishBanner.errors > 0 ? "#fffbeb" : "#ecf5f1",
+            border: `1px solid ${publishBanner.errors > 0 ? "#fbbf24" : "#16654e33"}`,
+            color: publishBanner.errors > 0 ? "#92400e" : "#16654e",
+            fontSize: 13,
+            fontFamily: T.sans,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span>
+            {publishBanner.sent > 0
+              ? `${publishBanner.sent} E-Mail${publishBanner.sent !== 1 ? "s" : ""} erfolgreich versendet.`
+              : "Keine E-Mails versendet."}
+            {publishBanner.errors > 0 && ` ${publishBanner.errors} fehlgeschlagen.`}
+          </span>
+          <button
+            onClick={() => setPublishBanner(null)}
+            style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontSize: 16, padding: 0 }}
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       {/* Create error banner */}
       {createError && (
@@ -1015,12 +1056,31 @@ function AlertDetailView({
   const [newClientActionText, setNewClientActionText] = useState("");
   const [newClientActionDue, setNewClientActionDue] = useState("");
   const [savingClientAction, setSavingClientAction] = useState(false);
+  const [notifLog, setNotifLog] = useState<NotificationLogEntry[]>([]);
+  const [notifLogOpen, setNotifLogOpen] = useState(false);
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     loadClientActionsForAlert(alert.id)
       .then(setClientActionGroups)
       .catch((err) => console.error("Failed to load client actions:", err));
+    loadNotificationLog(alert.id)
+      .then(setNotifLog)
+      .catch((err) => console.error("Failed to load notification log:", err));
   }, [alert.id]);
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await resendAlertNotification(alert.id);
+      const updated = await loadNotificationLog(alert.id);
+      setNotifLog(updated);
+    } catch (err) {
+      console.error("Resend failed:", err);
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleActionToggle = async (item: DbActionItem) => {
     const newStatus = item.status === "done" ? "pending" : "done";
@@ -1362,6 +1422,9 @@ function AlertDetailView({
                 {alert.affected_clients.map((c) => {
                   const riskColor = c.risk === "high" ? T.red : c.risk === "medium" ? T.amber : T.accent;
                   const clientName = c.organizations?.name ?? "Unbekannt";
+                  const ns = (c as unknown as { notification_status: string | null }).notification_status;
+                  const notifColor = ns === "sent" ? T.accent : ns === "partial" ? T.amber : ns === "failed" ? T.red : T.ink4;
+                  const notifLabel = ns === "sent" ? "Gesendet" : ns === "partial" ? "Teilweise" : ns === "failed" ? "Fehler" : "Ausstehend";
                   return (
                     <div
                       key={c.id}
@@ -1376,23 +1439,59 @@ function AlertDetailView({
                         <span style={{ fontSize: 12.5, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
                           {clientName}
                         </span>
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 600,
-                            padding: "2px 8px",
-                            borderRadius: 8,
-                            background: riskColor + "18",
-                            color: riskColor,
-                            fontFamily: T.sans,
-                          }}
-                        >
-                          {c.risk === "high" ? "Hoch" : c.risk === "medium" ? "Mittel" : "Niedrig"}
-                        </span>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              padding: "2px 8px",
+                              borderRadius: 8,
+                              background: notifColor + "18",
+                              color: notifColor,
+                              fontFamily: T.sans,
+                            }}
+                          >
+                            {notifLabel}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              padding: "2px 8px",
+                              borderRadius: 8,
+                              background: riskColor + "18",
+                              color: riskColor,
+                              fontFamily: T.sans,
+                            }}
+                          >
+                            {c.risk === "high" ? "Hoch" : c.risk === "medium" ? "Mittel" : "Niedrig"}
+                          </span>
+                        </div>
                       </div>
                       <div style={{ fontSize: 11.5, color: T.ink3, fontFamily: T.sans, lineHeight: 1.4 }}>
                         {c.reason}
                       </div>
+                      {ns === "failed" && (
+                        <button
+                          onClick={handleResend}
+                          disabled={resending}
+                          style={{
+                            marginTop: 6,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: "4px 10px",
+                            borderRadius: 6,
+                            border: `1px solid ${T.red}33`,
+                            background: "#fef2f2",
+                            color: T.red,
+                            cursor: resending ? "default" : "pointer",
+                            fontFamily: T.sans,
+                            opacity: resending ? 0.6 : 1,
+                          }}
+                        >
+                          {resending ? "Wird gesendet..." : "Erneut senden"}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -1598,6 +1697,91 @@ function AlertDetailView({
               </p>
             </div>
           )}
+
+          {/* Email notification log */}
+          {notifLog.length > 0 && (
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: T.rLg,
+                padding: "20px 22px",
+                border: `1px solid ${T.border}`,
+                boxShadow: T.shSm,
+              }}
+            >
+              <button
+                onClick={() => setNotifLogOpen(!notifLogOpen)}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 0,
+                  fontFamily: T.sans,
+                }}
+              >
+                <Icon d={icons.mail} size={14} color={T.ink3} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
+                  E-Mail-Protokoll ({notifLog.length})
+                </span>
+                <span style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}>
+                  <Icon d={notifLogOpen ? "M19 15l-7-7-7 7" : "M9 5l7 7-7 7"} size={12} color={T.ink4} />
+                </span>
+              </button>
+
+              {notifLogOpen && (
+                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {notifLog.map((entry) => (
+                    <div
+                      key={entry.id}
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: 6,
+                        background: T.s1,
+                        border: `1px solid ${T.borderL}`,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 500, color: T.ink2, fontFamily: T.sans }}>
+                          {entry.recipient_name ?? entry.recipient_email}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 600,
+                            padding: "1px 6px",
+                            borderRadius: 4,
+                            background: entry.status === "sent" ? T.accentS : "#fef2f2",
+                            color: entry.status === "sent" ? T.accent : T.red,
+                            fontFamily: T.sans,
+                          }}
+                        >
+                          {entry.status === "sent" ? "Gesendet" : "Fehler"}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 10.5, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
+                        {entry.org_name} &middot;{" "}
+                        {new Date(entry.sent_at).toLocaleString("de-CH", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                      {entry.error_message && (
+                        <div style={{ fontSize: 10, color: T.red, fontFamily: T.sans, marginTop: 2 }}>
+                          {entry.error_message.length > 80 ? entry.error_message.slice(0, 80) + "..." : entry.error_message}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1612,7 +1796,7 @@ interface DraftDetailViewProps {
   alert: DbAlert;
   organizations: Organization[];
   onBack: () => void;
-  onPublished: () => void;
+  onPublished: (emailResult?: { sent: number; errors: number }) => void;
 }
 
 function DraftDetailView({ alert, organizations, onBack, onPublished }: DraftDetailViewProps) {
@@ -1669,7 +1853,7 @@ function DraftDetailView({ alert, organizations, onBack, onPublished }: DraftDet
   const handlePublish = async () => {
     setPublishing(true);
     try {
-      await publishAlert(
+      const result = await publishAlert(
         alert.id,
         { severity, category, legal_basis: legalBasis, deadline, elena_comment: elenaComment, summary },
         affectedClients.map((c) => ({
@@ -1679,7 +1863,7 @@ function DraftDetailView({ alert, organizations, onBack, onPublished }: DraftDet
           elena_comment: c.elena_comment,
         })),
       );
-      onPublished();
+      onPublished(result as unknown as { sent: number; errors: number } | undefined);
     } catch (err) {
       console.error("Publish alert failed:", err);
     } finally {
