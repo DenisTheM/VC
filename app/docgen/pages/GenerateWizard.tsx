@@ -427,7 +427,7 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
           body: {
             docType: docKey,
             jurisdiction,
-            profile,
+            companyProfile: profile,
             answers,
             organizationId: orgId || undefined,
           },

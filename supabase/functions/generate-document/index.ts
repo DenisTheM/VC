@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const { docType, jurisdiction, companyProfile, answers } = await req.json();
+    const { docType, jurisdiction, companyProfile, answers, organizationId } = await req.json();
 
     if (!docType || !jurisdiction || !companyProfile) {
       return new Response(JSON.stringify({ error: "Missing required fields: docType, jurisdiction, companyProfile" }), {
@@ -161,6 +161,7 @@ Das Dokument soll sofort verwendbar sein und den aktuellen regulatorischen Stand
         name: docType,
         content: generatedContent,
         jurisdiction,
+        organization_id: organizationId || null,
         status: "review",
         wizard_answers: answers || {},
         created_by: user.id,
