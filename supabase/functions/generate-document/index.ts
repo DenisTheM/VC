@@ -60,6 +60,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (!organizationId) {
+      return new Response(JSON.stringify({ error: "organizationId ist erforderlich. Bitte wählen Sie eine Organisation." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Get Anthropic API key
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!anthropicApiKey) {
@@ -161,7 +168,7 @@ Das Dokument soll sofort verwendbar sein und den aktuellen regulatorischen Stand
         name: docType,
         content: generatedContent,
         jurisdiction,
-        organization_id: organizationId || null,
+        organization_id: organizationId,
         status: "review",
         wizard_answers: answers || {},
         created_by: user.id,

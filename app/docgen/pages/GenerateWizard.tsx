@@ -421,29 +421,34 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
   if (step === 3 && doc) {
     // Trigger generation on mount
     if (!generating && !result && !error) {
-      setGenerating(true);
-      supabase.functions
-        .invoke("generate-document", {
-          body: {
-            docType: docKey,
-            jurisdiction,
-            companyProfile: profile,
-            answers,
-            organizationId: orgId || undefined,
-          },
-        })
-        .then(({ data, error: fnError }) => {
-          setGenerating(false);
-          if (fnError) {
-            setError(fnError.message || "Fehler bei der Generierung.");
-          } else {
-            setResult(typeof data === "string" ? data : JSON.stringify(data, null, 2));
-          }
-        })
-        .catch((err: Error) => {
-          setGenerating(false);
-          setError(err.message || "Unbekannter Fehler.");
-        });
+      if (!orgId) {
+        setError("Keine Organisation ausgewählt. Bitte wählen Sie zuerst eine Organisation.");
+      } else {
+        setGenerating(true);
+        supabase.functions
+          .invoke("generate-document", {
+            body: {
+              docType: docKey,
+              jurisdiction,
+              companyProfile: profile,
+              answers,
+              organizationId: orgId,
+            },
+          })
+          .then(({ data, error: fnError }) => {
+            setGenerating(false);
+            if (fnError) {
+              setError(fnError.message || "Fehler bei der Generierung.");
+            } else {
+              const content = data?.document?.content;
+              setResult(content || (typeof data === "string" ? data : "Dokument wurde generiert, aber kein Inhalt erhalten."));
+            }
+          })
+          .catch((err: Error) => {
+            setGenerating(false);
+            setError(err.message || "Unbekannter Fehler.");
+          });
+      }
     }
 
     /* Loading state */

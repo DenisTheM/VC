@@ -7,8 +7,8 @@
 // Expects: { email: string, full_name: string, org_id: string, role: string }
 // =============================================================================
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -19,6 +19,12 @@ const FROM_EMAIL =
 const PORTAL_URL =
   Deno.env.get("VC_PORTAL_URL") || "https://app.virtue-compliance.ch";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
 const VALID_ROLES = ["viewer", "editor", "approver"];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -27,7 +33,12 @@ const ROLE_LABELS: Record<string, string> = {
   approver: "Freigeber",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     const { email, full_name, org_id, role } = await req.json();
 
@@ -62,7 +73,11 @@ serve(async (req) => {
     }
 
     // ── Check if user already exists ─────────────────────────────────
-    const { data: existingUsers } = await supabase.auth.admin.listUsers();
+    const { data: existingUsers } = await supabase.auth.admin.listUsers({
+      page: 1,
+      perPage: 1,
+      filter: email.toLowerCase(),
+    });
     const existingUser = existingUsers?.users?.find(
       (u) => u.email?.toLowerCase() === email.toLowerCase(),
     );
@@ -211,23 +226,31 @@ serve(async (req) => {
 // ── Send Email via Resend ────────────────────────────────────────────────────
 
 async function sendEmail(opts: { to: string; subject: string; html: string }) {
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: FROM_EMAIL,
-      to: [opts.to],
-      subject: opts.subject,
-      html: opts.html,
-    }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Resend API error ${response.status}: ${body}`);
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: FROM_EMAIL,
+        to: [opts.to],
+        subject: opts.subject,
+        html: opts.html,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Resend API error ${response.status}: ${body}`);
+    }
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -379,6 +402,6 @@ function buildAddedToOrgEmail(
 function jsonResponse(data: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
