@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
-import { DOC_STATUS, FORMAT_COLORS } from "../data/clientData";
-import { loadClientDocuments, approveDocument, loadDocumentAuditLog, type ClientOrg, type PortalDoc, type AuditEntry } from "../lib/api";
+import { DOC_STATUS, FORMAT_COLORS, SEV } from "../data/clientData";
+import { loadClientDocuments, approveDocument, loadDocumentAuditLog, loadDocAlerts, type ClientOrg, type PortalDoc, type AuditEntry, type LinkedAlert } from "../lib/api";
 
 interface ClientDocsProps {
   org: ClientOrg | null;
   initialDocName?: string | null;
   onDocConsumed?: () => void;
+  onAlertNav?: (alertId: string) => void;
 }
 
 type StatusFilter = "all" | PortalDoc["status"];
@@ -32,14 +33,14 @@ function downloadDoc(doc: PortalDoc) {
   URL.revokeObjectURL(url);
 }
 
-export function ClientDocs({ org, initialDocName, onDocConsumed }: ClientDocsProps) {
+export function ClientDocs({ org, initialDocName, onDocConsumed, onAlertNav }: ClientDocsProps) {
   const [docs, setDocs] = useState<PortalDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeStatus, setActiveStatus] = useState<StatusFilter>("all");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [selectedDoc, setSelectedDoc] = useState<PortalDoc | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [showAlertOnly, setShowAlertOnly] = useState(false);
 
@@ -60,12 +61,12 @@ export function ClientDocs({ org, initialDocName, onDocConsumed }: ClientDocsPro
 
   useEffect(() => { load(); }, [org]);
 
-  // Deep-link: auto-expand document when navigated from alerts
+  // Deep-link: auto-select document when navigated from alerts
   useEffect(() => {
-    if (initialDocName && docs.length > 0 && !expanded) {
+    if (initialDocName && docs.length > 0 && !selectedDoc) {
       const match = docs.find((d) => d.name === initialDocName);
       if (match) {
-        setExpanded(match.id);
+        setSelectedDoc(match);
         onDocConsumed?.();
       }
     }
@@ -134,7 +135,36 @@ export function ClientDocs({ org, initialDocName, onDocConsumed }: ClientDocsPro
     );
   }
 
-  /* -- Render ------------------------------------------------------ */
+  /* -- Detail view ------------------------------------------------- */
+  if (selectedDoc) {
+    return (
+      <DocDetail
+        doc={selectedDoc}
+        org={org}
+        approvingId={approvingId}
+        onBack={() => setSelectedDoc(null)}
+        onAlertNav={onAlertNav}
+        onApprove={async (doc) => {
+          if (!window.confirm("Ich habe das Dokument «" + doc.name + "» geprüft und gebe es hiermit frei.")) return;
+          setApprovingId(doc.id);
+          try {
+            await approveDocument(doc.id);
+            const now = new Date().toLocaleDateString("de-CH", { day: "numeric", month: "short", year: "numeric" });
+            const updated = { ...doc, status: "current" as const, approvedAt: now, updatedAt: now };
+            setDocs((prev) => prev.map((d) => d.id === doc.id ? updated : d));
+            setSelectedDoc(updated);
+          } catch (err) {
+            console.error("Failed to approve document:", err);
+            alert(err instanceof Error ? err.message : "Freigabe fehlgeschlagen. Bitte versuchen Sie es erneut.");
+          } finally {
+            setApprovingId(null);
+          }
+        }}
+      />
+    );
+  }
+
+  /* -- List view --------------------------------------------------- */
   return (
     <div style={{ padding: "40px 48px", maxWidth: 960 }}>
       <SectionLabel text="Dokumentation" />
@@ -406,34 +436,36 @@ export function ClientDocs({ org, initialDocName, onDocConsumed }: ClientDocsPro
               {group.docs.map((doc) => {
                 const st = DOC_STATUS[doc.status] ?? DOC_STATUS.draft;
                 const fmt = FORMAT_COLORS[doc.format] ?? FORMAT_COLORS.DOCX;
-                const isExpanded = expanded === doc.id;
 
                 return (
                   <div
                     key={doc.id}
+                    onClick={() => setSelectedDoc(doc)}
                     style={{
                       background: "#fff",
                       borderRadius: T.r,
-                      border: `1px solid ${isExpanded ? T.accent + "44" : T.border}`,
+                      border: `1px solid ${T.border}`,
                       borderLeft: `3px solid ${st.color}`,
-                      boxShadow: isExpanded ? T.shMd : T.shSm,
-                      overflow: "hidden",
-                      transition: "box-shadow 0.2s ease, border-color 0.2s ease",
+                      boxShadow: T.shSm,
+                      cursor: "pointer",
+                      transition: "box-shadow 0.15s, transform 0.15s",
+                    }}
+                    onMouseOver={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.boxShadow = T.shMd;
+                      (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)";
+                    }}
+                    onMouseOut={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.boxShadow = T.shSm;
+                      (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
                     }}
                   >
-                    {/* Row header */}
                     <div
-                      onClick={() => setExpanded(isExpanded ? null : doc.id)}
                       style={{
                         padding: "14px 18px",
-                        cursor: "pointer",
                         display: "flex",
                         alignItems: "center",
                         gap: 14,
-                        transition: "background 0.1s",
                       }}
-                      onMouseOver={(e) => ((e.currentTarget as HTMLDivElement).style.background = T.s1)}
-                      onMouseOut={(e) => ((e.currentTarget as HTMLDivElement).style.background = "transparent")}
                     >
                       {/* Format badge */}
                       <span
@@ -490,230 +522,9 @@ export function ClientDocs({ org, initialDocName, onDocConsumed }: ClientDocsPro
                         />
                       )}
 
-                      {/* Inline download button */}
-                      {doc.content && (
-                        <button
-                          title="Download"
-                          onClick={(e) => { e.stopPropagation(); downloadDoc(doc); }}
-                          style={{
-                            background: "none",
-                            border: `1px solid ${T.border}`,
-                            borderRadius: 6,
-                            padding: "5px 7px",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                            transition: "all 0.15s ease",
-                          }}
-                          onMouseOver={(e) => {
-                            (e.currentTarget as HTMLButtonElement).style.background = T.primaryDeep;
-                            (e.currentTarget as HTMLButtonElement).style.borderColor = T.primaryDeep;
-                            const svg = e.currentTarget.querySelector("svg");
-                            if (svg) svg.style.stroke = "#fff";
-                          }}
-                          onMouseOut={(e) => {
-                            (e.currentTarget as HTMLButtonElement).style.background = "none";
-                            (e.currentTarget as HTMLButtonElement).style.borderColor = T.border;
-                            const svg = e.currentTarget.querySelector("svg");
-                            if (svg) svg.style.stroke = T.ink4;
-                          }}
-                        >
-                          <Icon d={icons.download} size={14} color={T.ink4} />
-                        </button>
-                      )}
-
-                      {/* Expand arrow */}
-                      <Icon
-                        d={isExpanded ? "M19 15l-7-7-7 7" : "M9 5l7 7-7 7"}
-                        size={14}
-                        color={T.ink4}
-                      />
+                      {/* Arrow */}
+                      <Icon d="M9 5l7 7-7 7" size={14} color={T.ink4} />
                     </div>
-
-                    {/* Expanded details */}
-                    {isExpanded && (
-                      <div
-                        style={{
-                          padding: "0 18px 18px",
-                          borderTop: `1px solid ${T.borderL}`,
-                        }}
-                      >
-                        <div style={{ paddingTop: 16 }}>
-                          <p style={{ fontSize: 13, color: T.ink2, fontFamily: T.sans, lineHeight: 1.6, margin: "0 0 14px" }}>
-                            {doc.desc}
-                          </p>
-
-                          {/* Doc meta grid */}
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
-                            <div style={{ background: T.s1, borderRadius: 8, padding: "10px 12px" }}>
-                              <div style={{ fontSize: 10, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.3px" }}>
-                                Zuletzt aktualisiert
-                              </div>
-                              <div style={{ fontSize: 12.5, color: T.ink2, fontFamily: T.sans }}>
-                                {doc.updatedAt}
-                              </div>
-                              <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans }}>
-                                von {doc.updatedBy}
-                              </div>
-                            </div>
-                            <div style={{ background: T.s1, borderRadius: 8, padding: "10px 12px" }}>
-                              <div style={{ fontSize: 10, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.3px" }}>
-                                Rechtsgrundlage
-                              </div>
-                              <div style={{ fontSize: 12.5, color: T.ink2, fontFamily: T.sans }}>
-                                {doc.legalBasis}
-                              </div>
-                            </div>
-                            <div style={{ background: T.s1, borderRadius: 8, padding: "10px 12px" }}>
-                              <div style={{ fontSize: 10, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.3px" }}>
-                                Umfang
-                              </div>
-                              <div style={{ fontSize: 12.5, color: T.ink2, fontFamily: T.sans }}>
-                                {doc.pages} Seiten ({doc.format})
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Approval info */}
-                          {doc.status === "current" && doc.approvedAt && (
-                            <div
-                              style={{
-                                background: "#ecf5f1",
-                                borderRadius: 8,
-                                padding: "10px 14px",
-                                marginBottom: 14,
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 8,
-                                border: "1px solid #16654e22",
-                              }}
-                            >
-                              <Icon d={icons.check} size={14} color="#16654e" />
-                              <span style={{ fontSize: 12.5, color: "#16654e", fontFamily: T.sans, fontWeight: 500 }}>
-                                Freigegeben am {doc.approvedAt}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Audit Trail */}
-                          <AuditTimeline docId={doc.id} />
-
-                          {/* Alert notice */}
-                          {doc.alert && (
-                            <div
-                              style={{
-                                background: "#fffbeb",
-                                borderRadius: 8,
-                                padding: "10px 14px",
-                                marginBottom: 14,
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 8,
-                                border: "1px solid #f59e0b22",
-                              }}
-                            >
-                              <Icon d={icons.alert} size={14} color="#d97706" />
-                              <span style={{ fontSize: 12.5, color: "#92400e", fontFamily: T.sans, fontWeight: 500 }}>
-                                {doc.alert}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Document Preview */}
-                          {doc.content && (
-                            <DocPreview doc={doc} />
-                          )}
-
-                          {/* Action buttons */}
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button
-                              disabled={!doc.content}
-                              onClick={() => downloadDoc(doc)}
-                              style={{
-                                background: doc.content ? T.primaryDeep : T.ink4,
-                                color: "#fff",
-                                border: "none",
-                                borderRadius: 8,
-                                padding: "9px 16px",
-                                fontSize: 12.5,
-                                fontWeight: 600,
-                                fontFamily: T.sans,
-                                cursor: doc.content ? "pointer" : "not-allowed",
-                                opacity: doc.content ? 1 : 0.5,
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 6,
-                                transition: "opacity 0.15s ease",
-                              }}
-                            >
-                              <Icon d={icons.download} size={14} color="#fff" />
-                              Download
-                            </button>
-                            {doc.status === "review" && (
-                              <button
-                                disabled={approvingId === doc.id}
-                                onClick={async () => {
-                                  if (!window.confirm("Ich habe das Dokument «" + doc.name + "» geprüft und gebe es hiermit frei.")) return;
-                                  setApprovingId(doc.id);
-                                  try {
-                                    await approveDocument(doc.id);
-                                    const now = new Date().toLocaleDateString("de-CH", { day: "numeric", month: "short", year: "numeric" });
-                                    setDocs((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: "current" as const, approvedAt: now, updatedAt: now } : d));
-                                  } catch (err) {
-                                    console.error("Failed to approve document:", err);
-                                    alert(err instanceof Error ? err.message : "Freigabe fehlgeschlagen. Bitte versuchen Sie es erneut.");
-                                  } finally {
-                                    setApprovingId(null);
-                                  }
-                                }}
-                                style={{
-                                  background: T.accentS,
-                                  color: T.accent,
-                                  border: `1px solid ${T.accent}33`,
-                                  borderRadius: 8,
-                                  padding: "9px 16px",
-                                  fontSize: 12.5,
-                                  fontWeight: 600,
-                                  fontFamily: T.sans,
-                                  cursor: approvingId === doc.id ? "wait" : "pointer",
-                                  opacity: approvingId === doc.id ? 0.6 : 1,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  transition: "opacity 0.15s ease",
-                                }}
-                              >
-                                <Icon d={icons.check} size={14} color={T.accent} />
-                                {approvingId === doc.id ? "Wird freigegeben..." : "Freigeben"}
-                              </button>
-                            )}
-                            <button
-                              onClick={() => { window.location.href = "mailto:es@virtue-compliance.ch?subject=" + encodeURIComponent("Frage zu Dokument: " + doc.name); }}
-                              style={{
-                                background: "#fff",
-                                color: T.ink3,
-                                border: `1px solid ${T.border}`,
-                                borderRadius: 8,
-                                padding: "9px 16px",
-                                fontSize: 12.5,
-                                fontWeight: 600,
-                                fontFamily: T.sans,
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 6,
-                                transition: "all 0.15s ease",
-                              }}
-                            >
-                              <Icon d={icons.mail} size={14} color={T.ink4} />
-                              Elena kontaktieren
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -782,6 +593,375 @@ export function ClientDocs({ org, initialDocName, onDocConsumed }: ClientDocsPro
           <Icon d={icons.mail} size={14} color="#fff" />
           Elena kontaktieren
         </button>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// Document Detail View
+// =============================================================================
+
+function DocDetail({
+  doc,
+  org,
+  approvingId,
+  onBack,
+  onAlertNav,
+  onApprove,
+}: {
+  doc: PortalDoc;
+  org: ClientOrg | null;
+  approvingId: string | null;
+  onBack: () => void;
+  onAlertNav?: (alertId: string) => void;
+  onApprove: (doc: PortalDoc) => void;
+}) {
+  const st = DOC_STATUS[doc.status] ?? DOC_STATUS.draft;
+  const fmt = FORMAT_COLORS[doc.format] ?? FORMAT_COLORS.DOCX;
+
+  return (
+    <div style={{ padding: "40px 48px", maxWidth: 960 }}>
+      {/* Back button */}
+      <button
+        onClick={onBack}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          background: "none",
+          border: "none",
+          color: T.ink3,
+          fontSize: 13,
+          fontFamily: T.sans,
+          cursor: "pointer",
+          padding: 0,
+          marginBottom: 20,
+        }}
+      >
+        <Icon d={icons.back} size={16} color={T.ink3} />
+        Zurück zu Dokumenten
+      </button>
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: fmt.color,
+            background: fmt.bg,
+            padding: "3px 10px",
+            borderRadius: 6,
+            fontFamily: T.sans,
+          }}
+        >
+          {doc.format}
+        </span>
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            color: st.color,
+            background: st.bg,
+            padding: "3px 10px",
+            borderRadius: 6,
+            fontFamily: T.sans,
+            border: `1px solid ${st.color}22`,
+          }}
+        >
+          {st.label}
+        </span>
+      </div>
+
+      <h1
+        style={{
+          fontSize: 24,
+          fontWeight: 700,
+          color: T.ink,
+          fontFamily: T.sans,
+          margin: "0 0 6px",
+          letterSpacing: "-0.4px",
+          lineHeight: 1.3,
+        }}
+      >
+        {doc.name}
+      </h1>
+      <p style={{ fontSize: 13, color: T.ink3, fontFamily: T.sans, margin: "0 0 4px" }}>
+        Version {doc.version} · Zuletzt aktualisiert: {doc.updatedAt}
+      </p>
+      {doc.desc && (
+        <p style={{ fontSize: 13.5, color: T.ink2, fontFamily: T.sans, lineHeight: 1.6, margin: "0 0 24px" }}>
+          {doc.desc}
+        </p>
+      )}
+      {!doc.desc && <div style={{ marginBottom: 24 }} />}
+
+      {/* Meta grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+        <div style={{ background: T.s1, borderRadius: T.r, padding: "14px 16px", border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.3px" }}>
+            Zuletzt aktualisiert
+          </div>
+          <div style={{ fontSize: 13, color: T.ink2, fontFamily: T.sans }}>
+            {doc.updatedAt}
+          </div>
+          <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans }}>
+            von {doc.updatedBy}
+          </div>
+        </div>
+        <div style={{ background: T.s1, borderRadius: T.r, padding: "14px 16px", border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.3px" }}>
+            Rechtsgrundlage
+          </div>
+          <div style={{ fontSize: 13, color: T.ink2, fontFamily: T.sans, lineHeight: 1.5 }}>
+            {doc.legalBasis}
+          </div>
+        </div>
+        <div style={{ background: T.s1, borderRadius: T.r, padding: "14px 16px", border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.3px" }}>
+            Umfang
+          </div>
+          <div style={{ fontSize: 13, color: T.ink2, fontFamily: T.sans }}>
+            {doc.pages} Seiten ({doc.format})
+          </div>
+        </div>
+      </div>
+
+      {/* Approval info */}
+      {doc.status === "current" && doc.approvedAt && (
+        <div
+          style={{
+            background: "#ecf5f1",
+            borderRadius: 8,
+            padding: "10px 14px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            border: "1px solid #16654e22",
+          }}
+        >
+          <Icon d={icons.check} size={14} color="#16654e" />
+          <span style={{ fontSize: 12.5, color: "#16654e", fontFamily: T.sans, fontWeight: 500 }}>
+            Freigegeben am {doc.approvedAt}
+          </span>
+        </div>
+      )}
+
+      {/* Alert notice */}
+      {doc.alert && (
+        <div
+          style={{
+            background: "#fffbeb",
+            borderRadius: 8,
+            padding: "10px 14px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            border: "1px solid #f59e0b22",
+          }}
+        >
+          <Icon d={icons.alert} size={14} color="#d97706" />
+          <span style={{ fontSize: 12.5, color: "#92400e", fontFamily: T.sans, fontWeight: 500 }}>
+            {doc.alert}
+          </span>
+        </div>
+      )}
+
+      {/* Audit Trail */}
+      <AuditTimeline docId={doc.id} />
+
+      {/* Document Preview */}
+      {doc.content && <DocPreview doc={doc} />}
+
+      {/* Linked Alerts */}
+      {org && <LinkedAlerts docName={doc.name} orgId={org.id} onAlertNav={onAlertNav} />}
+
+      {/* Action buttons */}
+      <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+        <button
+          disabled={!doc.content}
+          onClick={() => downloadDoc(doc)}
+          style={{
+            background: doc.content ? T.primaryDeep : T.ink4,
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            padding: "9px 16px",
+            fontSize: 12.5,
+            fontWeight: 600,
+            fontFamily: T.sans,
+            cursor: doc.content ? "pointer" : "not-allowed",
+            opacity: doc.content ? 1 : 0.5,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            transition: "opacity 0.15s ease",
+          }}
+        >
+          <Icon d={icons.download} size={14} color="#fff" />
+          Download
+        </button>
+        {doc.status === "review" && (
+          <button
+            disabled={approvingId === doc.id}
+            onClick={() => onApprove(doc)}
+            style={{
+              background: T.accentS,
+              color: T.accent,
+              border: `1px solid ${T.accent}33`,
+              borderRadius: 8,
+              padding: "9px 16px",
+              fontSize: 12.5,
+              fontWeight: 600,
+              fontFamily: T.sans,
+              cursor: approvingId === doc.id ? "wait" : "pointer",
+              opacity: approvingId === doc.id ? 0.6 : 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              transition: "opacity 0.15s ease",
+            }}
+          >
+            <Icon d={icons.check} size={14} color={T.accent} />
+            {approvingId === doc.id ? "Wird freigegeben..." : "Freigeben"}
+          </button>
+        )}
+        <button
+          onClick={() => { window.location.href = "mailto:es@virtue-compliance.ch?subject=" + encodeURIComponent("Frage zu Dokument: " + doc.name); }}
+          style={{
+            background: "#fff",
+            color: T.ink3,
+            border: `1px solid ${T.border}`,
+            borderRadius: 8,
+            padding: "9px 16px",
+            fontSize: 12.5,
+            fontWeight: 600,
+            fontFamily: T.sans,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            transition: "all 0.15s ease",
+          }}
+        >
+          <Icon d={icons.mail} size={14} color={T.ink4} />
+          Elena kontaktieren
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// Linked Alerts — shows regulatory alerts that reference this document
+// =============================================================================
+
+function LinkedAlerts({
+  docName,
+  orgId,
+  onAlertNav,
+}: {
+  docName: string;
+  orgId: string;
+  onAlertNav?: (alertId: string) => void;
+}) {
+  const [alerts, setAlerts] = useState<LinkedAlert[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    loadDocAlerts(docName, orgId)
+      .then(setAlerts)
+      .catch((err) => console.error("Failed to load linked alerts:", err))
+      .finally(() => setLoading(false));
+  }, [docName, orgId]);
+
+  if (loading) {
+    return (
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans }}>Verknüpfte Meldungen werden geladen...</div>
+      </div>
+    );
+  }
+
+  if (alerts.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <h3
+        style={{
+          fontSize: 13,
+          fontWeight: 700,
+          color: T.ink3,
+          fontFamily: T.sans,
+          margin: "0 0 10px",
+          textTransform: "uppercase",
+          letterSpacing: "0.3px",
+        }}
+      >
+        Verknüpfte Meldungen
+      </h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {alerts.map((a) => {
+          const sev = SEV[a.severity as keyof typeof SEV] ?? SEV.info;
+          return (
+            <div
+              key={a.id}
+              onClick={() => onAlertNav?.(a.id)}
+              style={{
+                background: "#fff",
+                borderRadius: T.r,
+                padding: "12px 16px",
+                border: `1px solid ${T.border}`,
+                borderLeft: `3px solid ${sev.border}`,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                cursor: onAlertNav ? "pointer" : "default",
+                transition: "box-shadow 0.15s, transform 0.15s",
+              }}
+              onMouseOver={(e) => {
+                if (onAlertNav) {
+                  (e.currentTarget as HTMLDivElement).style.boxShadow = T.shMd;
+                  (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)";
+                }
+              }}
+              onMouseOut={(e) => {
+                (e.currentTarget as HTMLDivElement).style.boxShadow = "none";
+                (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
+              }}
+            >
+              <Icon d={icons.alert} size={16} color={sev.color} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
+                  {a.title}
+                </div>
+              </div>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: sev.color,
+                  background: sev.bg,
+                  padding: "2px 8px",
+                  borderRadius: 6,
+                  fontFamily: T.sans,
+                  textTransform: "uppercase",
+                  flexShrink: 0,
+                }}
+              >
+                {sev.label}
+              </span>
+              <span style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, flexShrink: 0 }}>
+                {a.date}
+              </span>
+              {onAlertNav && <Icon d="M9 5l7 7-7 7" size={12} color={T.ink4} />}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

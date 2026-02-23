@@ -8,12 +8,14 @@ export interface ClientOrg {
   short_name: string | null;
   industry: string | null;
   sro: string | null;
+  contact_name: string | null;
+  contact_salutation: string | null;
 }
 
 export async function loadUserOrganization(userId: string): Promise<ClientOrg | null> {
   const { data, error } = await supabase
     .from("organization_members")
-    .select("organizations(id, name, short_name, industry, sro)")
+    .select("organizations(id, name, short_name, industry, sro, contact_name, contact_salutation)")
     .eq("user_id", userId)
     .limit(1)
     .maybeSingle();
@@ -101,7 +103,7 @@ export async function loadClientAlerts(organizationId: string): Promise<PortalAl
 
 export async function updateClientActionStatus(
   actionId: string,
-  newStatus: "offen" | "erledigt",
+  newStatus: "offen" | "in_arbeit" | "erledigt",
 ): Promise<void> {
   const { error } = await supabase
     .from("client_alert_actions")
@@ -255,4 +257,42 @@ export async function loadPortalStats(organizationId: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     currentDocs: docs.filter((d: any) => d.status === "current").length,
   };
+}
+
+// ─── Document ↔ Alert Links ──────────────────────────────────────────
+
+export interface LinkedAlert {
+  id: string;
+  title: string;
+  severity: string;
+  date: string;
+}
+
+export async function loadDocAlerts(docName: string, orgId: string): Promise<LinkedAlert[]> {
+  const { data, error } = await supabase
+    .from("alert_related_documents")
+    .select(`
+      alert_affected_clients!inner(
+        id,
+        organization_id,
+        regulatory_alerts!inner(title, severity, date, status)
+      )
+    `)
+    .eq("name", docName)
+    .eq("alert_affected_clients.organization_id", orgId);
+
+  if (error) throw error;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? [])
+    .filter((row: any) => {
+      const status = row.alert_affected_clients?.regulatory_alerts?.status;
+      return status && status !== "draft" && status !== "dismissed";
+    })
+    .map((row: any) => ({
+      id: row.alert_affected_clients.id,
+      title: row.alert_affected_clients.regulatory_alerts.title,
+      severity: row.alert_affected_clients.regulatory_alerts.severity,
+      date: row.alert_affected_clients.regulatory_alerts.date,
+    }));
 }

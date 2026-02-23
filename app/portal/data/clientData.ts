@@ -31,3 +31,34 @@ export const FORMAT_COLORS = {
   PPTX: { bg: "#fff7ed", color: "#ea580c" },
   XLSX: { bg: T.accentS, color: T.accent },
 } as const;
+
+/* ------------------------------------------------------------------ */
+/*  Action Status Config (offen → in_arbeit → erledigt)               */
+/* ------------------------------------------------------------------ */
+
+export const ACTION_STATUS = {
+  offen: {
+    label: "Offen",
+    bg: "#fffbeb",
+    color: "#d97706",
+    border: T.amber,
+    icon: null as string | null,
+    strikethrough: false,
+  },
+  in_arbeit: {
+    label: "In Arbeit",
+    bg: "#eff6ff",
+    color: "#3b82f6",
+    border: "#3b82f6",
+    icon: "clock" as string | null,
+    strikethrough: false,
+  },
+  erledigt: {
+    label: "Erledigt",
+    bg: T.accentS,
+    color: T.accent,
+    border: T.accent,
+    icon: "check" as string | null,
+    strikethrough: true,
+  },
+} as const;

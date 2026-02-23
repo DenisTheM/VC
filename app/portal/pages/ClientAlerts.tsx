@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
-import { SEV, IMPACT } from "../data/clientData";
+import { SEV, IMPACT, ACTION_STATUS } from "../data/clientData";
 import { loadClientAlerts, updateClientActionStatus, type ClientOrg, type PortalAlert } from "../lib/api";
 
 interface ClientAlertsProps {
@@ -99,6 +99,7 @@ export function ClientAlerts({ org, initialAlertId, onAlertConsumed, onDocNav }:
     return (
       <AlertDetail
         alert={selected}
+        org={org}
         orgShort={orgShort}
         onBack={() => setSelected(null)}
         onDocNav={onDocNav}
@@ -473,12 +474,14 @@ export function ClientAlerts({ org, initialAlertId, onAlertConsumed, onDocNav }:
 
 function AlertDetail({
   alert,
+  org,
   orgShort,
   onBack,
   onDocNav,
   onActionsUpdated,
 }: {
   alert: PortalAlert;
+  org: ClientOrg | null;
   orgShort: string;
   onBack: () => void;
   onDocNav?: (docName: string) => void;
@@ -489,13 +492,18 @@ function AlertDetail({
   const [localActions, setLocalActions] = useState(alert.actions);
 
   const handleToggle = async (action: PortalAlert["actions"][number]) => {
-    const newStatus = action.status === "offen" ? "erledigt" : "offen";
+    const cycle: Record<string, string> = {
+      offen: "in_arbeit",
+      in_arbeit: "erledigt",
+      erledigt: "offen",
+    };
+    const newStatus = cycle[action.status] ?? "in_arbeit";
     // Optimistic update
     const updated = localActions.map((a) => (a.id === action.id ? { ...a, status: newStatus } : a));
     setLocalActions(updated);
     onActionsUpdated(updated);
     try {
-      await updateClientActionStatus(action.id, newStatus as "offen" | "erledigt");
+      await updateClientActionStatus(action.id, newStatus as "offen" | "in_arbeit" | "erledigt");
     } catch (err) {
       console.error("Failed to update action status:", err);
       // Revert on error
@@ -505,8 +513,10 @@ function AlertDetail({
   };
 
   const doneCount = localActions.filter((a) => a.status === "erledigt").length;
+  const inProgressCount = localActions.filter((a) => a.status === "in_arbeit").length;
   const totalCount = localActions.length;
-  const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+  const donePct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+  const inProgressPct = totalCount > 0 ? Math.round((inProgressCount / totalCount) * 100) : 0;
 
   return (
     <div style={{ padding: "40px 48px", maxWidth: 960 }}>
@@ -691,6 +701,12 @@ function AlertDetail({
                   whiteSpace: "pre-line",
                 }}
               >
+                {org?.contact_salutation && org?.contact_name && (
+                  <strong style={{ color: "#fff" }}>
+                    {org.contact_salutation === "Frau" ? "Liebe" : "Lieber"}{" "}
+                    {org.contact_name.split(" ")[0]},{" "}
+                  </strong>
+                )}
                 {alert.elenaComment}
               </p>
             </div>
@@ -718,7 +734,7 @@ function AlertDetail({
                     Fortschritt
                   </span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: T.accent, fontFamily: T.sans }}>
-                    {doneCount}/{totalCount} erledigt
+                    {doneCount}/{totalCount} erledigt{inProgressCount > 0 ? ` · ${inProgressCount} in Arbeit` : ""}
                   </span>
                 </div>
                 <div
@@ -727,14 +743,22 @@ function AlertDetail({
                     borderRadius: 3,
                     background: T.s2,
                     overflow: "hidden",
+                    display: "flex",
                   }}
                 >
                   <div
                     style={{
                       height: "100%",
-                      borderRadius: 3,
                       background: T.accent,
-                      width: `${pct}%`,
+                      width: `${donePct}%`,
+                      transition: "width 0.3s ease",
+                    }}
+                  />
+                  <div
+                    style={{
+                      height: "100%",
+                      background: "#93c5fd",
+                      width: `${inProgressPct}%`,
                       transition: "width 0.3s ease",
                     }}
                   />
@@ -742,70 +766,74 @@ function AlertDetail({
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {localActions.map((action) => (
-                  <div
-                    key={action.id}
-                    style={{
-                      background: "#fff",
-                      borderRadius: T.r,
-                      padding: "14px 16px",
-                      border: `1px solid ${T.border}`,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                    }}
-                  >
+                {localActions.map((action) => {
+                  const st = ACTION_STATUS[action.status as keyof typeof ACTION_STATUS] ?? ACTION_STATUS.offen;
+                  return (
                     <div
-                      onClick={() => handleToggle(action)}
+                      key={action.id}
                       style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: 6,
-                        border: `2px solid ${action.status === "offen" ? T.amber : T.accent}`,
-                        background: action.status === "offen" ? "#fffbeb" : T.accentS,
+                        background: "#fff",
+                        borderRadius: T.r,
+                        padding: "14px 16px",
+                        border: `1px solid ${T.border}`,
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                        cursor: "pointer",
-                        transition: "all 0.15s",
+                        gap: 12,
                       }}
                     >
-                      {action.status !== "offen" && <Icon d={icons.check} size={12} color={T.accent} />}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div
+                        onClick={() => handleToggle(action)}
                         style={{
-                          fontSize: 13.5,
-                          fontWeight: 500,
-                          color: action.status === "offen" ? T.ink : T.ink4,
-                          fontFamily: T.sans,
-                          textDecoration: action.status !== "offen" ? "line-through" : "none",
+                          width: 22,
+                          height: 22,
+                          borderRadius: 6,
+                          border: `2px solid ${st.border}`,
+                          background: st.bg,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          cursor: "pointer",
+                          transition: "all 0.15s",
                         }}
                       >
-                        {action.text}
+                        {st.icon === "check" && <Icon d={icons.check} size={12} color={st.color} />}
+                        {st.icon === "clock" && <Icon d={icons.clock} size={12} color={st.color} />}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 13.5,
+                            fontWeight: 500,
+                            color: st.strikethrough ? T.ink4 : T.ink,
+                            fontFamily: T.sans,
+                            textDecoration: st.strikethrough ? "line-through" : "none",
+                          }}
+                        >
+                          {action.text}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: st.color,
+                            background: st.bg,
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            fontFamily: T.sans,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {st.label}
+                        </span>
+                        <span style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans }}>
+                          Frist: {action.due}
+                        </span>
                       </div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: action.status === "offen" ? "#d97706" : T.accent,
-                          background: action.status === "offen" ? "#fffbeb" : T.accentS,
-                          padding: "2px 8px",
-                          borderRadius: 6,
-                          fontFamily: T.sans,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {action.status}
-                      </span>
-                      <span style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans }}>
-                        Frist: {action.due}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
