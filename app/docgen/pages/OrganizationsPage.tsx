@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
-import { createOrganization, loadDocCountsByOrg, searchZefix, loadOrgMembers, updateOrgMemberRole, removeOrgMember, inviteMember, type Organization, type ZefixResult, type OrgMember, type OrgRole } from "../lib/api";
+import { createOrganization, deleteOrganization, loadDocCountsByOrg, searchZefix, loadOrgMembers, updateOrgMemberRole, removeOrgMember, inviteMember, type Organization, type ZefixResult, type OrgMember, type OrgRole } from "../lib/api";
 
 const INDUSTRIES = [
   "Fintech",
@@ -21,6 +21,7 @@ interface OrganizationsPageProps {
   organizations: Organization[];
   onSelectOrg: (orgId: string, zefixData?: ZefixResult) => void;
   onOrgCreated: (org: Organization, zefixData?: ZefixResult) => void;
+  onOrgDeleted: (orgId: string) => void;
   initialShowForm?: boolean;
 }
 
@@ -37,9 +38,10 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, initialShowForm = false }: OrganizationsPageProps) {
+export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, onOrgDeleted, initialShowForm = false }: OrganizationsPageProps) {
   const [showForm, setShowForm] = useState(initialShowForm);
   const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
   const [membersOrgId, setMembersOrgId] = useState<string | null>(null);
 
@@ -110,6 +112,20 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, in
       console.error("Failed to create organization:", err);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleDelete = async (org: Organization) => {
+    if (!window.confirm(`Kunden "${org.name}" wirklich löschen? Alle zugehörigen Daten (Profil, Dokumente, Mitglieder) werden unwiderruflich entfernt.`)) return;
+    setDeleting(org.id);
+    try {
+      await deleteOrganization(org.id);
+      if (membersOrgId === org.id) setMembersOrgId(null);
+      onOrgDeleted(org.id);
+    } catch (err) {
+      console.error("Failed to delete organization:", err);
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -517,31 +533,58 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, in
                   <Icon d={icons.doc} size={12} color={T.ink4} /> {docCounts[org.id] || 0} Dok.
                 </span>
               </div>
-              {/* Members toggle */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMembersOrgId(membersOrgId === org.id ? null : org.id);
-                }}
-                style={{
-                  marginTop: 10,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                  background: membersOrgId === org.id ? T.accentS : T.s1,
-                  border: `1px solid ${membersOrgId === org.id ? T.accent + "33" : T.border}`,
-                  borderRadius: 6,
-                  padding: "5px 10px",
-                  fontSize: 11.5,
-                  fontWeight: 500,
-                  color: membersOrgId === org.id ? T.accent : T.ink3,
-                  fontFamily: T.sans,
-                  cursor: "pointer",
-                }}
-              >
-                <Icon d={icons.users} size={12} color={membersOrgId === org.id ? T.accent : T.ink4} />
-                Mitglieder
-              </button>
+              {/* Actions row */}
+              <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMembersOrgId(membersOrgId === org.id ? null : org.id);
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    background: membersOrgId === org.id ? T.accentS : T.s1,
+                    border: `1px solid ${membersOrgId === org.id ? T.accent + "33" : T.border}`,
+                    borderRadius: 6,
+                    padding: "5px 10px",
+                    fontSize: 11.5,
+                    fontWeight: 500,
+                    color: membersOrgId === org.id ? T.accent : T.ink3,
+                    fontFamily: T.sans,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Icon d={icons.users} size={12} color={membersOrgId === org.id ? T.accent : T.ink4} />
+                  Mitglieder
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(org);
+                  }}
+                  disabled={deleting === org.id}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    background: T.s1,
+                    border: `1px solid ${T.border}`,
+                    borderRadius: 6,
+                    padding: "5px 10px",
+                    fontSize: 11.5,
+                    fontWeight: 500,
+                    color: T.ink4,
+                    fontFamily: T.sans,
+                    cursor: deleting === org.id ? "wait" : "pointer",
+                    opacity: deleting === org.id ? 0.5 : 1,
+                  }}
+                  title="Kunden löschen"
+                >
+                  <Icon d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={12} color={T.ink4} />
+                  {deleting === org.id ? "Löschen..." : "Löschen"}
+                </button>
+              </div>
             </div>
           ))}
         </div>

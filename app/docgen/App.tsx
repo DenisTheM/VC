@@ -142,6 +142,16 @@ function DocGenInner() {
     setPage("profile");
   }, []);
 
+  // Remove deleted org from local state
+  const handleOrgDeleted = useCallback((deletedOrgId: string) => {
+    setOrganizations((prev) => prev.filter((o) => o.id !== deletedOrgId));
+    if (orgId === deletedOrgId) {
+      setOrgId(null);
+      setUpdatedAt(null);
+      setPage("organizations");
+    }
+  }, [orgId]);
+
   const profOk = PROFILE_FIELDS.filter((f) => f.required !== false).every((f) => {
     const v = profile[f.id];
     return v !== undefined && v !== "" && v !== null && !(Array.isArray(v) && v.length === 0);
@@ -311,6 +321,7 @@ function DocGenInner() {
               organizations={organizations}
               onSelectOrg={handleSelectOrg}
               onOrgCreated={handleOrgCreated}
+              onOrgDeleted={handleOrgDeleted}
               initialShowForm={page === "new-profile"}
             />
           )}
