@@ -1055,6 +1055,7 @@ function AlertDetailView({
   const [addClientActionFor, setAddClientActionFor] = useState<string | null>(null);
   const [newClientActionText, setNewClientActionText] = useState("");
   const [newClientActionDue, setNewClientActionDue] = useState("");
+  const [newClientActionDueDate, setNewClientActionDueDate] = useState("");
   const [savingClientAction, setSavingClientAction] = useState(false);
   const [notifLog, setNotifLog] = useState<NotificationLogEntry[]>([]);
   const [notifLogOpen, setNotifLogOpen] = useState(false);
@@ -1108,6 +1109,7 @@ function AlertDetailView({
       await addClientAction(affectedClientId, {
         text: newClientActionText.trim(),
         due: newClientActionDue || undefined,
+        due_date: newClientActionDueDate || undefined,
       });
       // Reload client actions
       const updated = await loadClientActionsForAlert(alert.id);
@@ -1115,6 +1117,7 @@ function AlertDetailView({
       setAddClientActionFor(null);
       setNewClientActionText("");
       setNewClientActionDue("");
+      setNewClientActionDueDate("");
     } catch (err) {
       console.error("Failed to add client action:", err);
     } finally {
@@ -1578,20 +1581,42 @@ function AlertDetailView({
                           outline: "none",
                         }}
                       />
-                      <input
-                        type="text"
-                        value={newClientActionDue}
-                        onChange={(e) => setNewClientActionDue(e.target.value)}
-                        placeholder="Frist (optional)"
-                        style={{
-                          padding: "6px 8px",
-                          borderRadius: 6,
-                          border: `1px solid ${T.border}`,
-                          fontSize: 11.5,
-                          fontFamily: T.sans,
-                          outline: "none",
-                        }}
-                      />
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <input
+                          type="text"
+                          value={newClientActionDue}
+                          onChange={(e) => setNewClientActionDue(e.target.value)}
+                          placeholder="Frist-Text (z.B. Q2 2026)"
+                          style={{
+                            padding: "6px 8px",
+                            borderRadius: 6,
+                            border: `1px solid ${T.border}`,
+                            fontSize: 11.5,
+                            fontFamily: T.sans,
+                            outline: "none",
+                            flex: 1,
+                          }}
+                        />
+                        <input
+                          type="date"
+                          value={newClientActionDueDate}
+                          onChange={(e) => {
+                            setNewClientActionDueDate(e.target.value);
+                            if (e.target.value && !newClientActionDue) {
+                              setNewClientActionDue(new Date(e.target.value).toLocaleDateString("de-CH", { day: "numeric", month: "short", year: "numeric" }));
+                            }
+                          }}
+                          style={{
+                            padding: "6px 8px",
+                            borderRadius: 6,
+                            border: `1px solid ${T.border}`,
+                            fontSize: 11.5,
+                            fontFamily: T.sans,
+                            outline: "none",
+                            width: 130,
+                          }}
+                        />
+                      </div>
                       <div style={{ display: "flex", gap: 6 }}>
                         <button
                           onClick={() => handleAddClientAction(group.affectedClientId)}
@@ -1616,6 +1641,7 @@ function AlertDetailView({
                             setAddClientActionFor(null);
                             setNewClientActionText("");
                             setNewClientActionDue("");
+                            setNewClientActionDueDate("");
                           }}
                           style={{
                             padding: "5px 10px",

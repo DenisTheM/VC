@@ -827,9 +827,7 @@ function AlertDetail({
                         >
                           {st.label}
                         </span>
-                        <span style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans }}>
-                          Frist: {action.due}
-                        </span>
+                        <DueIndicator due={action.due} />
                       </div>
                     </div>
                   );
@@ -960,5 +958,36 @@ function AlertDetail({
         )}
       </div>
     </div>
+  );
+}
+
+// =============================================================================
+// Due Date Indicator — color-coded deadline display
+// =============================================================================
+
+function DueIndicator({ due }: { due: string }) {
+  if (!due) return <span style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans }}>Keine Frist</span>;
+
+  // Try to parse ISO or de-CH formatted dates
+  const parsed = Date.parse(due);
+  if (isNaN(parsed)) {
+    return <span style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans }}>Frist: {due}</span>;
+  }
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const dueDate = new Date(parsed);
+  dueDate.setHours(0, 0, 0, 0);
+  const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / 86400000);
+
+  let color: string = T.ink4; // default grey (no date)
+  if (diffDays < 0) color = "#dc2626"; // red — overdue
+  else if (diffDays <= 7) color = "#d97706"; // yellow — ≤7 days
+  else color = "#16654e"; // green — >7 days
+
+  return (
+    <span style={{ fontSize: 11.5, color, fontFamily: T.sans, fontWeight: diffDays < 0 ? 600 : 400 }}>
+      Frist: {due}
+    </span>
   );
 }

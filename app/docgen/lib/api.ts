@@ -460,7 +460,7 @@ export async function loadClientActionsForAlert(
 
 export async function addClientAction(
   affectedClientId: string,
-  action: { text: string; due?: string },
+  action: { text: string; due?: string; due_date?: string },
 ): Promise<void> {
   const { error } = await supabase
     .from("client_alert_actions")
@@ -468,6 +468,7 @@ export async function addClientAction(
       alert_affected_client_id: affectedClientId,
       text: action.text,
       due: action.due || null,
+      due_date: action.due_date || null,
       status: "offen",
     });
 
