@@ -3,7 +3,15 @@ import { SectionLabel } from "@shared/components/SectionLabel";
 import { Icon, icons } from "@shared/components/Icon";
 import { T } from "@shared/styles/tokens";
 import { DOC_TYPES } from "../data/docTypes";
-import { loadDocuments, loadDocumentAuditLog, type DbDocument, type AuditEntry } from "../lib/api";
+import {
+  loadDocuments,
+  loadDocumentAuditLog,
+  updateDocumentStatus,
+  bulkUpdateDocumentStatus,
+  type DbDocument,
+  type AuditEntry,
+  type Organization,
+} from "../lib/api";
 import { exportDocumentAsPdf } from "@shared/lib/pdfExport";
 
 const STATUS_COLORS: Record<string, { bg: string; color: string; label: string }> = {
@@ -13,11 +21,29 @@ const STATUS_COLORS: Record<string, { bg: string; color: string; label: string }
   outdated: { bg: "#fef2f2", color: "#dc2626", label: "Veraltet" },
 };
 
-export function DocumentsPage() {
+const FORMAT_COLORS: Record<string, { bg: string; color: string }> = {
+  DOCX: { bg: "#eff6ff", color: "#3b82f6" },
+  PDF: { bg: "#fef2f2", color: "#dc2626" },
+  PPTX: { bg: "#fef3c7", color: "#d97706" },
+  XLSX: { bg: "#ecf5f1", color: "#16654e" },
+};
+
+type StatusFilter = "all" | "current" | "review" | "draft" | "outdated";
+
+interface DocumentsPageProps {
+  organizations?: Organization[];
+}
+
+export function DocumentsPage({ organizations }: DocumentsPageProps) {
   const [documents, setDocuments] = useState<DbDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [selectedDoc, setSelectedDoc] = useState<DbDocument | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [orgFilter, setOrgFilter] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -33,13 +59,67 @@ export function DocumentsPage() {
 
   useEffect(() => { load(); }, []);
 
+  const statusCounts = {
+    all: documents.length,
+    current: documents.filter((d) => d.status === "current").length,
+    review: documents.filter((d) => d.status === "review").length,
+    draft: documents.filter((d) => d.status === "draft").length,
+    outdated: documents.filter((d) => d.status === "outdated").length,
+  };
+
+  const orgs = [...new Map(documents.filter((d) => d.organizations).map((d) => [d.organization_id, d.organizations!.name])).entries()];
+
+  const filtered = documents.filter((d) => {
+    const matchSearch = !search || d.name.toLowerCase().includes(search.toLowerCase()) || (d.organizations?.name ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === "all" || d.status === statusFilter;
+    const matchOrg = !orgFilter || d.organization_id === orgFilter;
+    return matchSearch && matchStatus && matchOrg;
+  });
+
+  const handleBulkAction = async (newStatus: string) => {
+    if (selectedIds.size === 0) return;
+    setBulkStatus(newStatus);
+    try {
+      await bulkUpdateDocumentStatus([...selectedIds], newStatus as DbDocument["status"]);
+      setSelectedIds(new Set());
+      load();
+    } catch (err) {
+      console.error("Bulk update failed:", err);
+    } finally {
+      setBulkStatus(null);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  /* -- Detail View ------------------------------------------------- */
+  if (selectedDoc) {
+    return (
+      <DocDetailView
+        doc={selectedDoc}
+        onBack={() => { setSelectedDoc(null); load(); }}
+        onStatusChange={(newStatus) => {
+          setSelectedDoc({ ...selectedDoc, status: newStatus });
+        }}
+      />
+    );
+  }
+
+  /* -- List View ---------------------------------------------------- */
   return (
     <div>
       <SectionLabel text="Dokumentenverwaltung" />
       <h1 style={{ fontFamily: T.serif, fontSize: 28, fontWeight: 700, color: T.ink, margin: "0 0 2px" }}>
         Dokumente
       </h1>
-      <p style={{ fontSize: 14.5, color: T.ink3, fontFamily: T.sans, margin: "0 0 24px" }}>
+      <p style={{ fontSize: 14.5, color: T.ink3, fontFamily: T.sans, margin: "0 0 20px" }}>
         Alle generierten Compliance-Dokumente auf einen Blick.
       </p>
 
@@ -50,196 +130,472 @@ export function DocumentsPage() {
       ) : error ? (
         <div style={{ padding: 40, textAlign: "center", fontFamily: T.sans }}>
           <div style={{ fontSize: 14, color: T.ink3, marginBottom: 12 }}>Dokumente konnten nicht geladen werden.</div>
-          <button
-            onClick={load}
-            style={{
-              padding: "8px 20px",
-              borderRadius: 8,
-              border: `1px solid ${T.border}`,
-              background: "#fff",
-              color: T.ink,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: T.sans,
-            }}
-          >
+          <button onClick={load} style={{ padding: "8px 20px", borderRadius: 8, border: `1px solid ${T.border}`, background: "#fff", color: T.ink, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: T.sans }}>
             Erneut versuchen
           </button>
         </div>
-      ) : documents.length === 0 ? (
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: T.rLg,
-            padding: "48px 32px",
-            border: `1px solid ${T.border}`,
-            boxShadow: T.shSm,
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 14,
-              background: T.accentS,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              margin: "0 auto 16px",
-            }}
-          >
-            <Icon d={icons.doc} size={24} color={T.accent} />
-          </div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: T.ink, fontFamily: T.sans, marginBottom: 6 }}>
-            Noch keine Dokumente
-          </div>
-          <p style={{ fontSize: 13.5, color: T.ink3, fontFamily: T.sans, margin: 0 }}>
-            Generieren Sie Ihr erstes Compliance-Dokument über den Wizard.
-          </p>
-        </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {documents.map((doc) => {
-            const docType = DOC_TYPES[doc.doc_type];
-            const status = STATUS_COLORS[doc.status] ?? STATUS_COLORS.draft;
-            const isExpanded = expanded === doc.id;
-            const date = new Date(doc.created_at).toLocaleDateString("de-CH", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            });
-
-            return (
-              <div
-                key={doc.id}
-                style={{
-                  background: "#fff",
-                  borderRadius: T.rLg,
-                  border: `1px solid ${T.border}`,
-                  boxShadow: T.shSm,
-                  overflow: "hidden",
-                }}
-              >
+        <>
+          {/* Stat cards */}
+          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+            {(["all", "current", "review", "draft", "outdated"] as StatusFilter[]).map((key) => {
+              const isActive = statusFilter === key;
+              const cfg = key === "all" ? { bg: T.s1, color: T.ink, label: "Total" } : STATUS_COLORS[key];
+              return (
                 <div
-                  onClick={() => setExpanded(isExpanded ? null : doc.id)}
+                  key={key}
+                  onClick={() => setStatusFilter(isActive && key !== "all" ? "all" : key)}
                   style={{
+                    padding: "10px 16px",
+                    borderRadius: T.r,
+                    background: cfg.bg,
                     display: "flex",
                     alignItems: "center",
-                    gap: 14,
-                    padding: "16px 20px",
+                    gap: 8,
                     cursor: "pointer",
+                    border: `2px solid ${isActive ? cfg.color : "transparent"}`,
+                    opacity: statusFilter !== "all" && !isActive ? 0.5 : 1,
+                    transition: "all 0.15s",
                   }}
                 >
-                  <div
-                    style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: 8,
-                      background: T.accentS,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Icon d={docType?.icon ?? icons.doc} size={18} color={T.accent} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
-                      {doc.name}
-                    </div>
-                    <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
-                      {doc.organizations?.name && (
-                        <span style={{ fontWeight: 500, color: T.ink3 }}>{doc.organizations.name} &middot; </span>
-                      )}
-                      {docType?.name ?? doc.doc_type} &middot; {doc.jurisdiction} &middot; {date}
-                    </div>
-                  </div>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      padding: "3px 10px",
-                      borderRadius: 10,
-                      background: status.bg,
-                      color: status.color,
-                      fontFamily: T.sans,
-                    }}
-                  >
-                    {status.label}
+                  <span style={{ fontSize: 18, fontWeight: 700, color: cfg.color, fontFamily: T.sans }}>
+                    {statusCounts[key]}
                   </span>
-                  <span style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans }}>{doc.version}</span>
-                  <span style={{ transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform 0.15s", display: "inline-flex" }}>
-                    <Icon d={icons.arrow} size={14} color={T.ink4} />
+                  <span style={{ fontSize: 12, color: cfg.color, fontFamily: T.sans }}>
+                    {cfg.label}
                   </span>
                 </div>
+              );
+            })}
+          </div>
 
-                {isExpanded && (
+          {/* Search */}
+          <div style={{ position: "relative", marginBottom: 12 }}>
+            <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", display: "flex" }}>
+              <Icon d={icons.search} size={16} color={T.ink4} />
+            </div>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Dokumente durchsuchen..."
+              style={{
+                width: "100%",
+                padding: "10px 12px 10px 38px",
+                borderRadius: T.r,
+                border: `1px solid ${T.border}`,
+                fontSize: 13,
+                fontFamily: T.sans,
+                color: T.ink,
+                background: "#fff",
+                boxSizing: "border-box",
+                outline: "none",
+              }}
+            />
+          </div>
+
+          {/* Filters: status pills + org dropdown */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
+            {Object.entries(STATUS_COLORS).map(([key, cfg]) => {
+              const isActive = statusFilter === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setStatusFilter(isActive ? "all" : key as StatusFilter)}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 16,
+                    border: `1px solid ${isActive ? cfg.color : T.border}`,
+                    background: isActive ? cfg.bg : "#fff",
+                    color: isActive ? cfg.color : T.ink3,
+                    fontSize: 12.5,
+                    fontWeight: isActive ? 600 : 400,
+                    cursor: "pointer",
+                    fontFamily: T.sans,
+                  }}
+                >
+                  {cfg.label}
+                </button>
+              );
+            })}
+            {orgs.length > 1 && (
+              <select
+                value={orgFilter || ""}
+                onChange={(e) => setOrgFilter(e.target.value || null)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${T.border}`,
+                  fontSize: 12.5,
+                  fontFamily: T.sans,
+                  color: T.ink2,
+                  background: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="">Alle Organisationen</option>
+                {orgs.map(([id, name]) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Bulk action bar */}
+          {selectedIds.size > 0 && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "10px 16px",
+                marginBottom: 12,
+                borderRadius: T.r,
+                background: T.accentS,
+                border: `1px solid ${T.accent}22`,
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 600, color: T.accent, fontFamily: T.sans }}>
+                {selectedIds.size} ausgewählt
+              </span>
+              <span style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans }}>Status ändern:</span>
+              {(["current", "review", "draft", "outdated"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => handleBulkAction(s)}
+                  disabled={!!bulkStatus}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    border: `1px solid ${STATUS_COLORS[s].color}33`,
+                    background: STATUS_COLORS[s].bg,
+                    color: STATUS_COLORS[s].color,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: bulkStatus ? "default" : "pointer",
+                    fontFamily: T.sans,
+                    opacity: bulkStatus ? 0.5 : 1,
+                  }}
+                >
+                  {STATUS_COLORS[s].label}
+                </button>
+              ))}
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                style={{
+                  marginLeft: "auto",
+                  background: "none",
+                  border: "none",
+                  color: T.ink3,
+                  fontSize: 12,
+                  cursor: "pointer",
+                  fontFamily: T.sans,
+                }}
+              >
+                Abbrechen
+              </button>
+            </div>
+          )}
+
+          {/* Document list */}
+          {filtered.length === 0 ? (
+            <div style={{ padding: 40, textAlign: "center", color: T.ink3, fontFamily: T.sans, background: "#fff", borderRadius: T.rLg, border: `1px solid ${T.border}` }}>
+              <Icon d={icons.doc} size={32} color={T.ink4} />
+              <div style={{ fontSize: 14, fontWeight: 500, marginTop: 12 }}>Keine Dokumente gefunden.</div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {filtered.map((doc) => {
+                const docType = DOC_TYPES[doc.doc_type];
+                const status = STATUS_COLORS[doc.status] ?? STATUS_COLORS.draft;
+                const fmt = FORMAT_COLORS[doc.format] ?? FORMAT_COLORS.DOCX;
+                const isSelected = selectedIds.has(doc.id);
+                const date = new Date(doc.created_at).toLocaleDateString("de-CH", { day: "numeric", month: "short", year: "numeric" });
+
+                return (
                   <div
+                    key={doc.id}
                     style={{
-                      borderTop: `1px solid ${T.borderL}`,
-                      padding: "20px 24px",
+                      background: "#fff",
+                      borderRadius: T.r,
+                      border: `1px solid ${isSelected ? T.accent : T.border}`,
+                      borderLeft: `3px solid ${status.color}`,
+                      boxShadow: T.shSm,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.boxShadow = T.shMd; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.boxShadow = T.shSm; }}
                   >
-                    {doc.content && (
-                      <>
-                        <div style={{ marginBottom: 12 }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              exportDocumentAsPdf({
-                                name: doc.name,
-                                version: doc.version,
-                                content: doc.content!,
-                                legalBasis: doc.legal_basis || undefined,
-                                orgName: doc.organizations?.name || undefined,
-                              });
-                            }}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 6,
-                              padding: "7px 14px",
-                              borderRadius: 8,
-                              border: "none",
-                              background: T.primaryDeep,
-                              color: "#fff",
-                              fontSize: 12,
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              fontFamily: T.sans,
-                            }}
-                          >
-                            <Icon d={icons.download} size={13} color="#fff" />
-                            PDF Download
-                          </button>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "14px 18px",
+                      }}
+                    >
+                      {/* Checkbox */}
+                      <div
+                        onClick={(e) => { e.stopPropagation(); toggleSelect(doc.id); }}
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 5,
+                          border: `2px solid ${isSelected ? T.accent : T.border}`,
+                          background: isSelected ? T.accentS : "transparent",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {isSelected && <Icon d={icons.check} size={12} color={T.accent} />}
+                      </div>
+
+                      {/* Format badge */}
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: fmt.color,
+                          background: fmt.bg,
+                          padding: "3px 8px",
+                          borderRadius: 5,
+                          fontFamily: T.sans,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {doc.format || "DOCX"}
+                      </span>
+
+                      {/* Doc info */}
+                      <div
+                        onClick={() => setSelectedDoc(doc)}
+                        style={{ flex: 1, minWidth: 0 }}
+                      >
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: T.ink, fontFamily: T.sans, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {doc.name}
                         </div>
-                        <div style={{ maxHeight: 400, overflow: "auto", marginBottom: 16 }}>
-                          <pre
-                            style={{
-                              fontFamily: T.sans,
-                              fontSize: 13,
-                              color: T.ink2,
-                              whiteSpace: "pre-wrap",
-                              lineHeight: 1.65,
-                              margin: 0,
-                            }}
-                          >
-                            {doc.content}
-                          </pre>
+                        <div style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
+                          {doc.organizations?.name && <span style={{ fontWeight: 500, color: T.ink3 }}>{doc.organizations.name} · </span>}
+                          {docType?.name ?? doc.doc_type} · {date}
                         </div>
-                      </>
-                    )}
-                    <AdminAuditTimeline docId={doc.id} />
+                      </div>
+
+                      {/* Version */}
+                      <span style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, flexShrink: 0 }}>{doc.version}</span>
+
+                      {/* Status badge */}
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: status.color,
+                          background: status.bg,
+                          padding: "2px 8px",
+                          borderRadius: 6,
+                          fontFamily: T.sans,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {status.label}
+                      </span>
+
+                      {/* Arrow */}
+                      <div onClick={() => setSelectedDoc(doc)} style={{ display: "flex", flexShrink: 0 }}>
+                        <Icon d="M9 5l7 7-7 7" size={14} color={T.ink4} />
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// Document Detail View (Admin)
+// =============================================================================
+
+function DocDetailView({
+  doc,
+  onBack,
+  onStatusChange,
+}: {
+  doc: DbDocument;
+  onBack: () => void;
+  onStatusChange: (s: DbDocument["status"]) => void;
+}) {
+  const status = STATUS_COLORS[doc.status] ?? STATUS_COLORS.draft;
+  const fmt = FORMAT_COLORS[doc.format] ?? FORMAT_COLORS.DOCX;
+  const date = new Date(doc.updated_at).toLocaleDateString("de-CH", { day: "numeric", month: "short", year: "numeric" });
+  const [changingStatus, setChangingStatus] = useState(false);
+
+  const handleStatusChange = async (newStatus: DbDocument["status"]) => {
+    setChangingStatus(true);
+    try {
+      await updateDocumentStatus(doc.id, newStatus);
+      onStatusChange(newStatus);
+    } catch (err) {
+      console.error("Status change failed:", err);
+    } finally {
+      setChangingStatus(false);
+    }
+  };
+
+  return (
+    <div>
+      <SectionLabel text="Dokument-Detail" />
+      <button
+        onClick={onBack}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          background: "none",
+          border: "none",
+          color: T.ink3,
+          fontSize: 13,
+          cursor: "pointer",
+          fontFamily: T.sans,
+          padding: 0,
+          marginBottom: 16,
+        }}
+      >
+        <Icon d={icons.back} size={14} color={T.ink3} />
+        Alle Dokumente
+      </button>
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: fmt.color, background: fmt.bg, padding: "3px 10px", borderRadius: 6, fontFamily: T.sans }}>
+          {doc.format || "DOCX"}
+        </span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: status.color, background: status.bg, padding: "3px 10px", borderRadius: 6, fontFamily: T.sans, border: `1px solid ${status.color}22` }}>
+          {status.label}
+        </span>
+      </div>
+
+      <h1 style={{ fontFamily: T.serif, fontSize: 24, fontWeight: 700, color: T.ink, margin: "0 0 6px" }}>
+        {doc.name}
+      </h1>
+      <p style={{ fontSize: 13, color: T.ink3, fontFamily: T.sans, margin: "0 0 24px" }}>
+        Version {doc.version} · Zuletzt aktualisiert: {date}
+      </p>
+
+      {/* Meta grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+        <div style={{ background: T.s1, borderRadius: T.r, padding: "14px 16px", border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.3px" }}>Organisation</div>
+          <div style={{ fontSize: 13, color: T.ink2, fontFamily: T.sans }}>{doc.organizations?.name ?? "—"}</div>
+        </div>
+        <div style={{ background: T.s1, borderRadius: T.r, padding: "14px 16px", border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.3px" }}>Jurisdiktion</div>
+          <div style={{ fontSize: 13, color: T.ink2, fontFamily: T.sans }}>{doc.jurisdiction}</div>
+        </div>
+        <div style={{ background: T.s1, borderRadius: T.r, padding: "14px 16px", border: `1px solid ${T.border}` }}>
+          <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.3px" }}>Rechtsgrundlage</div>
+          <div style={{ fontSize: 13, color: T.ink2, fontFamily: T.sans }}>{doc.legal_basis ?? "—"}</div>
+        </div>
+      </div>
+
+      {/* Status change */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: T.ink3, fontFamily: T.sans }}>Status ändern:</span>
+        {(["draft", "review", "current", "outdated"] as DbDocument["status"][]).map((s) => {
+          const cfg = STATUS_COLORS[s];
+          const isActive = doc.status === s;
+          return (
+            <button
+              key={s}
+              onClick={() => !isActive && handleStatusChange(s)}
+              disabled={changingStatus || isActive}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: `1px solid ${isActive ? cfg.color : T.border}`,
+                background: isActive ? cfg.bg : "#fff",
+                color: isActive ? cfg.color : T.ink3,
+                fontSize: 12,
+                fontWeight: isActive ? 600 : 400,
+                cursor: isActive || changingStatus ? "default" : "pointer",
+                fontFamily: T.sans,
+                opacity: changingStatus && !isActive ? 0.5 : 1,
+              }}
+            >
+              {cfg.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Content preview */}
+      {doc.content && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <button
+              onClick={() => {
+                exportDocumentAsPdf({
+                  name: doc.name,
+                  version: doc.version,
+                  content: doc.content!,
+                  legalBasis: doc.legal_basis || undefined,
+                  orgName: doc.organizations?.name || undefined,
+                });
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 16px",
+                borderRadius: 8,
+                border: "none",
+                background: T.primaryDeep,
+                color: "#fff",
+                fontSize: 12.5,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: T.sans,
+              }}
+            >
+              <Icon d={icons.download} size={13} color="#fff" />
+              PDF Download
+            </button>
+          </div>
+          <div
+            style={{
+              maxHeight: 400,
+              overflow: "auto",
+              background: "#fff",
+              borderRadius: T.r,
+              border: `1px solid ${T.border}`,
+              padding: "24px 28px",
+            }}
+          >
+            <pre
+              style={{
+                fontFamily: T.sans,
+                fontSize: 13,
+                color: T.ink2,
+                whiteSpace: "pre-wrap",
+                lineHeight: 1.65,
+                margin: 0,
+              }}
+            >
+              {doc.content}
+            </pre>
+          </div>
         </div>
       )}
+
+      {/* Audit Timeline */}
+      <AdminAuditTimeline docId={doc.id} />
     </div>
   );
 }
@@ -321,7 +677,6 @@ function AdminAuditTimeline({ docId }: { docId: string }) {
             <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans }}>Keine Einträge vorhanden.</div>
           ) : (
             <div style={{ position: "relative", paddingLeft: 20 }}>
-              {/* Vertical line */}
               <div
                 style={{
                   position: "absolute",
@@ -343,7 +698,6 @@ function AdminAuditTimeline({ docId }: { docId: string }) {
                       paddingBottom: i < entries.length - 1 ? 14 : 0,
                     }}
                   >
-                    {/* Dot */}
                     <div
                       style={{
                         position: "absolute",

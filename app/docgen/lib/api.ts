@@ -541,6 +541,30 @@ export async function loadDocCountsByOrg(): Promise<Record<string, number>> {
   return counts;
 }
 
+export async function updateDocumentStatus(
+  docId: string,
+  newStatus: "draft" | "review" | "current" | "outdated",
+): Promise<void> {
+  const { error } = await supabase
+    .from("documents")
+    .update({ status: newStatus, updated_at: new Date().toISOString() })
+    .eq("id", docId);
+
+  if (error) throw error;
+}
+
+export async function bulkUpdateDocumentStatus(
+  docIds: string[],
+  newStatus: "draft" | "review" | "current" | "outdated",
+): Promise<void> {
+  const { error } = await supabase
+    .from("documents")
+    .update({ status: newStatus, updated_at: new Date().toISOString() })
+    .in("id", docIds);
+
+  if (error) throw error;
+}
+
 // ─── Zefix (Handelsregister) ────────────────────────────────────────
 
 export interface ZefixResult {
