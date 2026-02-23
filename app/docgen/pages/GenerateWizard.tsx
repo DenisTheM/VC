@@ -31,6 +31,39 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
 
   const doc: DocType | null = docKey ? DOC_TYPES[docKey] : null;
 
+  /* Guard: no org selected */
+  if (!orgId) {
+    return (
+      <div>
+        <SectionLabel text="Ebene B" />
+        <h1 style={{ fontFamily: T.serif, fontSize: 28, fontWeight: 700, color: T.ink, margin: "0 0 2px" }}>
+          Dokument generieren
+        </h1>
+        <div style={{
+          background: "#fff", borderRadius: T.rLg, padding: "32px 28px", border: `1px solid ${T.border}`,
+          boxShadow: T.shSm, marginTop: 24, textAlign: "center",
+        }}>
+          <Icon d={icons.building} size={36} color={T.ink4} />
+          <p style={{ fontSize: 15, color: T.ink2, fontFamily: T.sans, margin: "16px 0 20px" }}>
+            Bitte wählen Sie zuerst einen Kunden aus, bevor Sie ein Dokument generieren.
+          </p>
+          <button
+            onClick={() => onNav("organizations")}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "10px 24px", borderRadius: 8, border: "none",
+              background: T.accent, color: "#fff", fontSize: 14,
+              fontWeight: 600, cursor: "pointer", fontFamily: T.sans,
+            }}
+          >
+            <Icon d={icons.folder} size={16} color="#fff" />
+            Zur Kundenübersicht
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   /* Step 0: Choose document type */
   if (step === 0) {
     return (
