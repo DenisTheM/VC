@@ -652,6 +652,34 @@ export async function addOrgMember(
   if (error) throw error;
 }
 
+export async function inviteMember(
+  orgId: string,
+  email: string,
+  fullName: string,
+  role: OrgRole,
+): Promise<{ success: boolean; message: string }> {
+  const { data, error } = await supabase.functions.invoke("invite-member", {
+    body: { email, full_name: fullName, org_id: orgId, role },
+  });
+
+  if (error) {
+    const msg =
+      typeof error === "object" && "message" in error
+        ? error.message
+        : String(error);
+    return { success: false, message: msg };
+  }
+
+  if (data?.error) {
+    return { success: false, message: data.error };
+  }
+
+  return {
+    success: true,
+    message: data?.message ?? "Einladung versendet.",
+  };
+}
+
 // ─── Zefix (Handelsregister) ────────────────────────────────────────
 
 export interface ZefixResult {

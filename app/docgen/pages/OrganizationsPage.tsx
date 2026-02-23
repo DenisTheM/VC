@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
-import { createOrganization, loadDocCountsByOrg, searchZefix, loadOrgMembers, updateOrgMemberRole, removeOrgMember, type Organization, type ZefixResult, type OrgMember, type OrgRole } from "../lib/api";
+import { createOrganization, loadDocCountsByOrg, searchZefix, loadOrgMembers, updateOrgMemberRole, removeOrgMember, inviteMember, type Organization, type ZefixResult, type OrgMember, type OrgRole } from "../lib/api";
 
 const INDUSTRIES = [
   "Fintech",
@@ -582,6 +582,13 @@ function OrgMembersPanel({
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
 
+  // Invite form state
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState<OrgRole>("editor");
+  const [inviting, setInviting] = useState(false);
+  const [inviteResult, setInviteResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
   const load = () => {
     setLoading(true);
     loadOrgMembers(orgId)
@@ -614,6 +621,26 @@ function OrgMembersPanel({
       console.error("Failed to remove member:", err);
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim() || !inviteName.trim()) return;
+    setInviting(true);
+    setInviteResult(null);
+    try {
+      const result = await inviteMember(orgId, inviteEmail.trim(), inviteName.trim(), inviteRole);
+      setInviteResult({ ok: result.success, msg: result.message });
+      if (result.success) {
+        setInviteEmail("");
+        setInviteName("");
+        setInviteRole("editor");
+        load(); // Reload members list
+      }
+    } catch (err) {
+      setInviteResult({ ok: false, msg: String(err) });
+    } finally {
+      setInviting(false);
     }
   };
 
@@ -762,6 +789,114 @@ function OrgMembersPanel({
             })}
           </div>
         )}
+
+        {/* ── Invite form ─────────────────────────────────────────── */}
+        <div
+          style={{
+            marginTop: 18,
+            padding: "16px 18px",
+            background: T.s1,
+            borderRadius: 10,
+            border: `1px solid ${T.borderL}`,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: T.ink,
+              fontFamily: T.sans,
+              marginBottom: 12,
+            }}
+          >
+            <Icon d={icons.plus} size={13} color={T.accent} /> Neues Mitglied einladen
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 14px" }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4, fontFamily: T.sans }}>
+                E-Mail *
+              </label>
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="name@firma.ch"
+                style={{ ...inputStyle, fontSize: 13, padding: "8px 12px" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4, fontFamily: T.sans }}>
+                Name *
+              </label>
+              <input
+                type="text"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+                placeholder="Vor- und Nachname"
+                style={{ ...inputStyle, fontSize: 13, padding: "8px 12px" }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 10, marginTop: 10 }}>
+            <div style={{ flex: "0 0 auto" }}>
+              <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4, fontFamily: T.sans }}>
+                Rolle
+              </label>
+              <select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as OrgRole)}
+                style={{ ...inputStyle, fontSize: 13, padding: "8px 12px", width: "auto", appearance: "auto" }}
+              >
+                <option value="viewer">Betrachter</option>
+                <option value="editor">Bearbeiter</option>
+                <option value="approver">Freigeber</option>
+              </select>
+            </div>
+            <button
+              onClick={handleInvite}
+              disabled={inviting || !inviteEmail.trim() || !inviteName.trim()}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 18px",
+                borderRadius: 7,
+                border: "none",
+                background: T.accent,
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: inviting || !inviteEmail.trim() || !inviteName.trim() ? "not-allowed" : "pointer",
+                fontFamily: T.sans,
+                opacity: inviting || !inviteEmail.trim() || !inviteName.trim() ? 0.6 : 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {inviting ? "Wird eingeladen..." : "Einladen"}
+            </button>
+          </div>
+
+          {/* Result banner */}
+          {inviteResult && (
+            <div
+              style={{
+                marginTop: 10,
+                padding: "8px 12px",
+                borderRadius: 7,
+                fontSize: 12.5,
+                fontWeight: 500,
+                fontFamily: T.sans,
+                background: inviteResult.ok ? "#f0fdf4" : T.redS,
+                color: inviteResult.ok ? "#16654e" : T.red,
+                border: `1px solid ${inviteResult.ok ? "#16654e20" : T.red + "20"}`,
+              }}
+            >
+              {inviteResult.msg}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
