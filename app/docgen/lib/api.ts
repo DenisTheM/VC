@@ -475,6 +475,21 @@ export async function addClientAction(
   if (error) throw error;
 }
 
+export async function loadActionCommentCounts(actionIds: string[]): Promise<Record<string, number>> {
+  if (actionIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from("action_comments")
+    .select("action_id")
+    .in("action_id", actionIds);
+
+  if (error) throw error;
+  const counts: Record<string, number> = {};
+  (data ?? []).forEach((row: { action_id: string }) => {
+    counts[row.action_id] = (counts[row.action_id] || 0) + 1;
+  });
+  return counts;
+}
+
 export async function updateClientAction(
   actionId: string,
   updates: { status?: string; text?: string; due?: string },

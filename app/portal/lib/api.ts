@@ -117,6 +117,56 @@ export async function updateClientActionStatus(
   if (error) throw error;
 }
 
+// ─── Action Comments ─────────────────────────────────────────────────
+
+export interface ActionComment {
+  id: string;
+  action_id: string;
+  user_id: string;
+  user_name: string;
+  text: string;
+  created_at: string;
+}
+
+export async function loadActionComments(actionId: string): Promise<ActionComment[]> {
+  const { data, error } = await supabase
+    .from("action_comments")
+    .select("id, action_id, user_id, text, created_at, profiles:user_id(full_name)")
+    .eq("action_id", actionId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((c: any) => ({
+    id: c.id,
+    action_id: c.action_id,
+    user_id: c.user_id,
+    user_name: c.profiles?.full_name ?? "Unbekannt",
+    text: c.text,
+    created_at: c.created_at,
+  }));
+}
+
+export async function addActionComment(actionId: string, text: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert");
+
+  const { error } = await supabase
+    .from("action_comments")
+    .insert({ action_id: actionId, user_id: user.id, text });
+
+  if (error) throw error;
+}
+
+export async function deleteActionComment(commentId: string): Promise<void> {
+  const { error } = await supabase
+    .from("action_comments")
+    .delete()
+    .eq("id", commentId);
+
+  if (error) throw error;
+}
+
 // ─── Client Documents ───────────────────────────────────────────────
 
 export interface PortalDoc {

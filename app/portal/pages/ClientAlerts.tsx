@@ -3,7 +3,7 @@ import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import { SEV, IMPACT, ACTION_STATUS } from "../data/clientData";
-import { loadClientAlerts, updateClientActionStatus, type ClientOrg, type PortalAlert } from "../lib/api";
+import { loadClientAlerts, updateClientActionStatus, loadActionComments, addActionComment, deleteActionComment, type ClientOrg, type PortalAlert, type ActionComment } from "../lib/api";
 
 interface ClientAlertsProps {
   org: ClientOrg | null;
@@ -773,68 +773,13 @@ function AlertDetail({
                 {localActions.map((action) => {
                   const st = ACTION_STATUS[action.status as keyof typeof ACTION_STATUS] ?? ACTION_STATUS.offen;
                   return (
-                    <div
+                    <ActionItem
                       key={action.id}
-                      style={{
-                        background: "#fff",
-                        borderRadius: T.r,
-                        padding: "14px 16px",
-                        border: `1px solid ${T.border}`,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                      }}
-                    >
-                      <div
-                        onClick={() => handleToggle(action)}
-                        style={{
-                          width: 22,
-                          height: 22,
-                          borderRadius: 6,
-                          border: `2px solid ${st.border}`,
-                          background: st.bg,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          cursor: canEdit ? "pointer" : "default",
-                          opacity: canEdit ? 1 : 0.6,
-                          transition: "all 0.15s",
-                        }}
-                      >
-                        {st.icon === "check" && <Icon d={icons.check} size={12} color={st.color} />}
-                        {st.icon === "clock" && <Icon d={icons.clock} size={12} color={st.color} />}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontSize: 13.5,
-                            fontWeight: 500,
-                            color: st.strikethrough ? T.ink4 : T.ink,
-                            fontFamily: T.sans,
-                            textDecoration: st.strikethrough ? "line-through" : "none",
-                          }}
-                        >
-                          {action.text}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: st.color,
-                            background: st.bg,
-                            padding: "2px 8px",
-                            borderRadius: 6,
-                            fontFamily: T.sans,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {st.label}
-                        </span>
-                        <DueIndicator due={action.due} />
-                      </div>
-                    </div>
+                      action={action}
+                      st={st}
+                      canEdit={canEdit}
+                      onToggle={() => handleToggle(action)}
+                    />
                   );
                 })}
               </div>
@@ -962,6 +907,250 @@ function AlertDetail({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// ActionItem — single action with collapsible comment thread
+// =============================================================================
+
+function ActionItem({
+  action,
+  st,
+  canEdit,
+  onToggle,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  action: { id: string; text: string; due: string; status: string };
+  st: { color: string; bg: string; border: string; label: string; icon: string | null; strikethrough?: boolean };
+  canEdit: boolean;
+  onToggle: () => void;
+}) {
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [comments, setComments] = useState<ActionComment[]>([]);
+  const [commentText, setCommentText] = useState("");
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [commentCount, setCommentCount] = useState<number | null>(null);
+
+  const toggleComments = () => {
+    const next = !commentsOpen;
+    setCommentsOpen(next);
+    if (next && comments.length === 0) {
+      setLoadingComments(true);
+      loadActionComments(action.id)
+        .then((data) => { setComments(data); setCommentCount(data.length); })
+        .catch((err) => console.error("Failed to load comments:", err))
+        .finally(() => setLoadingComments(false));
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!commentText.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      await addActionComment(action.id, commentText.trim());
+      setCommentText("");
+      const data = await loadActionComments(action.id);
+      setComments(data);
+      setCommentCount(data.length);
+    } catch (err) {
+      console.error("Failed to add comment:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (commentId: string) => {
+    try {
+      await deleteActionComment(commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      setCommentCount((c) => c !== null ? Math.max(0, c - 1) : null);
+    } catch (err) {
+      console.error("Failed to delete comment:", err);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        borderRadius: T.r,
+        border: `1px solid ${T.border}`,
+        overflow: "hidden",
+      }}
+    >
+      {/* Action row */}
+      <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+        <div
+          onClick={onToggle}
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: 6,
+            border: `2px solid ${st.border}`,
+            background: st.bg,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            cursor: canEdit ? "pointer" : "default",
+            opacity: canEdit ? 1 : 0.6,
+            transition: "all 0.15s",
+          }}
+        >
+          {st.icon === "check" && <Icon d={icons.check} size={12} color={st.color} />}
+          {st.icon === "clock" && <Icon d={icons.clock} size={12} color={st.color} />}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 13.5,
+              fontWeight: 500,
+              color: st.strikethrough ? T.ink4 : T.ink,
+              fontFamily: T.sans,
+              textDecoration: st.strikethrough ? "line-through" : "none",
+            }}
+          >
+            {action.text}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <span
+            style={{
+              fontSize: 11,
+              color: st.color,
+              background: st.bg,
+              padding: "2px 8px",
+              borderRadius: 6,
+              fontFamily: T.sans,
+              fontWeight: 600,
+            }}
+          >
+            {st.label}
+          </span>
+          <DueIndicator due={action.due} />
+        </div>
+      </div>
+
+      {/* Comment toggle */}
+      <button
+        onClick={toggleComments}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "8px 16px",
+          borderTop: `1px solid ${T.borderL}`,
+          background: commentsOpen ? T.s1 : "transparent",
+          border: "none",
+          borderTopStyle: "solid",
+          borderTopWidth: 1,
+          borderTopColor: T.borderL,
+          cursor: "pointer",
+          fontSize: 11.5,
+          fontWeight: 500,
+          color: T.ink4,
+          fontFamily: T.sans,
+        }}
+      >
+        <Icon d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" size={13} color={T.ink4} />
+        Kommentare{commentCount !== null ? ` (${commentCount})` : ""}
+        <Icon d={commentsOpen ? "M19 15l-7-7-7 7" : "M9 5l7 7-7 7"} size={10} color={T.ink4} />
+      </button>
+
+      {/* Comment thread */}
+      {commentsOpen && (
+        <div style={{ padding: "12px 16px", borderTop: `1px solid ${T.borderL}`, background: T.s1 }}>
+          {loadingComments ? (
+            <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans }}>Wird geladen...</div>
+          ) : comments.length === 0 && !canEdit ? (
+            <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans }}>Keine Kommentare.</div>
+          ) : (
+            <>
+              {comments.map((c) => (
+                <div key={c.id} style={{ marginBottom: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: T.ink2, fontFamily: T.sans }}>
+                      {c.user_name}
+                    </span>
+                    <span style={{ fontSize: 10, color: T.ink4, fontFamily: T.sans }}>
+                      {new Date(c.created_at).toLocaleDateString("de-CH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    {canEdit && (
+                      <button
+                        onClick={() => handleDelete(c.id)}
+                        style={{
+                          marginLeft: "auto",
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: 0,
+                          fontSize: 10,
+                          color: T.ink4,
+                          fontFamily: T.sans,
+                        }}
+                      >
+                        <Icon d="M6 18L18 6M6 6l12 12" size={10} color={T.ink4} />
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12.5, color: T.ink2, fontFamily: T.sans, lineHeight: 1.5 }}>
+                    {c.text}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* Input */}
+          {canEdit && (
+            <div style={{ display: "flex", gap: 8, marginTop: comments.length > 0 ? 8 : 0 }}>
+              <textarea
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder="Kommentar schreiben..."
+                rows={2}
+                style={{
+                  flex: 1,
+                  padding: "8px 10px",
+                  borderRadius: 6,
+                  border: `1px solid ${T.border}`,
+                  fontSize: 12.5,
+                  fontFamily: T.sans,
+                  color: T.ink,
+                  resize: "vertical",
+                  outline: "none",
+                  background: "#fff",
+                }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
+              />
+              <button
+                onClick={handleSubmit}
+                disabled={!commentText.trim() || submitting}
+                style={{
+                  alignSelf: "flex-end",
+                  padding: "7px 14px",
+                  borderRadius: 6,
+                  border: "none",
+                  background: T.accent,
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  fontFamily: T.sans,
+                  cursor: !commentText.trim() || submitting ? "not-allowed" : "pointer",
+                  opacity: !commentText.trim() || submitting ? 0.5 : 1,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {submitting ? "..." : "Senden"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
