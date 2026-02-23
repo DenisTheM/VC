@@ -7,7 +7,10 @@
 // =============================================================================
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 const FROM_EMAIL =
   Deno.env.get("VC_FROM_EMAIL") ||
@@ -50,6 +53,17 @@ Deno.serve(async (req) => {
       subject: "Ihre SRO-Registrierung Checkliste",
       html: buildChecklistEmail(email),
     });
+
+    // Persist lead for tracking — non-blocking, errors are logged only
+    try {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const { error: insertErr } = await supabase
+        .from("leads")
+        .insert({ email, source: "sro-checklist" });
+      if (insertErr) console.error("leads insert error:", insertErr);
+    } catch (dbErr) {
+      console.error("leads insert exception:", dbErr);
+    }
 
     return jsonResponse({ success: true, message: "Checkliste versendet." });
   } catch (err) {
