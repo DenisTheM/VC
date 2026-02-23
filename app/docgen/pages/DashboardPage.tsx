@@ -18,9 +18,9 @@ export function DashboardPage({ onNav, onGenerateDoc, profile, profOk, stats: db
   const firstName = authProfile.full_name?.split(" ")[0] || "User";
 
   const stats = [
-    { label: "Dokumente", value: dbStats.documentCount, icon: icons.doc, color: T.primary },
-    { label: "Jurisdiktionen", value: 2, icon: icons.shield, color: T.accent },
-    { label: "Reg. Alerts", value: dbStats.alertCount, icon: icons.alert, color: T.amber },
+    { label: "Dokumente", value: dbStats.documentCount, icon: icons.doc, color: T.primary, nav: "documents" },
+    { label: "Jurisdiktionen", value: 2, icon: icons.shield, color: T.accent, nav: "generate" },
+    { label: "Reg. Alerts", value: dbStats.alertCount, icon: icons.alert, color: T.amber, nav: "alerts" },
   ];
 
   return (
@@ -75,13 +75,18 @@ export function DashboardPage({ onNav, onGenerateDoc, profile, profOk, stats: db
         {stats.map((s) => (
           <div
             key={s.label}
+            onClick={() => onNav(s.nav)}
             style={{
               background: "#fff",
               borderRadius: T.rLg,
               padding: "20px 22px",
               border: `1px solid ${T.border}`,
               boxShadow: T.shSm,
+              cursor: "pointer",
+              transition: "box-shadow 0.15s, transform 0.15s",
             }}
+            onMouseOver={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shMd; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)"; }}
+            onMouseOut={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = T.shSm; (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"; }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <span style={{ fontSize: 12.5, fontWeight: 500, color: T.ink3, fontFamily: T.sans }}>
