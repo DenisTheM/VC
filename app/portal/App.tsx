@@ -5,6 +5,7 @@ import { AuthGuard } from "@shared/components/AuthGuard";
 import { useAuthContext } from "@shared/components/AuthContext";
 import { usePageNav } from "@shared/hooks/usePageNav";
 import { signOut } from "@shared/lib/auth";
+import { NotificationBell } from "@shared/components/NotificationBell";
 import { loadUserOrganization, type ClientOrg } from "./lib/api";
 
 const ClientDashboard = lazy(() => import("./pages/ClientDashboard").then((m) => ({ default: m.ClientDashboard })));
@@ -25,10 +26,12 @@ function ClientSidebar({
   active,
   onNav,
   org,
+  onNotificationNav,
 }: {
   active: string;
   onNav: (id: string) => void;
   org: ClientOrg | null;
+  onNotificationNav: (link: string) => void;
 }) {
   const { profile: authProfile } = useAuthContext();
   const displayName = authProfile.full_name || "Benutzer";
@@ -86,16 +89,25 @@ function ClientSidebar({
       <nav style={{ padding: "16px 12px", flex: 1 }}>
         <div
           style={{
-            fontSize: 10,
-            fontWeight: 600,
-            color: "rgba(255,255,255,0.25)",
-            letterSpacing: "1px",
-            textTransform: "uppercase",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             padding: "6px 10px 12px",
-            fontFamily: T.sans,
           }}
         >
-          Navigation
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.25)",
+              letterSpacing: "1px",
+              textTransform: "uppercase",
+              fontFamily: T.sans,
+            }}
+          >
+            Navigation
+          </span>
+          <NotificationBell onNavigate={onNotificationNav} />
         </div>
         {NAV_ITEMS.map((it) => {
           const isActive = active === it.id;
@@ -315,7 +327,16 @@ function PortalContent() {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: T.s1, fontFamily: T.sans }}>
-      <ClientSidebar active={page} onNav={handleNav} org={org} />
+      <ClientSidebar
+        active={page}
+        onNav={handleNav}
+        org={org}
+        onNotificationNav={(link) => {
+          // Parse link like "/portal/alerts" → navigate to "alerts"
+          const segment = link.split("/").pop() || "dashboard";
+          handleNav(segment);
+        }}
+      />
       <div style={{ flex: 1, overflow: "auto" }}>
         <Suspense fallback={<div style={{ padding: 40, color: T.ink3, fontFamily: T.sans }}>Laden...</div>}>
           {page === "dashboard" && <ClientDashboard onNav={handleNav} onAlertNav={handleAlertNav} org={org} />}

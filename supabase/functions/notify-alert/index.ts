@@ -141,6 +141,17 @@ serve(async (req) => {
         }
       }
 
+      // Create in-app notifications for all org members
+      for (const profile of profiles ?? []) {
+        await supabase.from("notifications").insert({
+          user_id: profile.id,
+          type: "new_alert",
+          title: "Neue regulatorische Meldung",
+          body: (alert as AlertData).title,
+          link: "/portal/alerts",
+        }).catch(() => { /* ignore notification insert errors */ });
+      }
+
       // Update affected client's notification status
       const status = orgFailCount === 0 && orgSentCount > 0
         ? "sent"
