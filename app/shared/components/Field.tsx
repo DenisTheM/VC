@@ -9,6 +9,7 @@ export interface FieldDef {
   required?: boolean;
   hint?: string;
   default?: string | number | boolean | string[];
+  placeholder?: string;
 }
 
 interface FieldProps {
@@ -135,7 +136,7 @@ export function Field({ field, value, onChange, highlight }: FieldProps) {
     return (
       <div style={{ marginBottom: 16 }}>
         {lbl}
-        <textarea value={(value as string) || ""} onChange={(e) => onChange(e.target.value)} rows={3} style={{ ...base, resize: "vertical" }} />
+        <textarea value={(value as string) || ""} onChange={(e) => onChange(e.target.value)} rows={3} placeholder={field.placeholder} style={{ ...base, resize: "vertical" }} />
         {hnt}
       </div>
     );
@@ -145,7 +146,7 @@ export function Field({ field, value, onChange, highlight }: FieldProps) {
     return (
       <div style={{ marginBottom: 16 }}>
         {lbl}
-        <input type="number" value={(value as string) || ""} onChange={(e) => onChange(e.target.value)} style={base} />
+        <input type="number" value={(value as string) || ""} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder} style={base} />
         {hnt}
       </div>
     );
@@ -165,7 +166,7 @@ export function Field({ field, value, onChange, highlight }: FieldProps) {
   return (
     <div style={{ marginBottom: 16 }}>
       {lbl}
-      <input type="text" value={(value as string) || (field.default as string) || ""} onChange={(e) => onChange(e.target.value)} style={base} />
+      <input type="text" value={(value as string) || ""} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder} style={base} />
       {hnt}
     </div>
   );

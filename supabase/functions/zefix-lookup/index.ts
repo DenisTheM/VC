@@ -125,8 +125,8 @@ function mapSearchResult(c: Record<string, unknown>) {
     legalForm: LEGAL_FORMS[c.legalFormId as number] || "",
     legalSeat: (c.legalSeat as string) || "",
     address: (c.legalSeat as string) || "",
-    foundingYear: extractYear(c.shabDate as string),
     purpose: null,
+    persons: null as { name: string; role: string }[] | null,
   };
 }
 
@@ -148,14 +148,27 @@ function mapDetailResult(c: Record<string, unknown>) {
     fullAddress = (c.legalSeat as string) || "";
   }
 
+  // Extract persons (VR members, management) if available
+  let persons: { name: string; role: string }[] | null = null;
+  const rawPersons = c.persons as { firstName?: string; lastName?: string; function?: string }[] | undefined;
+  if (Array.isArray(rawPersons) && rawPersons.length > 0) {
+    persons = rawPersons
+      .filter((p) => p.lastName)
+      .map((p) => ({
+        name: [p.firstName, p.lastName].filter(Boolean).join(" "),
+        role: (p.function as string) || "",
+      }));
+    if (persons.length === 0) persons = null;
+  }
+
   return {
     name: (c.name as string) || "",
     uid: (c.uidFormatted as string) || formatUid(c.uid as string),
     legalForm: LEGAL_FORMS[c.legalFormId as number] || "",
     legalSeat: (c.legalSeat as string) || "",
     address: fullAddress,
-    foundingYear: extractYear(c.shabDate as string),
     purpose: (c.purpose as string) || null,
+    persons,
   };
 }
 
@@ -168,8 +181,3 @@ function formatUid(uid: string | undefined): string {
   return uid;
 }
 
-function extractYear(dateStr: string | undefined): number | null {
-  if (!dateStr) return null;
-  const year = parseInt(dateStr.substring(0, 4), 10);
-  return year > 1800 && year <= new Date().getFullYear() ? year : null;
-}

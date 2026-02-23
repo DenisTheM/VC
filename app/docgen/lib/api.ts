@@ -688,8 +688,8 @@ export interface ZefixResult {
   legalForm: string;
   legalSeat: string;
   address: string;
-  foundingYear: number | null;
   purpose: string | null;
+  persons: { name: string; role: string }[] | null;
 }
 
 export interface ZefixResponse {

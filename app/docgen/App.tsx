@@ -36,7 +36,7 @@ function DocGenInner() {
   const [profile, setProfile] = useState<Record<string, unknown>>(() => {
     const p: Record<string, unknown> = {};
     PROFILE_FIELDS.forEach((f) => {
-      if (f.default !== undefined) p[f.id] = f.default;
+      p[f.id] = f.type === "multi" ? [] : f.type === "toggle" ? false : "";
     });
     return p;
   });
@@ -70,11 +70,10 @@ function DocGenInner() {
   // Switch to a different organization's profile
   const handleSelectOrg = useCallback(async (selectedOrgId: string) => {
     setOrgId(selectedOrgId);
-    // Reset profile to defaults, then load selected org's data
+    // Reset profile to empty, then load selected org's data
     const defaults: Record<string, unknown> = {};
     PROFILE_FIELDS.forEach((f) => {
-      if (f.default !== undefined) defaults[f.id] = f.default;
-      else defaults[f.id] = f.type === "multi" ? [] : f.type === "toggle" ? false : "";
+      defaults[f.id] = f.type === "multi" ? [] : f.type === "toggle" ? false : "";
     });
     setProfile(defaults);
 
@@ -108,8 +107,7 @@ function DocGenInner() {
     setOrgId(org.id);
     const defaults: Record<string, unknown> = {};
     PROFILE_FIELDS.forEach((f) => {
-      if (f.default !== undefined) defaults[f.id] = f.default;
-      else defaults[f.id] = f.type === "multi" ? [] : f.type === "toggle" ? false : "";
+      defaults[f.id] = f.type === "multi" ? [] : f.type === "toggle" ? false : "";
     });
 
     if (zefixData) {
@@ -120,8 +118,15 @@ function DocGenInner() {
         if (mapped) defaults.legal_form = mapped;
       }
       if (zefixData.address) defaults.address = zefixData.address;
-      if (zefixData.foundingYear) defaults.founding_year = zefixData.foundingYear;
       if (zefixData.purpose) defaults.business_detail = zefixData.purpose;
+
+      // Map Zefix persons to GL / VR fields
+      if (zefixData.persons && zefixData.persons.length > 0) {
+        const gl = zefixData.persons.filter((p) => /geschäftsführ|direktion|direktor/i.test(p.role)).map((p) => p.name);
+        const vr = zefixData.persons.filter((p) => /verwaltungsrat|vr|präsident/i.test(p.role)).map((p) => p.name);
+        if (gl.length > 0) defaults.geschaeftsleitung = gl.join(", ");
+        if (vr.length > 0) defaults.verwaltungsrat = vr.join(", ");
+      }
     }
 
     setProfile(defaults);
