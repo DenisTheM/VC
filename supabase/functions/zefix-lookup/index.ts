@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const ZEFIX_API = "https://www.zefix.admin.ch/ZefixPublicREST/api/v1";
+const ZEFIX_API = "https://www.zefix.ch/ZefixREST/api/v1";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -47,59 +47,45 @@ Deno.serve(async (req) => {
       return json({ error: "Query must be at least 2 characters" }, 400);
     }
 
-    // Build Zefix auth header (optional — works if credentials are configured)
-    const zefixUser = Deno.env.get("ZEFIX_USERNAME");
-    const zefixPass = Deno.env.get("ZEFIX_PASSWORD");
-    const zefixHeaders: Record<string, string> = {
-      "Content-Type": "application/json; charset=utf-8",
-    };
-    if (zefixUser && zefixPass) {
-      zefixHeaders["Authorization"] = `Basic ${btoa(`${zefixUser}:${zefixPass}`)}`;
-    }
-
-    // Step 1: Search by name
-    const searchRes = await fetch(`${ZEFIX_API}/company/search`, {
+    // Step 1: Search by name (public zefix.ch API — no auth required)
+    const searchRes = await fetch(`${ZEFIX_API}/firm/search.json`, {
       method: "POST",
-      headers: zefixHeaders,
-      body: JSON.stringify({ name: query.trim(), activeOnly: true }),
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({
+        name: query.trim(),
+        languageKey: "de",
+        maxEntries: 10,
+      }),
     });
 
     if (!searchRes.ok) {
-      const status = searchRes.status;
-      if (status === 401 || status === 403) {
-        return json({
-          results: [],
-          hint: "Zefix-API-Zugangsdaten nicht konfiguriert. Bitte ZEFIX_USERNAME und ZEFIX_PASSWORD als Supabase Secrets hinterlegen.",
-        });
-      }
       return json({
         results: [],
-        hint: `Zefix-API nicht erreichbar (Status ${status}).`,
+        hint: `Zefix-API nicht erreichbar (Status ${searchRes.status}).`,
       });
     }
 
     const searchData = await searchRes.json();
-    if (!Array.isArray(searchData) || searchData.length === 0) {
+    const list = searchData?.list;
+    if (!Array.isArray(list) || list.length === 0) {
       return json({ results: [], hint: null });
     }
 
     // Step 2: For top results, fetch details (max 8 to avoid rate limiting)
-    const topResults = searchData.slice(0, 8);
+    const topResults = list.slice(0, 8);
     const detailed = await Promise.all(
       topResults.map(async (company: Record<string, unknown>) => {
         try {
-          const uid = company.uid as string;
-          if (!uid) return mapSearchResult(company);
+          const ehraid = company.ehraid as number;
+          if (!ehraid) return mapSearchResult(company);
 
-          const detailRes = await fetch(`${ZEFIX_API}/company/uid/${uid}`, {
-            headers: zefixHeaders,
+          const detailRes = await fetch(`${ZEFIX_API}/firm/${ehraid}`, {
+            headers: { "Accept": "application/json" },
           });
 
           if (!detailRes.ok) return mapSearchResult(company);
 
-          const detailData = await detailRes.json();
-          // Detail endpoint may return an array
-          const detail = Array.isArray(detailData) ? detailData[0] : detailData;
+          const detail = await detailRes.json();
           return mapDetailResult(detail);
         } catch {
           return mapSearchResult(company);
@@ -114,16 +100,32 @@ Deno.serve(async (req) => {
   }
 });
 
+// Legal form ID → short name mapping (common Swiss legal forms)
+const LEGAL_FORMS: Record<number, string> = {
+  1: "EF", // Einzelfirma
+  2: "KlG", // Kollektivgesellschaft
+  3: "KmG", // Kommanditgesellschaft
+  4: "GmbH",
+  6: "AG",
+  7: "KmAG", // Kommanditaktiengesellschaft
+  8: "Gen", // Genossenschaft
+  9: "Verein",
+  10: "Stiftung",
+  15: "FI KmG", // Kommanditgesellschaft für KAG
+  16: "FI SICAV", // SICAV
+  17: "FI SICAF", // SICAF
+  21: "Inst öR", // Institut des öffentlichen Rechts
+};
+
 // Map search-only result (fallback if detail fetch fails)
 function mapSearchResult(c: Record<string, unknown>) {
-  const lf = c.legalForm as Record<string, unknown> | undefined;
   return {
     name: (c.name as string) || "",
-    uid: formatUid(c.uid as string),
-    legalForm: lf?.shortName?.toString() || lf?.name?.toString() || "",
+    uid: (c.uidFormatted as string) || formatUid(c.uid as string),
+    legalForm: LEGAL_FORMS[c.legalFormId as number] || "",
     legalSeat: (c.legalSeat as string) || "",
     address: (c.legalSeat as string) || "",
-    foundingYear: null,
+    foundingYear: extractYear(c.shabDate as string),
     purpose: null,
   };
 }
@@ -132,66 +134,42 @@ function mapSearchResult(c: Record<string, unknown>) {
 function mapDetailResult(c: Record<string, unknown>) {
   if (!c) return null;
 
-  const lf = c.legalForm as Record<string, unknown> | undefined;
-  const lfShort =
-    (lf?.shortName as Record<string, string>)?.de ||
-    (lf?.shortName as Record<string, string>)?.en ||
-    "";
-  const lfName =
-    (lf?.name as Record<string, string>)?.de ||
-    (lf?.name as Record<string, string>)?.en ||
-    "";
-
   // Build address
   const addr = c.address as Record<string, unknown> | undefined;
   let fullAddress = "";
   if (addr) {
-    const parts = [
-      addr.street,
-      addr.houseNumber ? ` ${addr.houseNumber}` : "",
-    ]
+    const street = [addr.street, addr.houseNumber ? ` ${addr.houseNumber}` : ""]
       .join("")
       .trim();
-    const city = [addr.swissZipCode, addr.city].filter(Boolean).join(" ");
-    fullAddress = [parts, city].filter(Boolean).join(", ");
+    const city = [addr.swissZipCode, addr.town].filter(Boolean).join(" ");
+    fullAddress = [street, city].filter(Boolean).join(", ");
   }
   if (!fullAddress) {
     fullAddress = (c.legalSeat as string) || "";
   }
 
-  // Extract founding year from sogcDate or registration
-  let foundingYear: number | null = null;
-  const sogcDate = c.sogcDate as string | undefined;
-  if (sogcDate) {
-    const year = parseInt(sogcDate.substring(0, 4), 10);
-    if (year > 1800 && year <= new Date().getFullYear()) {
-      foundingYear = year;
-    }
-  }
-
-  // Purpose
-  const purpose = (c.purpose as Record<string, string>)?.de ||
-    (c.purpose as Record<string, string>)?.en ||
-    (c.purpose as string) ||
-    null;
-
   return {
     name: (c.name as string) || "",
-    uid: formatUid(c.uid as string),
-    legalForm: lfShort || lfName,
+    uid: (c.uidFormatted as string) || formatUid(c.uid as string),
+    legalForm: LEGAL_FORMS[c.legalFormId as number] || "",
     legalSeat: (c.legalSeat as string) || "",
     address: fullAddress,
-    foundingYear,
-    purpose,
+    foundingYear: extractYear(c.shabDate as string),
+    purpose: (c.purpose as string) || null,
   };
 }
 
 function formatUid(uid: string | undefined): string {
   if (!uid) return "";
-  // Format CHE-xxx.xxx.xxx if not already formatted
   const clean = uid.replace(/[^0-9]/g, "");
   if (clean.length === 9) {
     return `CHE-${clean.substring(0, 3)}.${clean.substring(3, 6)}.${clean.substring(6, 9)}`;
   }
   return uid;
+}
+
+function extractYear(dateStr: string | undefined): number | null {
+  if (!dateStr) return null;
+  const year = parseInt(dateStr.substring(0, 4), 10);
+  return year > 1800 && year <= new Date().getFullYear() ? year : null;
 }
