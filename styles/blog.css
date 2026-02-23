@@ -107,6 +107,45 @@
 .blog-footer a   { color: rgba(255,255,255,0.6); text-decoration: none; }
 .blog-footer a:hover { color: white; }
 
+/* Lead Magnet */
+.lead-magnet       { background: var(--accent-surface); border: 2px solid var(--accent); border-radius: var(--radius-lg); padding: 32px; margin: 48px 0; }
+.lead-magnet-badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+.lead-magnet h3    { font-family: var(--font-serif); font-size: 22px; font-weight: 700; color: var(--accent); margin: 0 0 10px; }
+.lead-magnet > p   { font-size: 15px; line-height: 1.7; color: var(--ink-2); margin-bottom: 14px; }
+.lead-magnet ul    { padding-left: 20px; margin-bottom: 20px; }
+.lead-magnet li    { font-size: 14px; line-height: 1.7; color: var(--ink-2); margin-bottom: 4px; }
+.lead-magnet form  { display: flex; gap: 10px; margin-bottom: 10px; }
+.lead-magnet input[type=email] {
+    flex: 1; padding: 12px 16px; font-size: 15px; font-family: inherit;
+    border: 1px solid var(--border); border-radius: var(--radius); background: white;
+    outline: none; transition: border-color 0.2s;
+}
+.lead-magnet input[type=email]:focus { border-color: var(--accent); }
+.lead-magnet button {
+    padding: 12px 24px; font-size: 14px; font-weight: 700; font-family: inherit;
+    background: var(--accent); color: white; border: none; border-radius: var(--radius);
+    cursor: pointer; white-space: nowrap; transition: background 0.2s, transform 0.2s;
+}
+.lead-magnet button:hover { background: var(--primary); transform: translateY(-1px); }
+.lead-magnet button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.lead-magnet-privacy { font-size: 12px; color: var(--ink-4); }
+.lead-magnet-privacy a { color: var(--accent); text-decoration: underline; }
+.lead-magnet-success {
+    background: var(--accent); border-radius: var(--radius); padding: 24px;
+    text-align: center; color: white;
+}
+.lead-magnet-success-icon { width: 40px; height: 40px; margin: 0 auto 12px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.lead-magnet-success-icon svg { width: 20px; height: 20px; stroke: white; stroke-width: 3; fill: none; }
+.lead-magnet-success p { color: rgba(255,255,255,0.92); font-size: 15px; margin-bottom: 16px; }
+.lead-magnet-success strong { color: white; }
+.lead-magnet-success-cta {
+    display: inline-block; background: white; color: var(--accent); font-weight: 700;
+    font-size: 14px; padding: 10px 24px; border-radius: 50px; text-decoration: none;
+    transition: transform 0.2s;
+}
+.lead-magnet-success-cta:hover { transform: translateY(-2px); }
+.lead-magnet-error { font-size: 14px; color: #dc2626; margin-top: 8px; }
+
 /* — Responsive — */
 @media (max-width: 768px) {
     .article-hero { padding: 100px 20px 40px; }
@@ -114,4 +153,6 @@
     .article-hero h1 { font-size: 26px; }
     .author-box   { flex-direction: column; }
     .article-meta { flex-wrap: wrap; gap: 8px; }
+    .lead-magnet form { flex-direction: column; }
+    .lead-magnet button { width: 100%; }
 }
