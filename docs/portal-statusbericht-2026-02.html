@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virtue Compliance — Portal-Statusbericht & Strategieempfehlung</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap');
+
+    :root {
+      --primary: #0f3d2e;
+      --primary-light: #1a5c44;
+      --accent: #e8b931;
+      --text: #111827;
+      --text-muted: #6b7280;
+      --bg: #ffffff;
+      --bg-subtle: #f9fafb;
+      --border: #e5e7eb;
+      --green: #059669;
+      --green-bg: #ecfdf5;
+      --red: #dc2626;
+      --red-bg: #fef2f2;
+      --yellow-bg: #fffbeb;
+      --radius: 8px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.65;
+      font-size: 14px;
+    }
+
+    @media print {
+      body { font-size: 11px; line-height: 1.45; }
+      .page-break { page-break-before: always; }
+      header { padding: 24px 0 20px !important; }
+      main { padding: 0 !important; max-width: 100% !important; }
+      section { padding: 16px 0 !important; }
+      h2 { font-size: 16px !important; margin-top: 8px !important; }
+      h3 { font-size: 12px !important; }
+      table { font-size: 10px !important; }
+      .strength-card, .weakness-card, .fixed-card { padding: 10px 14px !important; margin-bottom: 8px !important; }
+    }
+
+    header {
+      background: var(--primary);
+      color: white;
+      padding: 40px 0 32px;
+    }
+
+    header .container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    header .overline {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    header h1 {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    header .subtitle {
+      font-size: 16px;
+      color: rgba(255,255,255,0.8);
+      margin-bottom: 8px;
+    }
+
+    header .date {
+      font-size: 13px;
+      color: rgba(255,255,255,0.6);
+    }
+
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 32px 48px;
+    }
+
+    section {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    section:last-child { border-bottom: none; }
+
+    h2 {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+
+    h2 .num { color: var(--accent); font-weight: 700; }
+
+    .section-intro {
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+
+    h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 16px 0 6px;
+    }
+
+    h3 .badge-new {
+      display: inline-block;
+      background: var(--green);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 10px;
+      margin-left: 8px;
+      vertical-align: middle;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .maturity {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin: 8px 0 4px;
+      font-style: italic;
+    }
+
+    .maturity strong { color: var(--primary); font-style: normal; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0 12px;
+      font-size: 13px;
+    }
+
+    th {
+      text-align: left;
+      background: var(--bg-subtle);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 8px 12px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    td {
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    td:first-child { font-weight: 500; white-space: nowrap; }
+
+    td code {
+      background: var(--bg-subtle);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 12px;
+      font-family: 'SF Mono', Monaco, monospace;
+    }
+
+    .strength-card {
+      background: var(--bg-subtle);
+      border-left: 3px solid var(--primary);
+      padding: 12px 16px;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+
+    .strength-card strong { color: var(--primary); }
+
+    .fixed-card {
+      background: var(--green-bg);
+      border-left: 3px solid var(--green);
+      padding: 12px 16px;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+
+    .fixed-card .label {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+
+    .fixed-card .status {
+      display: inline-block;
+      background: var(--green);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 10px;
+      margin-left: 6px;
+      text-transform: uppercase;
+    }
+
+    .weakness-card {
+      background: var(--red-bg);
+      border-left: 3px solid var(--red);
+      padding: 12px 16px;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+
+    .weakness-card strong { color: var(--red); }
+
+    .phase-header {
+      background: var(--bg-subtle);
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      margin: 16px 0 8px;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--primary);
+    }
+
+    .phase-header small {
+      font-weight: 400;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .priority-critical { color: var(--red); font-weight: 700; }
+    .priority-high { color: #d97706; font-weight: 700; }
+    .priority-medium { color: var(--text-muted); font-weight: 600; }
+
+    .footer-note {
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 12px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="overline">Virtue Compliance GmbH</div>
+    <h1>Portal-Statusbericht</h1>
+    <div class="subtitle">& Strategieempfehlung</div>
+    <div class="date">Stand: 23. Februar 2026 (aktualisiert) · Strategieberatung (technisch)</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- 1. Kundenportal -->
+  <section>
+    <h2><span class="num">1.</span> Funktionsumfang — Kundenportal</h2>
+    <p class="section-intro">Das Client-Portal (<code>/app/portal</code>) ist ein rollengeschütztes Single-Page-Application mit fünf Hauptbereichen.</p>
+
+    <h3>1.1 Dashboard</h3>
+    <table>
+      <tr><th>Feature</th><th>Beschreibung</th></tr>
+      <tr><td>Persönliche Begrüssung</td><td>Vorname des Benutzers + Organisationsname</td></tr>
+      <tr><td>Kritische Meldungen-Banner</td><td>Rot hinterlegter Hinweis bei kritischen Alerts, klickbar → direkte Navigation</td></tr>
+      <tr><td>Stat-Cards</td><td>3 Kennzahlen (Neue Updates, Offene Massnahmen, Compliance-Status), alle klickbar</td></tr>
+      <tr><td>Letzte Meldungen</td><td>Preview der 3 neusten Alerts mit Severity-Badge</td></tr>
+    </table>
+    <p class="maturity"><strong>Reifegrad:</strong> Hoch — funktioniert als Einstiegspunkt gut.</p>
+
+    <h3>1.2 Regulatorische Meldungen</h3>
+    <table>
+      <tr><th>Feature</th><th>Beschreibung</th></tr>
+      <tr><td>Listenansicht</td><td>Alle relevanten Meldungen mit Severity- und Impact-Badge</td></tr>
+      <tr><td>Filter</td><td>Nach Schweregrad (Kritisch, Hoch, Mittel, Info), "Nur neue" Toggle</td></tr>
+      <tr><td>Quick-Filter Cards</td><td>Klickbare Zähler für Kritisch/Hoch/Neu</td></tr>
+      <tr><td>Detailansicht</td><td>Vollbild mit Summary, Rechtsgrundlage, Frist</td></tr>
+      <tr><td>Auswirkungsanalyse</td><td>Individuelle Risikoeinschätzung pro Kunde</td></tr>
+      <tr><td>Elena-Kommentar</td><td>Persönlicher Kommentar mit dynamischer Anrede</td></tr>
+      <tr><td>Massnahmen-Tracking</td><td>3-Status-Zyklus (Offen → In Arbeit → Erledigt) mit Checkboxen</td></tr>
+      <tr><td>Kommentar-Funktion</td><td>Thread-basierte Kommentare auf Massnahmen (Kunde ↔ Beraterin)</td></tr>
+      <tr><td>Betroffene Dokumente</td><td>Sidebar mit verknüpften Dokumenten, klickbar → Detailseite</td></tr>
+      <tr><td>Deep-Linking</td><td>Dashboard → Meldung, Dokument → Meldung (bidirektional)</td></tr>
+    </table>
+    <p class="maturity"><strong>Reifegrad:</strong> Sehr hoch — ausgereift mit optimistischen Updates, Fehlerbehandlung, Dialog-Funktion.</p>
+
+    <h3>1.3 Dokumentation</h3>
+    <table>
+      <tr><th>Feature</th><th>Beschreibung</th></tr>
+      <tr><td>Listenansicht</td><td>Gruppiert nach Kategorie, Format-Badge, Version, Status</td></tr>
+      <tr><td>Filter</td><td>Nach Status, Kategorie, Volltextsuche</td></tr>
+      <tr><td>PDF-Export</td><td>Professionelles PDF mit VC-Branding, Kopf-/Fusszeile, Checkboxen</td></tr>
+      <tr><td>Freigabe-Workflow</td><td>"Freigeben"-Button bei Status "Review", mit Bestätigungsdialog</td></tr>
+      <tr><td>Änderungsverlauf</td><td>Aufklappbare Timeline (immutabler Audit Trail)</td></tr>
+      <tr><td>Versionierung mit Diff</td><td>Vergleich zwischen Versionen mit farbiger Hervorhebung</td></tr>
+      <tr><td>Verknüpfte Meldungen</td><td>Regulatorische Alerts, die dieses Dokument betreffen</td></tr>
+    </table>
+    <p class="maturity"><strong>Reifegrad:</strong> Sehr hoch — PDF-Export, Audit Trail, Versionierung, Freigabe-Flow, Cross-Referencing.</p>
+
+    <h3>1.4 Endkunden-Verwaltung (KYC/KYB) <span class="badge-new">Neu</span></h3>
+    <table>
+      <tr><th>Feature</th><th>Beschreibung</th></tr>
+      <tr><td>Kundenliste</td><td>Endkunden mit Typ, Risikostufe, Status, Dokumentanzahl</td></tr>
+      <tr><td>Kundenerfassung</td><td>Natürliche + juristische Personen (mit Zefix-Integration)</td></tr>
+      <tr><td>Dokumenten-Workflow</td><td>Erstellen → Ausfüllen → Einreichen → Freigeben/Ablehnen → Überarbeiten</td></tr>
+      <tr><td>Kontakte-Verwaltung</td><td>Ansprechpersonen pro Endkunde (Rolle, E-Mail, Telefon)</td></tr>
+      <tr><td>Löschen/Archivieren</td><td>Löschung mit vollständiger Archivierung aller Daten</td></tr>
+      <tr><td>Hilfe-Anfragen</td><td>Direkte Anfrage an Virtue Compliance, mit E-Mail-Benachrichtigung</td></tr>
+      <tr><td>Audit Trail</td><td>Lückenlose Protokollierung aller Änderungen</td></tr>
+      <tr><td>PDF-Export</td><td>Kundendokumente und Audit Trail als PDF</td></tr>
+    </table>
+    <p class="maturity"><strong>Reifegrad:</strong> Hoch — vollständiger CDD-Workflow mit Audit Trail und Archivierung.</p>
+
+    <h3>1.5 Übergreifende Features</h3>
+    <table>
+      <tr><th>Feature</th><th>Beschreibung</th></tr>
+      <tr><td>In-App Notifications</td><td>Bell-Icon mit Dropdown, Unread-Zähler, Typen: Alerts, Massnahmen, Dokumente</td></tr>
+      <tr><td>Multi-User</td><td>Mehrere Benutzer pro Organisation (Viewer, Editor, Approver)</td></tr>
+      <tr><td>Responsive Layout</td><td>Hamburger-Drawer, mobile Top-Bar, adaptive Breakpoints</td></tr>
+      <tr><td>Row-Level Security</td><td>Kunden sehen nur ihre eigene Organisation (DB-Level)</td></tr>
+      <tr><td>Authentifizierung</td><td>Supabase Auth mit Rollenprüfung, AuthGuard</td></tr>
+    </table>
+  </section>
+
+  <!-- 2. Admin-System -->
+  <section class="page-break">
+    <h2><span class="num">2.</span> Funktionsumfang — Admin-System</h2>
+    <p class="section-intro">Das Admin-System (<code>/app/docgen</code>) ist die interne Plattform für Virtue Compliance.</p>
+
+    <h3>2.1 Dashboard</h3>
+    <table>
+      <tr><th>Feature</th><th>Beschreibung</th></tr>
+      <tr><td>Admin-Begrüssung</td><td>Personalisiert mit Vorname, Profil-Warnung</td></tr>
+      <tr><td>Stat-Cards</td><td>Dokumente, Jurisdiktionen, Reg. Alerts — alle klickbar</td></tr>
+      <tr><td>Dokumenttypen-Grid</td><td>6 Typen mit Icon, Beschreibung, Zeitschätzung, Komplexität</td></tr>
+    </table>
+
+    <h3>2.2 Kundenverwaltung</h3>
+    <table>
+      <tr><th>Feature</th><th>Beschreibung</th></tr>
+      <tr><td>Kundenliste</td><td>Alle Organisationen mit Dokumentanzahl, Delete-Button</td></tr>
+      <tr><td>Neukunden-Formular</td><td>Branche, SRO, Kontaktdaten</td></tr>
+      <tr><td>Zefix-Integration</td><td>Handelsregister → automatische Befüllung (Name, UID, Rechtsform, Sitz)</td></tr>
+    </table>
+
+    <h3>2.3 Firmenprofil</h3>
+    <table>
+      <tr><th>Feature</th><th>Beschreibung</th></tr>
+      <tr><td>28 Felder in 5 Bereichen</td><td>Stammdaten, Geschäftstätigkeit, Organisation, Regulierung, Risikoprofil</td></tr>
+      <tr><td>Auto-Save</td><td>Debounced (2s), mit Status-Indikator</td></tr>
+      <tr><td>Zefix-Personen</td><td>Automatische Übernahme von Personen aus dem Handelsregister</td></tr>
+    </table>
+
+    <h3>2.4 Dokumentgenerierung</h3>
+    <table>
+      <tr><th>Feature</th><th>Beschreibung</th></tr>
+      <tr><td>3-Schritt-Wizard</td><td>Dokumenttyp → Jurisdiktion + Profil → Spezifische Fragen</td></tr>
+      <tr><td>6 Dokumenttypen</td><td>AML-Richtlinie, KYC-Checkliste, Risikoklassifizierung, Audit, KYT, Jahresbericht</td></tr>
+      <tr><td>KI-Generierung</td><td>Claude Opus 4 basierend auf Profil + Antworten</td></tr>
+    </table>
+
+    <h3>2.5 Dokumentenübersicht</h3>
+    <table>
+      <tr><th>Feature</th><th>Beschreibung</th></tr>
+      <tr><td>List/Detail-Pattern</td><td>Modernisierte Ansicht nach Portal-Vorbild</td></tr>
+      <tr><td>Bulk-Aktionen</td><td>Mehrere Dokumente gleichzeitig freigeben / Status ändern</td></tr>
+      <tr><td>PDF-Export</td><td>Professionelles PDF mit VC-Branding</td></tr>
+      <tr><td>Versionierung mit Diff</td><td>Visueller Vergleich zwischen Dokumentversionen</td></tr>
+    </table>
+    <p class="maturity"><strong>Reifegrad:</strong> Hoch — modernisiert auf Portal-Niveau mit Bulk-Aktionen und PDF-Export.</p>
+
+    <h3>2.6 Regulatorische Meldungen</h3>
+    <table>
+      <tr><th>Feature</th><th>Beschreibung</th></tr>
+      <tr><td>3-Tab-Ansicht</td><td>Aktiv, Entwürfe, Abgewiesen</td></tr>
+      <tr><td>KI-Pipeline</td><td>Täglicher Cron: RSS → KI-Analyse → Draft-Alerts → Client-Matching</td></tr>
+      <tr><td>Draft-Editor</td><td>Vollständiger Editor mit Kundenzuordnung + Elena-Kommentar</td></tr>
+      <tr><td>E-Mail-Benachrichtigung</td><td>Automatische E-Mail bei Veröffentlichung mit Tracking</td></tr>
+      <tr><td>Massnahmen-Editor</td><td>CRUD pro Kundenzuordnung, Kommentar-Zähler</td></tr>
+      <tr><td>Benachrichtigungs-Log</td><td>Gesendete E-Mails mit Status, Erneut-Senden möglich</td></tr>
+    </table>
+    <p class="maturity"><strong>Reifegrad:</strong> Sehr hoch — KI-Pipeline, Draft/Publish-Workflow, Client-Matching, E-Mail-Tracking.</p>
+
+    <h3>2.7 Mitgliederverwaltung <span class="badge-new">Neu</span></h3>
+    <table>
+      <tr><th>Feature</th><th>Beschreibung</th></tr>
+      <tr><td>Rollen-Zuweisung</td><td>Viewer, Editor, Approver — änderbar per Dropdown</td></tr>
+      <tr><td>Einladung per E-Mail</td><td>Neue Benutzer per Edge Function einladen</td></tr>
+      <tr><td>Mitglieder entfernen</td><td>Benutzer aus Organisation entfernen</td></tr>
+    </table>
+
+    <h3>2.8 Backend (14 Edge Functions)</h3>
+    <table>
+      <tr><th>Funktion</th><th>Beschreibung</th></tr>
+      <tr><td><code>generate-document</code></td><td>KI-Dokumentgenerierung via Claude Opus 4</td></tr>
+      <tr><td><code>fetch-regulatory-updates</code></td><td>Täglicher Cron: RSS → KI-Analyse → Draft-Alerts</td></tr>
+      <tr><td><code>notify-alert</code></td><td>E-Mail bei Alert-Veröffentlichung mit Tracking</td></tr>
+      <tr><td><code>notify-help-request</code></td><td>Benachrichtigung bei Hilfe-Anfrage</td></tr>
+      <tr><td><code>invite-member</code></td><td>Benutzer-Einladung per E-Mail</td></tr>
+      <tr><td><code>check-action-reminders</code></td><td>Fälligkeits-Erinnerungen für Massnahmen</td></tr>
+      <tr><td><code>check-customer-reviews</code></td><td>Erinnerung an fällige Kunden-Reviews</td></tr>
+      <tr><td><code>customer-export</code></td><td>Kundendaten-Export</td></tr>
+      <tr><td><code>zefix-lookup</code></td><td>Handelsregister-Suche (ZEFIX API)</td></tr>
+      <tr><td><code>notify-contact</code></td><td>Kontaktformular-Benachrichtigung</td></tr>
+      <tr><td><code>stripe-webhook</code></td><td>Stripe Payment-Events</td></tr>
+      <tr><td><code>create-checkout</code></td><td>Stripe Checkout Session</td></tr>
+      <tr><td><code>send-reminder</code></td><td>Erinnerungs-E-Mails</td></tr>
+      <tr><td><code>check-overdue</code></td><td>Überfälligkeitsprüfung (Cron)</td></tr>
+    </table>
+  </section>
+
+  <!-- 3. Strategische Bewertung -->
+  <section class="page-break">
+    <h2><span class="num">3.</span> Strategische Bewertung</h2>
+
+    <h3>3.1 Stärken</h3>
+
+    <div class="strength-card">
+      <strong>Produktionsreifer Reifegrad</strong> — Audit Trails, optimistische Updates, Deep-Linking, RLS, PDF-Export, Multi-User, Responsive Layout — das System ist über das MVP-Stadium hinausgewachsen.
+    </div>
+    <div class="strength-card">
+      <strong>KI-Pipeline als Differenzierungsmerkmal</strong> — Automatische Regulierungs-Überwachung (RSS → KI-Analyse → Draft-Alert → Client-Matching). Kein Wettbewerber im Schweizer Markt bietet das in dieser Form.
+    </div>
+    <div class="strength-card">
+      <strong>Endkunden-Verwaltung (CDD)</strong> — Vollständiger KYC/KYB-Workflow auf Endkunden-Ebene (Erfassung, Dokumentation, Freigabe, Archivierung) — starker Mehrwert für Finanzintermediäre.
+    </div>
+    <div class="strength-card">
+      <strong>Elena als persönliches Element</strong> — Durchgehende Präsenz der Beraterin (Kommentare, Kontaktkarten, dynamische Anrede) schafft Vertrauen.
+    </div>
+    <div class="strength-card">
+      <strong>Immutabler Audit Trail</strong> — Trigger-basiert, nicht manipulierbar. Durchgängig für Dokumente, Kundendaten und Endkunden.
+    </div>
+    <div class="strength-card">
+      <strong>Test-Abdeckung</strong> — 120 automatisierte Tests über alle API-Schichten (Admin, Portal, Kunden, PDF-Export).
+    </div>
+
+    <h3>3.2 Behobene Schwächen (seit Erstbericht)</h3>
+
+    <div class="fixed-card">
+      <span class="label">Kein PDF-Export</span> <span class="status">Behoben</span><br>
+      Professioneller PDF-Export mit VC-Branding, Checkboxen, Formularfelder, Kopf-/Fusszeile.
+    </div>
+    <div class="fixed-card">
+      <span class="label">Kein Benachrichtigungssystem</span> <span class="status">Behoben</span><br>
+      E-Mail bei Alert-Veröffentlichung + In-App Notifications (Bell-Dropdown).
+    </div>
+    <div class="fixed-card">
+      <span class="label">Keine mobile Nutzung</span> <span class="status">Behoben</span><br>
+      Responsive Layout mit Hamburger-Drawer, mobiler Top-Bar, adaptiven Paddings.
+    </div>
+    <div class="fixed-card">
+      <span class="label">Kein Multi-User</span> <span class="status">Behoben</span><br>
+      Rollen (Viewer, Editor, Approver), Einladung per E-Mail, Mitgliederverwaltung.
+    </div>
+    <div class="fixed-card">
+      <span class="label">Keine Tests</span> <span class="status">Behoben</span><br>
+      120 Tests (Vitest): Admin-API, Portal-API, Kunden-API, PDF-Export.
+    </div>
+    <div class="fixed-card">
+      <span class="label">Admin-Dokumentenansicht basisch</span> <span class="status">Behoben</span><br>
+      Modernisiert: List/Detail-Pattern, Stat-Cards, Bulk-Aktionen, PDF-Export.
+    </div>
+    <div class="fixed-card">
+      <span class="label">Keine Kommentar-Funktion</span> <span class="status">Behoben</span><br>
+      Thread-basierte Kommentare auf Massnahmen (Kunde ↔ Admin).
+    </div>
+    <div class="fixed-card">
+      <span class="label">Keine Dokumenten-Versionierung</span> <span class="status">Behoben</span><br>
+      Versionierung mit visuellem Text-Diff.
+    </div>
+
+    <h3>3.3 Verbleibende Schwächen</h3>
+
+    <div class="weakness-card">
+      <strong>Keine Echtzeit-Updates</strong> — Client sieht neue Alerts erst beim Seiten-Reload. Kein Websocket/SSE.
+    </div>
+    <div class="weakness-card">
+      <strong>Kein Error Monitoring</strong> — Fehler gehen in <code>console.error</code> verloren. Kein Sentry.
+    </div>
+    <div class="weakness-card">
+      <strong>Keine CI/CD-Pipeline</strong> — Kein automatisierter TypeScript-Check oder Build bei Push.
+    </div>
+    <div class="weakness-card">
+      <strong>Keine API-Dokumentation</strong> — Edge Functions sind undokumentiert.
+    </div>
+  </section>
+
+  <!-- 4. Strategieempfehlung -->
+  <section class="page-break">
+    <h2><span class="num">4.</span> Strategieempfehlung — Weiterentwicklung</h2>
+
+    <div class="phase-header">Phase 1: Sofort (2–4 Wochen) <small>— "Stabilisierung & Qualität"</small></div>
+    <table>
+      <tr><th style="width:90px">Priorität</th><th style="width:180px">Massnahme</th><th>Begründung</th></tr>
+      <tr><td class="priority-high">Hoch</td><td><strong>CI/CD-Pipeline</strong></td><td>GitHub Actions: TypeScript-Check + Tests + Build bei jedem Push. Die 120 Tests existieren — sie müssen automatisch laufen.</td></tr>
+      <tr><td class="priority-high">Hoch</td><td><strong>Error Monitoring</strong></td><td>Sentry einbinden für Frontend + Edge Functions. Produktionsfehler werden aktuell nicht erfasst.</td></tr>
+      <tr><td class="priority-medium">Mittel</td><td><strong>Test-Coverage erweitern</strong></td><td>React-Komponenten testen (Freigabe-Flow, Status-Toggle, Notification Bell). Ziel: 60% Coverage.</td></tr>
+    </table>
+
+    <div class="phase-header">Phase 2: Kurzfristig (1–2 Monate) <small>— "Client Value"</small></div>
+    <table>
+      <tr><th style="width:90px">Priorität</th><th style="width:180px">Massnahme</th><th>Begründung</th></tr>
+      <tr><td class="priority-high">Hoch</td><td><strong>Compliance-Kalender</strong></td><td>Kalenderansicht aller Fristen (Massnahmen, Reviews, Deadlines). Exportierbar als ICS.</td></tr>
+      <tr><td class="priority-high">Hoch</td><td><strong>Compliance-Checks</strong></td><td>Proaktive Hinweise basierend auf Firmenprofil: "KYC-Checkliste seit 14 Monaten nicht aktualisiert".</td></tr>
+      <tr><td class="priority-medium">Mittel</td><td><strong>Echtzeit-Updates</strong></td><td>Supabase Realtime Subscriptions. Client soll neue Alerts sofort sehen.</td></tr>
+    </table>
+
+    <div class="phase-header">Phase 3: Mittelfristig (3–6 Monate) <small>— "Platform"</small></div>
+    <table>
+      <tr><th style="width:90px">Priorität</th><th style="width:180px">Massnahme</th><th>Begründung</th></tr>
+      <tr><td class="priority-high">Hoch</td><td><strong>Compliance Score</strong></td><td>Aggregierter Score: Dokumentenaktualität, Massnahmen, Fristen. Visuell als Gauge/Donut.</td></tr>
+      <tr><td class="priority-medium">Mittel</td><td><strong>White-Label</strong></td><td>Organisations-Logo + Primärfarbe konfigurierbar. Hoher Perceived Value.</td></tr>
+      <tr><td class="priority-medium">Mittel</td><td><strong>API für Drittsysteme</strong></td><td>REST-API für CRM-Integration (Salesforce, HubSpot). Enterprise-Kunden.</td></tr>
+    </table>
+
+    <div class="phase-header">Phase 4: Langfristig (6–12 Monate) <small>— "Scale"</small></div>
+    <table>
+      <tr><th style="width:90px">Priorität</th><th style="width:180px">Massnahme</th><th>Begründung</th></tr>
+      <tr><td class="priority-high">Hoch</td><td><strong>Mehrsprachigkeit</strong></td><td>DE/FR/IT/EN. Schweizer Markt + EU-Expansion.</td></tr>
+      <tr><td class="priority-high">Hoch</td><td><strong>Compliance-Report</strong></td><td>Automatischer Quartals-/Jahresbericht als PDF per E-Mail.</td></tr>
+      <tr><td class="priority-medium">Mittel</td><td><strong>Audit-Mode</strong></td><td>Read-only Ansicht für SRO-Auditoren per zeitlich begrenztem Link.</td></tr>
+      <tr><td class="priority-medium">Mittel</td><td><strong>Workflow-Engine</strong></td><td>Definierbare Regeln: Critical Alert → automatisch E-Mail + Massnahme.</td></tr>
+    </table>
+  </section>
+
+  <!-- 5. Technische Empfehlungen -->
+  <section>
+    <h2><span class="num">5.</span> Technische Empfehlungen</h2>
+    <table>
+      <tr><th>Bereich</th><th>Empfehlung</th></tr>
+      <tr><td>Testing</td><td><del>Vitest einführen</del> <strong>Umgesetzt:</strong> 120 Tests. Nächster Schritt: Component-Tests + Coverage-Report.</td></tr>
+      <tr><td>Error Monitoring</td><td>Sentry einbinden. Aktuell gehen Fehler in <code>console.error</code> verloren.</td></tr>
+      <tr><td>Performance</td><td>Supabase Realtime Subscriptions für Live-Updates evaluieren.</td></tr>
+      <tr><td>CI/CD</td><td>GitHub Actions: TypeScript-Check + Tests + Build bei jedem Push.</td></tr>
+      <tr><td>Dokumentation</td><td>API-Dokumentation für Edge Functions (OpenAPI/Swagger).</td></tr>
+    </table>
+  </section>
+
+  <!-- 6. Fazit -->
+  <section>
+    <h2><span class="num">6.</span> Fazit</h2>
+    <p style="margin-bottom:12px">Das Portal hat seit der Erstbewertung <strong>erhebliche Fortschritte</strong> gemacht. Alle acht ursprünglich identifizierten Schwächen wurden adressiert: PDF-Export, Benachrichtigungen, Mobile Layout, Multi-User, Tests, Admin-Dokumentenansicht, Kommentar-Funktion und Dokumenten-Versionierung.</p>
+    <p style="margin-bottom:12px">Zusätzlich wurde ein <strong>komplett neues Feature</strong> implementiert: die <strong>Endkunden-Verwaltung (KYC/KYB)</strong> mit vollständigem CDD-Workflow, Kontakte-Management, Dokumenten-Freigabe, Archivierung und Audit Trail.</p>
+    <p style="margin-bottom:12px">Die KI-Pipeline und der immutable Audit Trail bleiben die zentralen Differenzierungsmerkmale. Die <strong>nächsten Prioritäten</strong> sind Stabilisierung (CI/CD, Error Monitoring), gefolgt von Compliance-Kalender und automatisierten Compliance-Checks.</p>
+    <p>Das System ist von einem <strong>fortgeschrittenen MVP</strong> zu einer <strong>produktionsreifen Plattform</strong> herangewachsen.</p>
+  </section>
+
+  <div class="footer-note">
+    Virtue Compliance GmbH · Uznach, Schweiz · www.virtue-compliance.ch
+  </div>
+
+</main>
+
+</body>
+</html>
