@@ -805,7 +805,7 @@ function DocDetail({
           <Icon d={icons.download} size={14} color="#fff" />
           Download
         </button>
-        {doc.status === "review" && (
+        {doc.status === "review" && org?.userRole === "approver" && (
           <button
             disabled={approvingId === doc.id}
             onClick={() => onApprove(doc)}

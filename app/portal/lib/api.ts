@@ -2,6 +2,8 @@ import { supabase } from "@shared/lib/supabase";
 
 // ─── Organization ───────────────────────────────────────────────────
 
+export type OrgRole = "viewer" | "editor" | "approver";
+
 export interface ClientOrg {
   id: string;
   name: string;
@@ -10,19 +12,21 @@ export interface ClientOrg {
   sro: string | null;
   contact_name: string | null;
   contact_salutation: string | null;
+  userRole: OrgRole;
 }
 
 export async function loadUserOrganization(userId: string): Promise<ClientOrg | null> {
   const { data, error } = await supabase
     .from("organization_members")
-    .select("organizations(id, name, short_name, industry, sro, contact_name, contact_salutation)")
+    .select("role, organizations(id, name, short_name, industry, sro, contact_name, contact_salutation)")
     .eq("user_id", userId)
     .limit(1)
     .maybeSingle();
 
   if (error) throw error;
   if (!data?.organizations) return null;
-  return data.organizations as unknown as ClientOrg;
+  const org = data.organizations as unknown as Omit<ClientOrg, "userRole">;
+  return { ...org, userRole: (data.role as OrgRole) || "viewer" };
 }
 
 // ─── Client Alerts ──────────────────────────────────────────────────

@@ -103,6 +103,7 @@ export function ClientAlerts({ org, initialAlertId, onAlertConsumed, onDocNav }:
         orgShort={orgShort}
         onBack={() => setSelected(null)}
         onDocNav={onDocNav}
+        canEdit={org?.userRole === "editor" || org?.userRole === "approver"}
         onActionsUpdated={(updatedActions) => {
           // Update both selected and alerts list
           const updated = { ...selected, actions: updatedActions };
@@ -479,6 +480,7 @@ function AlertDetail({
   onBack,
   onDocNav,
   onActionsUpdated,
+  canEdit,
 }: {
   alert: PortalAlert;
   org: ClientOrg | null;
@@ -486,12 +488,14 @@ function AlertDetail({
   onBack: () => void;
   onDocNav?: (docName: string) => void;
   onActionsUpdated: (actions: PortalAlert["actions"]) => void;
+  canEdit: boolean;
 }) {
   const sev = SEV[alert.severity] ?? SEV.info;
   const imp = IMPACT[alert.impact] ?? IMPACT.medium;
   const [localActions, setLocalActions] = useState(alert.actions);
 
   const handleToggle = async (action: PortalAlert["actions"][number]) => {
+    if (!canEdit) return;
     const cycle: Record<string, string> = {
       offen: "in_arbeit",
       in_arbeit: "erledigt",
@@ -793,7 +797,8 @@ function AlertDetail({
                           alignItems: "center",
                           justifyContent: "center",
                           flexShrink: 0,
-                          cursor: "pointer",
+                          cursor: canEdit ? "pointer" : "default",
+                          opacity: canEdit ? 1 : 0.6,
                           transition: "all 0.15s",
                         }}
                       >

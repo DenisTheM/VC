@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
-import { createOrganization, loadDocCountsByOrg, searchZefix, type Organization, type ZefixResult } from "../lib/api";
+import { createOrganization, loadDocCountsByOrg, searchZefix, loadOrgMembers, updateOrgMemberRole, removeOrgMember, type Organization, type ZefixResult, type OrgMember, type OrgRole } from "../lib/api";
 
 const INDUSTRIES = [
   "Fintech",
@@ -41,6 +41,7 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, in
   const [showForm, setShowForm] = useState(initialShowForm);
   const [creating, setCreating] = useState(false);
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
+  const [membersOrgId, setMembersOrgId] = useState<string | null>(null);
 
   // Zefix search state
   const [zefixQuery, setZefixQuery] = useState("");
@@ -516,10 +517,252 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, in
                   <Icon d={icons.doc} size={12} color={T.ink4} /> {docCounts[org.id] || 0} Dok.
                 </span>
               </div>
+              {/* Members toggle */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMembersOrgId(membersOrgId === org.id ? null : org.id);
+                }}
+                style={{
+                  marginTop: 10,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  background: membersOrgId === org.id ? T.accentS : T.s1,
+                  border: `1px solid ${membersOrgId === org.id ? T.accent + "33" : T.border}`,
+                  borderRadius: 6,
+                  padding: "5px 10px",
+                  fontSize: 11.5,
+                  fontWeight: 500,
+                  color: membersOrgId === org.id ? T.accent : T.ink3,
+                  fontFamily: T.sans,
+                  cursor: "pointer",
+                }}
+              >
+                <Icon d={icons.users} size={12} color={membersOrgId === org.id ? T.accent : T.ink4} />
+                Mitglieder
+              </button>
             </div>
           ))}
         </div>
       )}
+
+      {/* Members panel */}
+      {membersOrgId && (
+        <OrgMembersPanel
+          orgId={membersOrgId}
+          orgName={organizations.find((o) => o.id === membersOrgId)?.name ?? ""}
+          onClose={() => setMembersOrgId(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  OrgMembersPanel — manage members of an organization               */
+/* ------------------------------------------------------------------ */
+
+const ROLE_LABELS: Record<OrgRole, { label: string; color: string; bg: string }> = {
+  viewer: { label: "Betrachter", color: T.ink3, bg: T.s2 },
+  editor: { label: "Bearbeiter", color: "#2563eb", bg: "#eff6ff" },
+  approver: { label: "Freigeber", color: T.accent, bg: T.accentS },
+};
+
+function OrgMembersPanel({
+  orgId,
+  orgName,
+  onClose,
+}: {
+  orgId: string;
+  orgName: string;
+  onClose: () => void;
+}) {
+  const [members, setMembers] = useState<OrgMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    loadOrgMembers(orgId)
+      .then(setMembers)
+      .catch((err) => console.error("Failed to load members:", err))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [orgId]);
+
+  const handleRoleChange = async (memberId: string, newRole: OrgRole) => {
+    setUpdating(memberId);
+    try {
+      await updateOrgMemberRole(memberId, newRole);
+      setMembers((prev) => prev.map((m) => m.id === memberId ? { ...m, role: newRole } : m));
+    } catch (err) {
+      console.error("Failed to update role:", err);
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleRemove = async (member: OrgMember) => {
+    if (!window.confirm(`Mitglied "${member.full_name || member.user_id}" wirklich entfernen?`)) return;
+    setUpdating(member.id);
+    try {
+      await removeOrgMember(member.id);
+      setMembers((prev) => prev.filter((m) => m.id !== member.id));
+    } catch (err) {
+      console.error("Failed to remove member:", err);
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        marginTop: 20,
+        background: "#fff",
+        borderRadius: T.rLg,
+        border: `1px solid ${T.border}`,
+        boxShadow: T.shSm,
+        overflow: "hidden",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "16px 22px",
+          borderBottom: `1px solid ${T.borderL}`,
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
+            Mitglieder — {orgName}
+          </div>
+          <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
+            {members.length} {members.length === 1 ? "Mitglied" : "Mitglieder"}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: 4,
+            display: "flex",
+          }}
+        >
+          <Icon d="M6 18L18 6M6 6l12 12" size={16} color={T.ink4} />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div style={{ padding: "16px 22px" }}>
+        {loading ? (
+          <div style={{ fontSize: 13, color: T.ink4, fontFamily: T.sans, padding: "12px 0" }}>
+            Wird geladen...
+          </div>
+        ) : members.length === 0 ? (
+          <div style={{ fontSize: 13, color: T.ink4, fontFamily: T.sans, padding: "12px 0" }}>
+            Keine Mitglieder zugewiesen.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {members.map((member) => {
+              const rl = ROLE_LABELS[member.role] ?? ROLE_LABELS.viewer;
+              return (
+                <div
+                  key={member.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "10px 14px",
+                    background: T.s1,
+                    borderRadius: 8,
+                    border: `1px solid ${T.borderL}`,
+                  }}
+                >
+                  {/* Avatar */}
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: "50%",
+                      background: rl.bg,
+                      border: `1px solid ${rl.color}22`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: rl.color,
+                      fontFamily: T.sans,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {(member.full_name || "?").slice(0, 2).toUpperCase()}
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
+                      {member.full_name || "Unbekannter Benutzer"}
+                    </div>
+                    <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans }}>
+                      {member.user_id.slice(0, 8)}...
+                    </div>
+                  </div>
+
+                  {/* Role selector */}
+                  <select
+                    value={member.role}
+                    onChange={(e) => handleRoleChange(member.id, e.target.value as OrgRole)}
+                    disabled={updating === member.id}
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: 6,
+                      border: `1px solid ${T.border}`,
+                      fontSize: 12,
+                      fontFamily: T.sans,
+                      fontWeight: 500,
+                      color: rl.color,
+                      background: "#fff",
+                      cursor: updating === member.id ? "wait" : "pointer",
+                      opacity: updating === member.id ? 0.6 : 1,
+                    }}
+                  >
+                    <option value="viewer">Betrachter</option>
+                    <option value="editor">Bearbeiter</option>
+                    <option value="approver">Freigeber</option>
+                  </select>
+
+                  {/* Remove button */}
+                  <button
+                    onClick={() => handleRemove(member)}
+                    disabled={updating === member.id}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: updating === member.id ? "wait" : "pointer",
+                      padding: 4,
+                      display: "flex",
+                      opacity: updating === member.id ? 0.4 : 0.6,
+                    }}
+                    title="Mitglied entfernen"
+                  >
+                    <Icon d="M6 18L18 6M6 6l12 12" size={14} color="#dc2626" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

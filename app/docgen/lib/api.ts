@@ -565,6 +565,78 @@ export async function bulkUpdateDocumentStatus(
   if (error) throw error;
 }
 
+// ─── Organization Members (Multi-User) ────────────────────────────────
+
+export type OrgRole = "viewer" | "editor" | "approver";
+
+export interface OrgMember {
+  id: string;
+  user_id: string;
+  role: OrgRole;
+  full_name: string | null;
+  email: string | null;
+  created_at: string;
+}
+
+export async function loadOrgMembers(orgId: string): Promise<OrgMember[]> {
+  const { data, error } = await supabase
+    .from("organization_members")
+    .select("id, user_id, role, created_at, profiles(full_name)")
+    .eq("organization_id", orgId)
+    .order("created_at");
+
+  if (error) throw error;
+
+  // We need to look up emails via auth admin — but from client side we can't.
+  // Instead we'll use the profiles table (full_name) and show user_id as fallback.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((m: any) => ({
+    id: m.id,
+    user_id: m.user_id,
+    role: m.role as OrgRole,
+    full_name: m.profiles?.full_name ?? null,
+    email: null, // email not available via profiles; shown as user_id in UI
+    created_at: m.created_at,
+  }));
+}
+
+export async function updateOrgMemberRole(
+  memberId: string,
+  newRole: OrgRole,
+): Promise<void> {
+  const { error } = await supabase
+    .from("organization_members")
+    .update({ role: newRole })
+    .eq("id", memberId);
+
+  if (error) throw error;
+}
+
+export async function removeOrgMember(memberId: string): Promise<void> {
+  const { error } = await supabase
+    .from("organization_members")
+    .delete()
+    .eq("id", memberId);
+
+  if (error) throw error;
+}
+
+export async function addOrgMember(
+  orgId: string,
+  userId: string,
+  role: OrgRole,
+): Promise<void> {
+  const { error } = await supabase
+    .from("organization_members")
+    .insert({
+      organization_id: orgId,
+      user_id: userId,
+      role,
+    });
+
+  if (error) throw error;
+}
+
 // ─── Zefix (Handelsregister) ────────────────────────────────────────
 
 export interface ZefixResult {
