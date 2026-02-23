@@ -3,7 +3,7 @@ import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import { DOC_STATUS, FORMAT_COLORS } from "../data/clientData";
-import { loadClientDocuments, approveDocument, type ClientOrg, type PortalDoc } from "../lib/api";
+import { loadClientDocuments, approveDocument, loadDocumentAuditLog, type ClientOrg, type PortalDoc, type AuditEntry } from "../lib/api";
 
 interface ClientDocsProps {
   org: ClientOrg | null;
@@ -597,6 +597,9 @@ export function ClientDocs({ org, initialDocName, onDocConsumed }: ClientDocsPro
                             </div>
                           )}
 
+                          {/* Audit Trail */}
+                          <AuditTimeline docId={doc.id} />
+
                           {/* Alert notice */}
                           {doc.alert && (
                             <div
@@ -981,6 +984,136 @@ function DocPreview({ doc }: { doc: PortalDoc }) {
               {doc.content}
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  AuditTimeline — collapsible document change log                    */
+/* ------------------------------------------------------------------ */
+
+const AUDIT_COLORS: Record<string, { dot: string; text: string }> = {
+  created: { dot: T.primary, text: T.primary },
+  approved: { dot: T.accent, text: T.accent },
+  status_changed: { dot: T.amber, text: "#92400e" },
+  updated: { dot: T.ink3, text: T.ink3 },
+};
+
+function AuditTimeline({ docId }: { docId: string }) {
+  const [open, setOpen] = useState(false);
+  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && !loaded) {
+      setLoading(true);
+      loadDocumentAuditLog(docId)
+        .then((data) => { setEntries(data); setLoaded(true); })
+        .catch((err) => console.error("Audit log failed:", err))
+        .finally(() => setLoading(false));
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <button
+        onClick={toggle}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "10px 14px",
+          background: T.s1,
+          border: `1px solid ${T.border}`,
+          borderRadius: open ? "8px 8px 0 0" : 8,
+          cursor: "pointer",
+          fontFamily: T.sans,
+          fontSize: 12,
+          fontWeight: 600,
+          color: T.ink2,
+          transition: "all 0.15s ease",
+        }}
+      >
+        <Icon d={icons.clock} size={15} color={T.ink3} />
+        Änderungsverlauf
+        <span style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}>
+          <Icon
+            d={open ? "M19 15l-7-7-7 7" : "M9 5l7 7-7 7"}
+            size={12}
+            color={T.ink4}
+          />
+        </span>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            border: `1px solid ${T.border}`,
+            borderTop: "none",
+            borderRadius: "0 0 8px 8px",
+            padding: "16px 18px",
+            background: "#fff",
+          }}
+        >
+          {loading ? (
+            <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans }}>Wird geladen...</div>
+          ) : entries.length === 0 ? (
+            <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans }}>Keine Einträge vorhanden.</div>
+          ) : (
+            <div style={{ position: "relative", paddingLeft: 20 }}>
+              {/* Vertical line */}
+              <div
+                style={{
+                  position: "absolute",
+                  left: 5,
+                  top: 6,
+                  bottom: 6,
+                  width: 2,
+                  background: T.borderL,
+                  borderRadius: 1,
+                }}
+              />
+              {entries.map((entry, i) => {
+                const colors = AUDIT_COLORS[entry.action] ?? AUDIT_COLORS.updated;
+                return (
+                  <div
+                    key={entry.id}
+                    style={{
+                      position: "relative",
+                      paddingBottom: i < entries.length - 1 ? 14 : 0,
+                    }}
+                  >
+                    {/* Dot */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: -17,
+                        top: 4,
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        background: colors.dot,
+                        border: "2px solid #fff",
+                        boxShadow: `0 0 0 1px ${T.border}`,
+                      }}
+                    />
+                    <div style={{ fontSize: 12.5, fontFamily: T.sans, color: colors.text, fontWeight: 600 }}>
+                      {entry.details}
+                    </div>
+                    <div style={{ fontSize: 11, fontFamily: T.sans, color: T.ink4, marginTop: 1 }}>
+                      {entry.changedAt} — {entry.changedBy}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

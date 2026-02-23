@@ -193,6 +193,38 @@ export async function approveDocument(docId: string): Promise<void> {
   }
 }
 
+// ─── Document Audit Log ─────────────────────────────────────────────
+
+export interface AuditEntry {
+  id: string;
+  action: "created" | "updated" | "status_changed" | "approved";
+  oldStatus: string | null;
+  newStatus: string | null;
+  changedAt: string;
+  changedBy: string;
+  details: string | null;
+}
+
+export async function loadDocumentAuditLog(docId: string): Promise<AuditEntry[]> {
+  const { data, error } = await supabase
+    .from("document_audit_log")
+    .select("id, action, old_status, new_status, changed_by, changed_at, details, profiles:changed_by(full_name)")
+    .eq("document_id", docId)
+    .order("changed_at", { ascending: false });
+
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((e: any) => ({
+    id: e.id,
+    action: e.action,
+    oldStatus: e.old_status,
+    newStatus: e.new_status,
+    changedAt: formatDate(e.changed_at),
+    changedBy: e.profiles?.full_name ?? "System",
+    details: e.details,
+  }));
+}
+
 // ─── Dashboard Stats ────────────────────────────────────────────────
 
 export async function loadPortalStats(organizationId: string) {
