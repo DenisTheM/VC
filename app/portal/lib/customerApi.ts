@@ -65,11 +65,40 @@ export interface CustomerDocAuditEntry {
 export interface CustomerAuditEntry {
   id: string;
   customer_id: string;
-  action: "created" | "updated" | "status_changed" | "archived";
+  action: "created" | "updated" | "status_changed" | "archived" | "deleted" | "contact_added" | "contact_updated" | "contact_removed";
   changed_by: string | null;
   changed_by_name: string | null;
   changed_at: string;
   details: string | null;
+}
+
+export interface CustomerContact {
+  id: string;
+  customer_id: string;
+  organization_id: string;
+  role: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeletedCustomerArchive {
+  id: string;
+  organization_id: string;
+  original_customer_id: string;
+  customer_data: Record<string, unknown>;
+  contacts_data: Record<string, unknown>[];
+  documents_data: Record<string, unknown>[];
+  audit_log_data: Record<string, unknown>[];
+  deleted_by: string | null;
+  deleted_by_name: string | null;
+  deleted_at: string;
+  reason: string | null;
 }
 
 export interface HelpRequest {
@@ -453,6 +482,100 @@ export async function loadHelpRequests(orgId: string): Promise<HelpRequest[]> {
     created_at: formatDate(r.created_at),
     resolved_at: r.resolved_at ? formatDate(r.resolved_at) : null,
     admin_response: r.admin_response,
+  }));
+}
+
+// ─── Customer Contacts ──────────────────────────────────────────────
+
+export async function loadCustomerContacts(customerId: string): Promise<CustomerContact[]> {
+  const { data, error } = await supabase
+    .from("customer_contacts")
+    .select("*")
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as CustomerContact[];
+}
+
+export async function createCustomerContact(input: {
+  customer_id: string;
+  organization_id: string;
+  role: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+}): Promise<CustomerContact> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht authentifiziert");
+
+  const { data, error } = await supabase
+    .from("customer_contacts")
+    .insert({ ...input, created_by: user.id })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as CustomerContact;
+}
+
+export async function updateCustomerContact(
+  id: string,
+  updates: Partial<Pick<CustomerContact, "role" | "first_name" | "last_name" | "email" | "phone" | "notes">>,
+): Promise<void> {
+  const { error } = await supabase
+    .from("customer_contacts")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
+export async function deleteCustomerContact(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("customer_contacts")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
+// ─── Customer Delete ────────────────────────────────────────────────
+
+export async function deleteCustomer(customerId: string, reason?: string): Promise<void> {
+  const { error } = await supabase.rpc("delete_customer_with_archive", {
+    p_customer_id: customerId,
+    p_reason: reason || null,
+  });
+
+  if (error) throw error;
+}
+
+// ─── Deleted Customers Archive ──────────────────────────────────────
+
+export async function loadDeletedCustomers(orgId: string): Promise<DeletedCustomerArchive[]> {
+  const { data, error } = await supabase
+    .from("deleted_customers_archive")
+    .select("*, profiles:deleted_by(full_name)")
+    .eq("organization_id", orgId)
+    .order("deleted_at", { ascending: false });
+
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((d: any) => ({
+    id: d.id,
+    organization_id: d.organization_id,
+    original_customer_id: d.original_customer_id,
+    customer_data: d.customer_data,
+    contacts_data: d.contacts_data,
+    documents_data: d.documents_data,
+    audit_log_data: d.audit_log_data,
+    deleted_by: d.deleted_by,
+    deleted_by_name: d.profiles?.full_name ?? "System",
+    deleted_at: formatDate(d.deleted_at),
+    reason: d.reason,
   }));
 }
 

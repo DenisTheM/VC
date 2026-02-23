@@ -61,3 +61,39 @@ export const HELP_STATUS = {
 } as const;
 
 export type HelpStatus = keyof typeof HELP_STATUS;
+
+/* ------------------------------------------------------------------ */
+/*  Contact Role Config                                                */
+/* ------------------------------------------------------------------ */
+
+export const CONTACT_ROLES = [
+  "Geschäftsführer",
+  "Wirtschaftlich Berechtigter",
+  "Kontrollinhaber",
+  "Compliance Officer",
+  "Zeichnungsberechtigter",
+  "Verwaltungsrat",
+  "Ansprechperson",
+  "Andere",
+] as const;
+
+export type ContactRole = (typeof CONTACT_ROLES)[number];
+
+/* ------------------------------------------------------------------ */
+/*  Audit Action Color Config                                          */
+/* ------------------------------------------------------------------ */
+
+export const AUDIT_ACTION_COLORS: Record<string, { bg: string; color: string }> = {
+  created: { bg: T.accentS, color: T.accent },
+  approved: { bg: T.accentS, color: T.accent },
+  contact_added: { bg: T.accentS, color: T.accent },
+  updated: { bg: "#eff6ff", color: "#3b82f6" },
+  contact_updated: { bg: "#eff6ff", color: "#3b82f6" },
+  submitted: { bg: "#fffbeb", color: "#d97706" },
+  status_changed: { bg: "#fffbeb", color: "#d97706" },
+  rejected: { bg: "#fef2f2", color: "#dc2626" },
+  archived: { bg: "#fef2f2", color: "#dc2626" },
+  deleted: { bg: "#fef2f2", color: "#dc2626" },
+  contact_removed: { bg: "#fef2f2", color: "#dc2626" },
+  outdated: { bg: T.s2, color: T.ink3 },
+} as const;

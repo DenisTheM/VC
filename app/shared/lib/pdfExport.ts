@@ -328,3 +328,135 @@ export function exportCustomerDocumentAsPdf(opts: CustomerDocPdfOpts) {
   addFooter();
   doc.save(`${fileName}.pdf`);
 }
+
+// ─── Audit Trail PDF Export ─────────────────────────────────────────
+
+interface AuditTrailPdfOpts {
+  customerName: string;
+  customerType: string;
+  orgName: string;
+  entries: { date: string; action: string; details: string; user: string }[];
+}
+
+export function exportAuditTrailAsPdf(opts: AuditTrailPdfOpts) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const maxWidth = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
+  let y = MARGIN_TOP;
+  let pageNum = 1;
+  const fileName = `Audit Trail — ${opts.customerName}`;
+  const exportDate = new Date().toLocaleDateString("de-CH", {
+    day: "numeric", month: "long", year: "numeric",
+  });
+
+  const COL_DATE = MARGIN_LEFT;
+  const COL_ACTION = MARGIN_LEFT + 32;
+  const COL_USER = MARGIN_LEFT + 72;
+  const COL_DETAILS = MARGIN_LEFT + 108;
+  const COL_DETAILS_WIDTH = PAGE_WIDTH - MARGIN_RIGHT - COL_DETAILS;
+
+  const addHeader = () => {
+    doc.setFontSize(8);
+    doc.setTextColor(15, 61, 46);
+    doc.setFont("helvetica", "bold");
+    doc.text("Virtue Compliance", MARGIN_LEFT, 12);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(156, 163, 175);
+    doc.text(opts.orgName, PAGE_WIDTH - MARGIN_RIGHT, 12, { align: "right" });
+    doc.setDrawColor(229, 231, 235);
+    doc.line(MARGIN_LEFT, 16, PAGE_WIDTH - MARGIN_RIGHT, 16);
+  };
+
+  const addFooter = () => {
+    doc.setFontSize(7.5);
+    doc.setTextColor(156, 163, 175);
+    doc.setDrawColor(229, 231, 235);
+    doc.line(MARGIN_LEFT, 282, PAGE_WIDTH - MARGIN_RIGHT, 282);
+    doc.text(fileName, MARGIN_LEFT, 287);
+    doc.text(exportDate, PAGE_WIDTH / 2, 287, { align: "center" });
+    doc.text(`Seite ${pageNum}`, PAGE_WIDTH - MARGIN_RIGHT, 287, { align: "right" });
+  };
+
+  const ensureSpace = (needed: number) => {
+    if (y + needed > 297 - MARGIN_BOTTOM) {
+      addFooter();
+      doc.addPage();
+      pageNum++;
+      y = MARGIN_TOP;
+      addHeader();
+      addTableHeader();
+    }
+  };
+
+  const addTableHeader = () => {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(107, 114, 128);
+    doc.text("Datum", COL_DATE, y);
+    doc.text("Aktion", COL_ACTION, y);
+    doc.text("Benutzer", COL_USER, y);
+    doc.text("Details", COL_DETAILS, y);
+    y += 2;
+    doc.setDrawColor(229, 231, 235);
+    doc.line(MARGIN_LEFT, y, PAGE_WIDTH - MARGIN_RIGHT, y);
+    y += 4;
+  };
+
+  // Start rendering
+  addHeader();
+
+  // Title
+  doc.setFontSize(FONT_SIZE_H1);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 61, 46);
+  doc.text(`Audit Trail — ${opts.customerName}`, MARGIN_LEFT, y);
+  y += FONT_SIZE_H1 * 0.45 + 2;
+
+  // Subtitle
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(107, 114, 128);
+  doc.text(`${opts.customerType}  |  Export: ${exportDate}`, MARGIN_LEFT, y);
+  y += LINE_HEIGHT + 4;
+
+  // Separator
+  doc.setDrawColor(229, 231, 235);
+  doc.line(MARGIN_LEFT, y - 2, PAGE_WIDTH - MARGIN_RIGHT, y - 2);
+  y += 6;
+
+  // Table header
+  addTableHeader();
+
+  // Table rows
+  for (const entry of opts.entries) {
+    const detailLines = doc.splitTextToSize(entry.details || "—", COL_DETAILS_WIDTH);
+    const rowHeight = Math.max(detailLines.length * 3.5, 5);
+
+    ensureSpace(rowHeight + 2);
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(17, 24, 39);
+
+    doc.text(entry.date, COL_DATE, y);
+    doc.text(entry.action, COL_ACTION, y);
+
+    // Truncate user name to fit column
+    const userText = entry.user.length > 18 ? entry.user.slice(0, 17) + "…" : entry.user;
+    doc.text(userText, COL_USER, y);
+
+    for (let i = 0; i < detailLines.length; i++) {
+      doc.text(detailLines[i], COL_DETAILS, y + i * 3.5);
+    }
+
+    y += rowHeight + 1.5;
+  }
+
+  if (opts.entries.length === 0) {
+    doc.setFontSize(9);
+    doc.setTextColor(156, 163, 175);
+    doc.text("Keine Audit-Einträge vorhanden.", MARGIN_LEFT, y);
+  }
+
+  addFooter();
+  doc.save(`${fileName}.pdf`);
+}
