@@ -137,8 +137,8 @@ export function NotificationBell({ onNavigate }: { onNavigate?: (link: string) =
           style={{
             position: "absolute",
             top: "calc(100% + 8px)",
-            right: 0,
-            width: 340,
+            left: 0,
+            width: 320,
             maxHeight: 420,
             background: "#fff",
             borderRadius: 12,
