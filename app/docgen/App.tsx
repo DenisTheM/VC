@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { T } from "@shared/styles/tokens";
-import { icons } from "@shared/components/Icon";
+import { Icon, icons } from "@shared/components/Icon";
 import { Sidebar } from "@shared/components/Sidebar";
 import { AuthGuard } from "@shared/components/AuthGuard";
 import { useAuthContext } from "@shared/components/AuthContext";
 import { usePageNav } from "@shared/hooks/usePageNav";
+import { useBreakpoint } from "@shared/hooks/useBreakpoint";
 import { signOut } from "@shared/lib/auth";
 import { PROFILE_FIELDS } from "./data/profileFields";
 import { loadOrganizations, loadCompanyProfile, saveCompanyProfile, loadDashboardStats, type Organization, type ZefixResult } from "./lib/api";
@@ -21,6 +22,9 @@ function DocGenInner() {
   const displayName = authProfile.full_name || "User";
   const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   const [page, setPage] = usePageNav("dashboard");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isMobile, isTablet } = useBreakpoint();
+  const compact = isMobile || isTablet;
   const [orgId, setOrgId] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -141,11 +145,13 @@ function DocGenInner() {
   const handleNav = useCallback((id: string) => {
     if (id === "new-profile") {
       setPage("new-profile");
+      setMobileMenuOpen(false);
       return;
     }
     if (id === "generate") setSelectedDocKey(null); // reset when navigating via sidebar
     setPage(id);
-  }, []);
+    setMobileMenuOpen(false);
+  }, [compact]);
 
   const handleGenerateDoc = useCallback((docKey: string) => {
     setSelectedDocKey(docKey);
@@ -215,16 +221,85 @@ function DocGenInner() {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: T.sans, background: T.s1 }}>
-      <Sidebar
-        items={sidebarItems}
-        active={page}
-        onNav={handleNav}
-        title="Virtue"
-        subtitle="Document Generator"
-        footer={footer}
-      />
-      <main style={{ flex: 1, padding: "36px 44px", maxWidth: 960, overflowY: "auto" }}>
-        <Suspense fallback={<div style={{ padding: 40, color: T.ink3, fontFamily: T.sans }}>Laden...</div>}>
+      {/* Mobile top bar */}
+      {compact && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 52,
+            background: T.primaryDeep,
+            display: "flex",
+            alignItems: "center",
+            padding: "0 16px",
+            gap: 12,
+            zIndex: 1001,
+            borderBottom: "1px solid rgba(255,255,255,0.07)",
+          }}
+        >
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 6,
+              display: "flex",
+            }}
+          >
+            <Icon d={mobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} size={20} color="rgba(255,255,255,0.8)" />
+          </button>
+          <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#fff", fontFamily: T.sans }}>
+            Virtue <span style={{ color: "rgba(255,255,255,0.45)", fontWeight: 400 }}>DocGen</span>
+          </div>
+        </div>
+      )}
+
+      {/* Backdrop */}
+      {compact && mobileMenuOpen && (
+        <div
+          onClick={() => setMobileMenuOpen(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.4)",
+            zIndex: 1002,
+          }}
+        />
+      )}
+
+      {/* Sidebar — desktop: fixed, mobile: overlay drawer */}
+      <div
+        style={{
+          ...(compact ? {
+            position: "fixed",
+            top: 0,
+            left: 0,
+            bottom: 0,
+            zIndex: 1003,
+            transform: mobileMenuOpen ? "translateX(0)" : "translateX(-100%)",
+            transition: "transform 0.25s ease",
+          } : {}),
+        }}
+      >
+        <Sidebar
+          items={sidebarItems}
+          active={page}
+          onNav={handleNav}
+          title="Virtue"
+          subtitle="Document Generator"
+          footer={footer}
+        />
+      </div>
+
+      {/* Main content */}
+      <main style={{ flex: 1, padding: compact ? "20px 16px" : "36px 44px", paddingTop: compact ? 68 : undefined, maxWidth: 960, overflowY: "auto" }}>
+        <Suspense fallback={<div style={{ padding: compact ? 20 : 40, color: T.ink3, fontFamily: T.sans }}>Laden...</div>}>
           {page === "dashboard" && <DashboardPage onNav={setPage} onGenerateDoc={handleGenerateDoc} profile={profile} profOk={profOk} stats={dashStats} />}
           {(page === "organizations" || page === "new-profile") && (
             <OrganizationsPage

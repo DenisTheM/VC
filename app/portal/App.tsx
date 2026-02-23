@@ -4,6 +4,7 @@ import { Icon, icons } from "@shared/components/Icon";
 import { AuthGuard } from "@shared/components/AuthGuard";
 import { useAuthContext } from "@shared/components/AuthContext";
 import { usePageNav } from "@shared/hooks/usePageNav";
+import { useBreakpoint } from "@shared/hooks/useBreakpoint";
 import { signOut } from "@shared/lib/auth";
 import { NotificationBell } from "@shared/components/NotificationBell";
 import { loadUserOrganization, type ClientOrg } from "./lib/api";
@@ -302,6 +303,9 @@ function PortalContent() {
   const [org, setOrg] = useState<ClientOrg | null>(null);
   const [pendingAlertId, setPendingAlertId] = useState<string | null>(null);
   const [pendingDocName, setPendingDocName] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isMobile, isTablet } = useBreakpoint();
+  const compact = isMobile || isTablet;
 
   useEffect(() => {
     loadUserOrganization(user.id)
@@ -313,6 +317,7 @@ function PortalContent() {
     if (id !== "alerts") setPendingAlertId(null);
     if (id !== "docs") setPendingDocName(null);
     setPage(id);
+    if (compact) setMobileMenuOpen(false);
   };
 
   const handleAlertNav = (alertId: string) => {
@@ -327,18 +332,88 @@ function PortalContent() {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: T.s1, fontFamily: T.sans }}>
-      <ClientSidebar
-        active={page}
-        onNav={handleNav}
-        org={org}
-        onNotificationNav={(link) => {
-          // Parse link like "/portal/alerts" → navigate to "alerts"
-          const segment = link.split("/").pop() || "dashboard";
-          handleNav(segment);
+      {/* Mobile top bar */}
+      {compact && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 52,
+            background: T.primaryDeep,
+            display: "flex",
+            alignItems: "center",
+            padding: "0 16px",
+            gap: 12,
+            zIndex: 1001,
+            borderBottom: "1px solid rgba(255,255,255,0.07)",
+          }}
+        >
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 6,
+              display: "flex",
+            }}
+          >
+            <Icon d={mobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} size={20} color="rgba(255,255,255,0.8)" />
+          </button>
+          <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#fff", fontFamily: T.sans }}>
+            Virtue <span style={{ color: "rgba(255,255,255,0.45)", fontWeight: 400 }}>Compliance</span>
+          </div>
+          <NotificationBell onNavigate={(link) => { handleNav(link.split("/").pop() || "dashboard"); }} />
+        </div>
+      )}
+
+      {/* Backdrop */}
+      {compact && mobileMenuOpen && (
+        <div
+          onClick={() => setMobileMenuOpen(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.4)",
+            zIndex: 1002,
+          }}
+        />
+      )}
+
+      {/* Sidebar — desktop: fixed, mobile: overlay drawer */}
+      <div
+        style={{
+          ...(compact ? {
+            position: "fixed",
+            top: 0,
+            left: 0,
+            bottom: 0,
+            width: 248,
+            zIndex: 1003,
+            transform: mobileMenuOpen ? "translateX(0)" : "translateX(-100%)",
+            transition: "transform 0.25s ease",
+          } : {
+            width: 248,
+            flexShrink: 0,
+          }),
         }}
-      />
-      <div style={{ flex: 1, overflow: "auto" }}>
-        <Suspense fallback={<div style={{ padding: 40, color: T.ink3, fontFamily: T.sans }}>Laden...</div>}>
+      >
+        <ClientSidebar
+          active={page}
+          onNav={handleNav}
+          org={org}
+          onNotificationNav={(link) => { handleNav(link.split("/").pop() || "dashboard"); }}
+        />
+      </div>
+
+      {/* Main content */}
+      <div style={{ flex: 1, overflow: "auto", paddingTop: compact ? 52 : 0 }}>
+        <Suspense fallback={<div style={{ padding: compact ? 20 : 40, color: T.ink3, fontFamily: T.sans }}>Laden...</div>}>
           {page === "dashboard" && <ClientDashboard onNav={handleNav} onAlertNav={handleAlertNav} org={org} />}
           {page === "alerts" && <ClientAlerts org={org} initialAlertId={pendingAlertId} onAlertConsumed={() => setPendingAlertId(null)} onDocNav={handleDocNav} />}
           {page === "docs" && <ClientDocs org={org} initialDocName={pendingDocName} onDocConsumed={() => setPendingDocName(null)} onAlertNav={handleAlertNav} />}
