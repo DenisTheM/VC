@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
-import { createOrganization, deleteOrganization, loadDocCountsByOrg, searchZefix, loadOrgMembers, updateOrgMemberRole, removeOrgMember, inviteMember, type Organization, type ZefixResult, type OrgMember, type OrgRole } from "../lib/api";
+import { createOrganization, updateOrganization, deleteOrganization, loadDocCountsByOrg, searchZefix, loadOrgMembers, updateOrgMemberRole, removeOrgMember, inviteMember, type Organization, type ZefixResult, type OrgMember, type OrgRole } from "../lib/api";
 import { useAutosave, readAutosave } from "@shared/hooks/useAutosave";
 
 const INDUSTRIES = [
@@ -56,7 +56,7 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
   useEffect(() => {
     loadDocCountsByOrg().then(setDocCounts).catch(console.error);
   }, []);
-  const orgDefaults = { name: "", short_name: "", industry: "", sro: "", contact_name: "", contact_role: "" };
+  const orgDefaults = { name: "", short_name: "", industry: "", sro: "", contact_name: "", contact_role: "", contact_email: "" };
   const [newOrg, setNewOrg] = useState(() => readAutosave<typeof orgDefaults>("vc:docgen:create-org") ?? orgDefaults);
   const orgAutosave = useAutosave({ key: "vc:docgen:create-org", data: newOrg, enabled: showForm });
 
@@ -97,10 +97,20 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
         sro: newOrg.sro || undefined,
         contact_name: newOrg.contact_name.trim() || undefined,
         contact_role: newOrg.contact_role.trim() || undefined,
+        contact_email: newOrg.contact_email.trim() || undefined,
       });
+      // Auto-invite CO as approver if contact_email is provided
+      const email = newOrg.contact_email.trim();
+      if (email && email.includes("@")) {
+        try {
+          await inviteMember(created.id, email, newOrg.contact_name.trim() || email.split("@")[0], "approver");
+        } catch {
+          // Ignore invite errors (e.g. already invited) — org is created
+        }
+      }
       onOrgCreated(created, selectedZefix || undefined);
       orgAutosave.clear();
-      setNewOrg({ name: "", short_name: "", industry: "", sro: "", contact_name: "", contact_role: "" });
+      setNewOrg({ name: "", short_name: "", industry: "", sro: "", contact_name: "", contact_role: "", contact_email: "" });
       setSelectedZefix(null);
       setZefixQuery("");
       setZefixResults([]);
@@ -362,6 +372,22 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
                 style={inputStyle}
               />
             </div>
+            {/* Contact email (CO) */}
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: T.ink, display: "block", marginBottom: 5, fontFamily: T.sans }}>
+                Compliance Officer E-Mail
+              </label>
+              <input
+                type="email"
+                value={newOrg.contact_email}
+                onChange={(e) => setNewOrg((p) => ({ ...p, contact_email: e.target.value }))}
+                placeholder="z.B. co@firma.ch — wird automatisch als Freigeber eingeladen"
+                style={inputStyle}
+              />
+              <div style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans, marginTop: 4 }}>
+                Wird automatisch als Approver eingeladen und erhält Freigabe-E-Mails für generierte Dokumente.
+              </div>
+            </div>
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
             <button
@@ -530,6 +556,11 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
                   <Icon d={icons.doc} size={12} color={T.ink4} /> {docCounts[org.id] || 0} Dok.
                 </span>
               </div>
+              {org.contact_email && (
+                <div style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans, marginTop: 4 }}>
+                  CO: {org.contact_email}
+                </div>
+              )}
               {/* Actions row */}
               <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
                 <button

@@ -14,18 +14,20 @@ const ClientAlerts = lazy(() => import("./pages/ClientAlerts").then((m) => ({ de
 const ClientDocs = lazy(() => import("./pages/ClientDocs").then((m) => ({ default: m.ClientDocs })));
 const ClientCustomers = lazy(() => import("./pages/ClientCustomers").then((m) => ({ default: m.ClientCustomers })));
 const ClientHelp = lazy(() => import("./pages/ClientHelp").then((m) => ({ default: m.ClientHelp })));
+const DocumentApproval = lazy(() => import("./pages/DocumentApproval").then((m) => ({ default: m.DocumentApproval })));
 
 /* ------------------------------------------------------------------ */
 /*  Client Sidebar                                                    */
 /* ------------------------------------------------------------------ */
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS: readonly { id: string; icon: string; label: string; approverOnly?: boolean }[] = [
   { id: "dashboard", icon: icons.home, label: "Dashboard" },
   { id: "alerts", icon: icons.alert, label: "Meldungen" },
   { id: "docs", icon: icons.doc, label: "Dokumente" },
+  { id: "approvals", icon: icons.check, label: "Freigaben", approverOnly: true },
   { id: "customers", icon: icons.users, label: "Kunden" },
   { id: "help", icon: icons.mail, label: "Hilfe" },
-] as const;
+];
 
 function ClientSidebar({
   active,
@@ -114,7 +116,7 @@ function ClientSidebar({
           </span>
           <NotificationBell onNavigate={onNotificationNav} />
         </div>
-        {NAV_ITEMS.map((it) => {
+        {BASE_NAV_ITEMS.filter((it) => !it.approverOnly || org?.userRole === "approver").map((it) => {
           const isActive = active === it.id;
           return (
             <button
@@ -421,6 +423,7 @@ function PortalContent() {
           {page === "dashboard" && <ClientDashboard onNav={handleNav} onAlertNav={handleAlertNav} org={org} />}
           {page === "alerts" && <ClientAlerts org={org} initialAlertId={pendingAlertId} onAlertConsumed={() => setPendingAlertId(null)} onDocNav={handleDocNav} />}
           {page === "docs" && <ClientDocs org={org} initialDocName={pendingDocName} onDocConsumed={() => setPendingDocName(null)} onAlertNav={handleAlertNav} />}
+          {page === "approvals" && <DocumentApproval org={org} />}
           {page === "customers" && <ClientCustomers org={org} onNav={handleNav} />}
           {page === "help" && <ClientHelp org={org} />}
         </Suspense>

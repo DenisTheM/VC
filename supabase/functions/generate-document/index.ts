@@ -171,7 +171,7 @@ Das Dokument soll sofort verwendbar sein und den aktuellen regulatorischen Stand
         content: generatedContent,
         jurisdiction,
         organization_id: organizationId,
-        status: "review",
+        status: "draft",
         wizard_answers: answers || {},
         created_by: user.id,
       })
@@ -192,7 +192,7 @@ Das Dokument soll sofort verwendbar sein und den aktuellen regulatorischen Stand
         document: {
           id: doc.id,
           content: generatedContent,
-          status: "review",
+          status: "draft",
         },
       }),
       {

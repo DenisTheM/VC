@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
         type: "recovery",
         email: email.toLowerCase(),
         options: {
-          redirectTo: `${PORTAL_URL}/app/login`,
+          redirectTo: `${PORTAL_URL}/app/portal`,
         },
       });
 
@@ -199,7 +199,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    const passwordLink = linkData.properties.action_link;
+    // The action_link points to Supabase's API URL. We need to extract the
+    // token parameters and build a link that goes through the site URL so
+    // that Supabase Auth can verify the token and redirect to the portal.
+    let passwordLink = linkData.properties.action_link;
+
+    // If the link points to the Supabase API directly, rewrite it to go
+    // through the site URL's /auth/v1/verify endpoint instead, which ensures
+    // the redirect_to parameter is respected by the Auth server.
+    // For hosted Supabase this should work as-is, but we ensure the
+    // redirect_to points to the correct portal URL.
+    try {
+      const linkUrl = new URL(passwordLink);
+      // Ensure redirect_to parameter points to the portal
+      linkUrl.searchParams.set("redirect_to", `${PORTAL_URL}/app/portal`);
+      passwordLink = linkUrl.toString();
+    } catch {
+      // If URL parsing fails, use the link as-is
+    }
 
     // ── Send branded welcome email ───────────────────────────────────
     await sendEmail({

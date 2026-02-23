@@ -54,13 +54,14 @@ export interface Organization {
   sro: string | null;
   contact_name: string | null;
   contact_role: string | null;
+  contact_email: string | null;
   created_at: string;
 }
 
 export async function loadOrganizations(): Promise<Organization[]> {
   const { data, error } = await supabase
     .from("organizations")
-    .select("id, name, short_name, industry, sro, contact_name, contact_role, created_at")
+    .select("id, name, short_name, industry, sro, contact_name, contact_role, contact_email, created_at")
     .order("name");
 
   if (error) throw error;
@@ -74,15 +75,28 @@ export async function createOrganization(org: {
   sro?: string;
   contact_name?: string;
   contact_role?: string;
+  contact_email?: string;
 }): Promise<Organization> {
   const { data, error } = await supabase
     .from("organizations")
     .insert(org)
-    .select("id, name, short_name, industry, sro, contact_name, contact_role, created_at")
+    .select("id, name, short_name, industry, sro, contact_name, contact_role, contact_email, created_at")
     .single();
 
   if (error) throw error;
   return data as Organization;
+}
+
+export async function updateOrganization(
+  orgId: string,
+  updates: { contact_email?: string | null },
+): Promise<void> {
+  const { error } = await supabase
+    .from("organizations")
+    .update(updates)
+    .eq("id", orgId);
+
+  if (error) throw error;
 }
 
 export async function deleteOrganization(orgId: string): Promise<void> {
@@ -568,6 +582,18 @@ export async function updateDocumentStatus(
   if (error) throw error;
 }
 
+export async function updateDocumentContent(
+  docId: string,
+  content: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("documents")
+    .update({ content, updated_at: new Date().toISOString() })
+    .eq("id", docId);
+
+  if (error) throw error;
+}
+
 export async function bulkUpdateDocumentStatus(
   docIds: string[],
   newStatus: "draft" | "review" | "current" | "outdated",
@@ -578,6 +604,27 @@ export async function bulkUpdateDocumentStatus(
     .in("id", docIds);
 
   if (error) throw error;
+}
+
+// ─── Approval Notification ──────────────────────────────────────────────
+
+export async function notifyApproval(
+  docId: string,
+  orgId: string,
+): Promise<{ success: boolean; message: string }> {
+  const { data, error } = await supabase.functions.invoke("notify-approval", {
+    body: { document_id: docId, organization_id: orgId },
+  });
+
+  if (error) {
+    const msg = typeof error === "object" && "message" in error ? error.message : String(error);
+    return { success: false, message: msg };
+  }
+
+  return {
+    success: true,
+    message: data?.message ?? "Benachrichtigung versendet.",
+  };
 }
 
 // ─── Organization Members (Multi-User) ────────────────────────────────
