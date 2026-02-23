@@ -84,7 +84,14 @@ Deine Dokumente sind:
 - Auf die spezifische Firma und deren Risikoprofil zugeschnitten
 - Mit korrekten Gesetzesreferenzen versehen
 
-Formatiere das Dokument in Markdown mit klarer Kapitelstruktur.`;
+FORMATIERUNGSREGELN FÜR DAS DOKUMENT:
+- Verwende Standard-Markdown: # ## ### für Überschriften, - für Listen, **fett** für Hervorhebungen
+- Verwende \`---\` für horizontale Trennlinien (NICHT %%%%% oder ===== oder andere Sonderzeichen)
+- Verwende \`- [ ] Text\` für Checkboxen zum Ankreuzen (NICHT & Text oder andere Sonderzeichen)
+- Verwende \`_____\` (5+ Underscores) für ausfüllbare Formularfelder, z.B. "Name: _____________________"
+- Verwende KEINE Sonderzeichen wie &, %, § als Aufzählungszeichen oder Dekoration
+- Halte das Format schlicht, druckfreundlich und professionell
+- Formatiere das Dokument in Markdown mit klarer Kapitelstruktur`;
 
     const profileSummary = Object.entries(companyProfile)
       .filter(([, v]) => v !== undefined && v !== "" && v !== null)

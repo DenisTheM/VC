@@ -136,6 +136,88 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
   for (const rawLine of contentLines) {
     const line = rawLine.trimEnd();
 
+    // ── Separator lines: %%%, ---, === (3+ chars) ──
+    if (/^[%\-=]{3,}$/.test(line.trim())) {
+      ensureSpace(4);
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.2);
+      doc.line(MARGIN_LEFT, y, PAGE_WIDTH - MARGIN_RIGHT, y);
+      y += LINE_HEIGHT;
+      continue;
+    }
+
+    // ── Checkboxes: "- [ ] Text" or "- [x] Text" ──
+    if (/^\s*-\s*\[[ x]\]\s/.test(line)) {
+      const checked = /^\s*-\s*\[x\]/i.test(line);
+      const text = line.replace(/^\s*-\s*\[[ x]\]\s*/i, "");
+      const indent = line.search(/\S/);
+      ensureSpace(LINE_HEIGHT);
+      const boxX = MARGIN_LEFT + Math.min(indent, 10);
+      doc.setDrawColor(80, 80, 80);
+      doc.setLineWidth(0.3);
+      doc.rect(boxX, y - 3, 3.5, 3.5);
+      if (checked) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(15, 61, 46);
+        doc.text("\u2713", boxX + 0.5, y - 0.2);
+      }
+      doc.setFontSize(FONT_SIZE_BODY);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(17, 24, 39);
+      const cbLines = doc.splitTextToSize(text, maxWidth - Math.min(indent, 10) - 8);
+      for (const l of cbLines) {
+        doc.text(l, boxX + 6, y);
+        y += FONT_SIZE_BODY * 0.45;
+      }
+      y += 1;
+      continue;
+    }
+
+    // ── Checkboxes: "& Text" (legacy AI pattern) ──
+    if (/^\s*&\s+/.test(line)) {
+      const text = line.replace(/^\s*&\s+/, "");
+      const indent = line.search(/&/);
+      ensureSpace(LINE_HEIGHT);
+      const boxX = MARGIN_LEFT + Math.min(indent, 10);
+      doc.setDrawColor(80, 80, 80);
+      doc.setLineWidth(0.3);
+      doc.rect(boxX, y - 3, 3.5, 3.5);
+      doc.setFontSize(FONT_SIZE_BODY);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(17, 24, 39);
+      const cbLines = doc.splitTextToSize(text, maxWidth - Math.min(indent, 10) - 8);
+      for (const l of cbLines) {
+        doc.text(l, boxX + 6, y);
+        y += FONT_SIZE_BODY * 0.45;
+      }
+      y += 1;
+      continue;
+    }
+
+    // ── Form field lines: "Label: ___________" or standalone "___________" ──
+    if (/_{3,}/.test(line)) {
+      ensureSpace(LINE_HEIGHT + 2);
+      const parts = line.split(/_{3,}/);
+      const label = parts[0]?.trim();
+      if (label) {
+        doc.setFontSize(FONT_SIZE_BODY);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(17, 24, 39);
+        doc.text(label, MARGIN_LEFT, y);
+        const labelW = doc.getTextWidth(label) + 3;
+        doc.setDrawColor(160, 160, 160);
+        doc.setLineWidth(0.3);
+        doc.line(MARGIN_LEFT + labelW, y + 1, PAGE_WIDTH - MARGIN_RIGHT, y + 1);
+      } else {
+        doc.setDrawColor(160, 160, 160);
+        doc.setLineWidth(0.3);
+        doc.line(MARGIN_LEFT, y + 1, PAGE_WIDTH - MARGIN_RIGHT, y + 1);
+      }
+      y += LINE_HEIGHT + 1;
+      continue;
+    }
+
     // Headings
     if (line.startsWith("### ")) {
       renderText(line.slice(4), FONT_SIZE_H3, "bold", 4);
