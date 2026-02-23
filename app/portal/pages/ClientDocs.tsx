@@ -4,6 +4,7 @@ import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import { DOC_STATUS, FORMAT_COLORS, SEV } from "../data/clientData";
 import { loadClientDocuments, approveDocument, loadDocumentAuditLog, loadDocAlerts, type ClientOrg, type PortalDoc, type AuditEntry, type LinkedAlert } from "../lib/api";
+import { exportDocumentAsPdf } from "@shared/lib/pdfExport";
 
 interface ClientDocsProps {
   org: ClientOrg | null;
@@ -22,15 +23,15 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "outdated", label: "Veraltet" },
 ];
 
-function downloadDoc(doc: PortalDoc) {
+function downloadDoc(doc: PortalDoc, orgName?: string) {
   if (!doc.content) return;
-  const blob = new Blob([doc.content], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = doc.name + "." + doc.format.toLowerCase();
-  a.click();
-  URL.revokeObjectURL(url);
+  exportDocumentAsPdf({
+    name: doc.name,
+    version: doc.version,
+    content: doc.content,
+    legalBasis: doc.legalBasis,
+    orgName: orgName,
+  });
 }
 
 export function ClientDocs({ org, initialDocName, onDocConsumed, onAlertNav }: ClientDocsProps) {
@@ -774,7 +775,7 @@ function DocDetail({
       <AuditTimeline docId={doc.id} />
 
       {/* Document Preview */}
-      {doc.content && <DocPreview doc={doc} />}
+      {doc.content && <DocPreview doc={doc} orgName={org?.name || undefined} />}
 
       {/* Linked Alerts */}
       {org && <LinkedAlerts docName={doc.name} orgId={org.id} onAlertNav={onAlertNav} />}
@@ -783,7 +784,7 @@ function DocDetail({
       <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
         <button
           disabled={!doc.content}
-          onClick={() => downloadDoc(doc)}
+          onClick={() => downloadDoc(doc, org?.name || undefined)}
           style={{
             background: doc.content ? T.primaryDeep : T.ink4,
             color: "#fff",
@@ -1014,7 +1015,7 @@ function StatCard({
 /*  DocPreview — professional document viewer                          */
 /* ------------------------------------------------------------------ */
 
-function DocPreview({ doc }: { doc: PortalDoc }) {
+function DocPreview({ doc, orgName }: { doc: PortalDoc; orgName?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const fmt = FORMAT_COLORS[doc.format] ?? FORMAT_COLORS.DOCX;
 
@@ -1105,7 +1106,7 @@ function DocPreview({ doc }: { doc: PortalDoc }) {
               {doc.name} — {doc.version}
             </span>
             <button
-              onClick={(e) => { e.stopPropagation(); downloadDoc(doc); }}
+              onClick={(e) => { e.stopPropagation(); downloadDoc(doc, orgName); }}
               style={{
                 display: "flex",
                 alignItems: "center",

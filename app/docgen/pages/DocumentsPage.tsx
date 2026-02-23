@@ -4,6 +4,7 @@ import { Icon, icons } from "@shared/components/Icon";
 import { T } from "@shared/styles/tokens";
 import { DOC_TYPES } from "../data/docTypes";
 import { loadDocuments, loadDocumentAuditLog, type DbDocument, type AuditEntry } from "../lib/api";
+import { exportDocumentAsPdf } from "@shared/lib/pdfExport";
 
 const STATUS_COLORS: Record<string, { bg: string; color: string; label: string }> = {
   draft: { bg: T.s2, color: T.ink3, label: "Entwurf" },
@@ -183,20 +184,53 @@ export function DocumentsPage() {
                     }}
                   >
                     {doc.content && (
-                      <div style={{ maxHeight: 400, overflow: "auto", marginBottom: 16 }}>
-                        <pre
-                          style={{
-                            fontFamily: T.sans,
-                            fontSize: 13,
-                            color: T.ink2,
-                            whiteSpace: "pre-wrap",
-                            lineHeight: 1.65,
-                            margin: 0,
-                          }}
-                        >
-                          {doc.content}
-                        </pre>
-                      </div>
+                      <>
+                        <div style={{ marginBottom: 12 }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              exportDocumentAsPdf({
+                                name: doc.name,
+                                version: doc.version,
+                                content: doc.content!,
+                                legalBasis: doc.legal_basis || undefined,
+                                orgName: doc.organizations?.name || undefined,
+                              });
+                            }}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                              padding: "7px 14px",
+                              borderRadius: 8,
+                              border: "none",
+                              background: T.primaryDeep,
+                              color: "#fff",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              fontFamily: T.sans,
+                            }}
+                          >
+                            <Icon d={icons.download} size={13} color="#fff" />
+                            PDF Download
+                          </button>
+                        </div>
+                        <div style={{ maxHeight: 400, overflow: "auto", marginBottom: 16 }}>
+                          <pre
+                            style={{
+                              fontFamily: T.sans,
+                              fontSize: 13,
+                              color: T.ink2,
+                              whiteSpace: "pre-wrap",
+                              lineHeight: 1.65,
+                              margin: 0,
+                            }}
+                          >
+                            {doc.content}
+                          </pre>
+                        </div>
+                      </>
                     )}
                     <AdminAuditTimeline docId={doc.id} />
                   </div>
