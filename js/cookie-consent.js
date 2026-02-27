@@ -7,8 +7,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Returning visitor – bereits entschieden
     if (document.cookie.indexOf('vc_consent=') !== -1) {
-        if (document.cookie.indexOf('vc_consent=1') !== -1 && typeof gtag === 'function') {
-            gtag('consent', 'update', { 'analytics_storage': 'granted' });
+        if (document.cookie.indexOf('vc_consent=1') !== -1) {
+            if (typeof gtag === 'function') {
+                gtag('consent', 'update', { 'analytics_storage': 'granted' });
+            }
+            loadLinkedInInsight();
         }
         return;
     }
@@ -68,6 +71,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (typeof gtag === 'function') {
             gtag('consent', 'update', { 'analytics_storage': 'granted' });
         }
+        loadLinkedInInsight();
         closeBanner();
     });
 
@@ -86,3 +90,18 @@ document.addEventListener('DOMContentLoaded', function () {
     document.body.appendChild(banner);
 
 });
+
+// ── LinkedIn Insight Tag (consent-gated) ────────────────────────────────────
+function loadLinkedInInsight() {
+    if (window._linkedin_insight_loaded) return;
+    window._linkedin_insight_loaded = true;
+    window._linkedin_partner_id = '8742258';
+    window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];
+    window._linkedin_data_partner_ids.push(window._linkedin_partner_id);
+    var s = document.getElementsByTagName('script')[0];
+    var b = document.createElement('script');
+    b.type = 'text/javascript';
+    b.async = true;
+    b.src = 'https://snap.licdn.com/li.lms-analytics/insight.min.js';
+    s.parentNode.insertBefore(b, s);
+}
