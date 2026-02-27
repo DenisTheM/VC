@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
 
     // Send approval request email
     const recipientName = org.contact_name || org.contact_email.split("@")[0];
-    const portalLink = `${PORTAL_URL}/app/portal`;
+    const portalLink = `${PORTAL_URL}/app/portal#approvals`;
 
     await sendEmail({
       to: org.contact_email,

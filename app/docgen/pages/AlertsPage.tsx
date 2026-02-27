@@ -199,7 +199,7 @@ export function AlertsPage({ profile: _profile, organizations }: AlertsPageProps
         Regulatorische Alerts
       </h1>
       <p style={{ fontSize: 14.5, color: T.ink3, fontFamily: T.sans, margin: "0 0 20px" }}>
-        Aktuelle regulatorische Entwicklungen mit Elena-Analyse.
+        Aktuelle regulatorische Entwicklungen mit Compliance-Analyse.
       </p>
 
       {/* Tab bar */}
@@ -1317,7 +1317,7 @@ function AlertDetailView({
                 </div>
                 <div>
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", fontFamily: T.sans }}>
-                    Elena
+                    Virtue Compliance
                   </span>
                   <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontFamily: T.sans, marginLeft: 6 }}>
                     Compliance-Analyse
@@ -1681,49 +1681,6 @@ function AlertDetailView({
             </div>
           )}
 
-          {/* Elena sidebar mini */}
-          {alert.elena_comment && (
-            <div
-              style={{
-                background: T.primaryDeep,
-                borderRadius: T.rLg,
-                padding: "18px 20px",
-                boxShadow: T.shSm,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <div
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: "50%",
-                    background: T.accent,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Icon d={icons.sparkle} size={12} color="#fff" />
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "#fff", fontFamily: T.sans }}>
-                  Elena empfiehlt
-                </span>
-              </div>
-              <p
-                style={{
-                  fontSize: 12,
-                  color: "rgba(255,255,255,0.7)",
-                  fontFamily: T.sans,
-                  lineHeight: 1.5,
-                  margin: 0,
-                }}
-              >
-                {alert.elena_comment.length > 140
-                  ? alert.elena_comment.slice(0, 140) + "..."
-                  : alert.elena_comment}
-              </p>
-            </div>
-          )}
 
           {/* Email notification log */}
           {notifLog.length > 0 && (
@@ -2087,7 +2044,7 @@ function DraftDetailView({ alert, organizations, onBack, onPublished }: DraftDet
 
             {/* Elena comment */}
             <div>
-              <label style={labelStyle}>Elena-Kommentar (Admin)</label>
+              <label style={labelStyle}>Compliance-Empfehlung</label>
               <textarea
                 value={elenaComment}
                 onChange={(e) => setElenaComment(e.target.value)}

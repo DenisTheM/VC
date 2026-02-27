@@ -6,6 +6,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const DOC_NAMES: Record<string, string> = {
+  aml_policy: "AML-Richtlinie",
+  kyc_checklist: "KYC-Checkliste",
+  risk_assessment: "Risikoklassifizierung",
+  audit_prep: "Audit-Vorbereitung",
+  kyt_policy: "Transaktionsüberwachung",
+  annual_report: "Compliance-Jahresbericht",
+};
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -167,7 +176,7 @@ Das Dokument soll sofort verwendbar sein und den aktuellen regulatorischen Stand
       .from("documents")
       .insert({
         doc_type: docType,
-        name: docType,
+        name: DOC_NAMES[docType] || docType,
         content: generatedContent,
         jurisdiction,
         organization_id: organizationId,

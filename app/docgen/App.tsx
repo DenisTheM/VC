@@ -176,7 +176,6 @@ function DocGenInner() {
   const sidebarItems = [
     { id: "dashboard", icon: icons.home, label: "Dashboard" },
     { id: "organizations", icon: icons.folder, label: "Kunden" },
-    { id: "new-profile", icon: icons.building, label: "Firmenprofil anlegen" },
     { id: "generate", icon: icons.plus, label: "Neues Dokument" },
     { id: "documents", icon: icons.doc, label: "Dokumente" },
     { id: "alerts", icon: icons.alert, label: "Reg. Alerts", badge: dashStats.draftAlertCount || undefined },
