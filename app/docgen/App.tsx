@@ -120,6 +120,8 @@ function DocGenInner() {
       if (zefixData.address) defaults.address = zefixData.address;
       if (zefixData.purpose) defaults.business_detail = zefixData.purpose;
 
+      if (zefixData.foundingYear) defaults.founding_year = zefixData.foundingYear;
+
       // Map Zefix persons to GL / VR fields
       if (zefixData.persons && zefixData.persons.length > 0) {
         const gl = zefixData.persons.filter((p) => /geschäftsführ|direktion|direktor/i.test(p.role)).map((p) => p.name);

@@ -52,6 +52,7 @@ export interface Organization {
   short_name: string | null;
   industry: string | null;
   sro: string | null;
+  country: string | null;
   contact_name: string | null;
   contact_role: string | null;
   contact_email: string | null;
@@ -61,7 +62,7 @@ export interface Organization {
 export async function loadOrganizations(): Promise<Organization[]> {
   const { data, error } = await supabase
     .from("organizations")
-    .select("id, name, short_name, industry, sro, contact_name, contact_role, contact_email, created_at")
+    .select("id, name, short_name, industry, sro, country, contact_name, contact_role, contact_email, created_at")
     .order("name");
 
   if (error) throw error;
@@ -73,6 +74,7 @@ export async function createOrganization(org: {
   short_name?: string;
   industry?: string;
   sro?: string;
+  country?: string;
   contact_name?: string;
   contact_role?: string;
   contact_email?: string;
@@ -80,7 +82,7 @@ export async function createOrganization(org: {
   const { data, error } = await supabase
     .from("organizations")
     .insert(org)
-    .select("id, name, short_name, industry, sro, contact_name, contact_role, contact_email, created_at")
+    .select("id, name, short_name, industry, sro, country, contact_name, contact_role, contact_email, created_at")
     .single();
 
   if (error) throw error;

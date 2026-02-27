@@ -4,7 +4,7 @@ import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import { Field } from "@shared/components/Field";
 import { PROFILE_FIELDS } from "../data/profileFields";
-import { loadDocumentsByOrg, type DbDocument } from "../lib/api";
+import { loadDocumentsByOrg, updateDocumentStatus, type DbDocument } from "../lib/api";
 import { DOC_TYPES } from "../data/docTypes";
 import { MarkdownContent } from "@shared/components/MarkdownContent";
 
@@ -48,6 +48,7 @@ export function ProfilePage({ profile, setProfile, onSave, saving, orgId, orgNam
   const [docs, setDocs] = useState<DbDocument[]>([]);
   const [docsLoading, setDocsLoading] = useState(false);
   const [expandedDoc, setExpandedDoc] = useState<string | null>(null);
+  const [updatingDocStatus, setUpdatingDocStatus] = useState<string | null>(null);
 
   // Feature 2: Auto-save state
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -546,6 +547,29 @@ export function ProfilePage({ profile, setProfile, onSave, saving, orgId, orgNam
                   year: "numeric",
                 });
 
+                const handleStatusChange = async (newStatus: "draft" | "review" | "current" | "outdated") => {
+                  setUpdatingDocStatus(doc.id);
+                  try {
+                    await updateDocumentStatus(doc.id, newStatus);
+                    setDocs((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: newStatus } : d));
+                  } catch (err) {
+                    console.error("Failed to update document status:", err);
+                  } finally {
+                    setUpdatingDocStatus(null);
+                  }
+                };
+
+                const handleDownload = () => {
+                  if (!doc.content) return;
+                  const blob = new Blob([doc.content], { type: "text/markdown;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `${doc.name.replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, "_")}.md`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                };
+
                 return (
                   <div key={doc.id} style={{ borderTop: i > 0 ? `1px solid ${T.borderL}` : undefined }}>
                     <div
@@ -580,7 +604,15 @@ export function ProfilePage({ profile, setProfile, onSave, saving, orgId, orgNam
                           {docType?.name ?? doc.doc_type} &middot; {doc.jurisdiction} &middot; {date}
                         </div>
                       </div>
-                      <span
+                      {/* Status dropdown */}
+                      <select
+                        value={doc.status}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          handleStatusChange(e.target.value as "draft" | "review" | "current" | "outdated");
+                        }}
+                        disabled={updatingDocStatus === doc.id}
                         style={{
                           fontSize: 10.5,
                           fontWeight: 600,
@@ -589,10 +621,44 @@ export function ProfilePage({ profile, setProfile, onSave, saving, orgId, orgNam
                           background: status.bg,
                           color: status.color,
                           fontFamily: T.sans,
+                          border: `1px solid ${status.color}22`,
+                          cursor: updatingDocStatus === doc.id ? "wait" : "pointer",
+                          opacity: updatingDocStatus === doc.id ? 0.6 : 1,
+                          appearance: "auto",
                         }}
                       >
-                        {status.label}
-                      </span>
+                        <option value="draft">Entwurf</option>
+                        <option value="review">In Pr\u00FCfung</option>
+                        <option value="current">Aktuell</option>
+                        <option value="outdated">Veraltet</option>
+                      </select>
+                      {/* Download button */}
+                      {doc.content && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownload();
+                          }}
+                          title="Dokument herunterladen"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            padding: "4px 10px",
+                            borderRadius: 6,
+                            border: `1px solid ${T.border}`,
+                            background: "#fff",
+                            color: T.ink3,
+                            fontSize: 11,
+                            fontWeight: 500,
+                            cursor: "pointer",
+                            fontFamily: T.sans,
+                          }}
+                        >
+                          <Icon d="M12 10v6m0 0l-3-3m3 3l3-3M3 17v3a2 2 0 002 2h14a2 2 0 002-2v-3" size={12} color={T.ink3} />
+                          Download
+                        </button>
+                      )}
                       <span style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.15s", display: "inline-flex" }}>
                         <Icon d={icons.arrow} size={12} color={T.ink4} />
                       </span>

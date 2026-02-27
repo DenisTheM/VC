@@ -12,11 +12,21 @@ const INDUSTRIES = [
   "Zahlungsverkehr",
   "Leasing / Finanzierung",
   "Effektenhandel",
+  "Investmentgesellschaft",
+  "Venture Capital / PE",
   "Versicherung",
   "Andere",
 ];
 
 const SROS = ["VQF", "PolyReg", "SO-FIT", "ARIF", "OAR-G", "Keine / In Bearbeitung"];
+
+const COUNTRIES = [
+  { value: "CH", label: "\u{1F1E8}\u{1F1ED} Schweiz" },
+  { value: "DE", label: "\u{1F1E9}\u{1F1EA} Deutschland" },
+  { value: "LI", label: "\u{1F1F1}\u{1F1EE} Liechtenstein" },
+  { value: "AT", label: "\u{1F1E6}\u{1F1F9} Österreich" },
+  { value: "EU", label: "\u{1F1EA}\u{1F1FA} EU (Sonstige)" },
+];
 
 interface OrganizationsPageProps {
   organizations: Organization[];
@@ -56,7 +66,7 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
   useEffect(() => {
     loadDocCountsByOrg().then(setDocCounts).catch(console.error);
   }, []);
-  const orgDefaults = { name: "", short_name: "", industry: "", sro: "", contact_name: "", contact_role: "", contact_email: "" };
+  const orgDefaults = { name: "", short_name: "", industry: "", sro: "", country: "CH", contact_name: "", contact_role: "", contact_email: "" };
   const [newOrg, setNewOrg] = useState(() => readAutosave<typeof orgDefaults>("vc:docgen:create-org") ?? orgDefaults);
   const orgAutosave = useAutosave({ key: "vc:docgen:create-org", data: newOrg, enabled: showForm });
 
@@ -95,6 +105,7 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
         short_name: newOrg.short_name.trim() || undefined,
         industry: newOrg.industry || undefined,
         sro: newOrg.sro || undefined,
+        country: newOrg.country || "CH",
         contact_name: newOrg.contact_name.trim() || undefined,
         contact_role: newOrg.contact_role.trim() || undefined,
         contact_email: newOrg.contact_email.trim() || undefined,
@@ -110,7 +121,7 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
       }
       onOrgCreated(created, selectedZefix || undefined);
       orgAutosave.clear();
-      setNewOrg({ name: "", short_name: "", industry: "", sro: "", contact_name: "", contact_role: "", contact_email: "" });
+      setNewOrg({ name: "", short_name: "", industry: "", sro: "", country: "CH", contact_name: "", contact_role: "", contact_email: "" });
       setSelectedZefix(null);
       setZefixQuery("");
       setZefixResults([]);
@@ -297,7 +308,7 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
                 type="text"
                 value={newOrg.name}
                 onChange={(e) => setNewOrg((p) => ({ ...p, name: e.target.value }))}
-                placeholder="z.B. Align Technology AG"
+                placeholder="z.B. Muster Finanz AG"
                 style={inputStyle}
               />
             </div>
@@ -310,7 +321,7 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
                 type="text"
                 value={newOrg.short_name}
                 onChange={(e) => setNewOrg((p) => ({ ...p, short_name: e.target.value }))}
-                placeholder="z.B. Align Technology"
+                placeholder="z.B. Muster Finanz"
                 style={inputStyle}
               />
             </div>
@@ -343,6 +354,21 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
                 <option value="">Bitte wählen...</option>
                 {SROS.map((s) => (
                   <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            {/* Country */}
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 500, color: T.ink, display: "block", marginBottom: 5, fontFamily: T.sans }}>
+                Land
+              </label>
+              <select
+                value={newOrg.country}
+                onChange={(e) => setNewOrg((p) => ({ ...p, country: e.target.value }))}
+                style={{ ...inputStyle, appearance: "auto" }}
+              >
+                {COUNTRIES.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
               </select>
             </div>
@@ -514,6 +540,21 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
                 <Icon d={icons.arrow} size={14} color={T.ink4} />
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {org.country && (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 500,
+                      padding: "3px 10px",
+                      borderRadius: 10,
+                      background: "#f0f9ff",
+                      color: "#0369a1",
+                      fontFamily: T.sans,
+                    }}
+                  >
+                    {COUNTRIES.find((c) => c.value === org.country)?.label ?? org.country}
+                  </span>
+                )}
                 {org.industry && (
                   <span
                     style={{

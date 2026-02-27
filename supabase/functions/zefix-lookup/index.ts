@@ -127,6 +127,7 @@ function mapSearchResult(c: Record<string, unknown>) {
     address: (c.legalSeat as string) || "",
     purpose: null,
     persons: null as { name: string; role: string }[] | null,
+    foundingYear: null as string | null,
   };
 }
 
@@ -161,6 +162,14 @@ function mapDetailResult(c: Record<string, unknown>) {
     if (persons.length === 0) persons = null;
   }
 
+  // Extract founding year from registrationDate (e.g. "2019-03-15")
+  let foundingYear: string | null = null;
+  const regDate = c.registrationDate as string | undefined;
+  if (regDate && typeof regDate === "string") {
+    const year = regDate.substring(0, 4);
+    if (/^\d{4}$/.test(year)) foundingYear = year;
+  }
+
   return {
     name: (c.name as string) || "",
     uid: (c.uidFormatted as string) || formatUid(c.uid as string),
@@ -169,6 +178,7 @@ function mapDetailResult(c: Record<string, unknown>) {
     address: fullAddress,
     purpose: (c.purpose as string) || null,
     persons,
+    foundingYear,
   };
 }
 

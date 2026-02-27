@@ -10,6 +10,7 @@ export interface ZefixResult {
   address: string;
   purpose: string | null;
   persons: { name: string; role: string }[] | null;
+  foundingYear?: string | null;
 }
 
 export interface ZefixResponse {

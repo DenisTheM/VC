@@ -22,7 +22,7 @@ export const PROFILE_FIELDS: ProfileFieldDef[] = [
   { id: "tx_volume", label: "Transaktionsvolumen (jährl.)", type: "select", options: ["< CHF 1 Mio.", "CHF 1-10 Mio.", "CHF 10-50 Mio.", "CHF 50-100 Mio.", "> CHF 100 Mio."], required: true, section: "Risikoprofil" },
   { id: "client_types", label: "Kundentypen", type: "multi", options: ["B2B (Unternehmen)", "B2C (Privatkunden)", "Institutionelle Kunden", "NPOs / Vereine"], required: true, section: "Risikoprofil" },
   { id: "geo_focus", label: "Geogr. Fokus der Kunden", type: "multi", options: ["Schweiz", "EU/EWR", "USA/UK", "Asien", "Naher Osten", "Afrika", "Lateinamerika"], required: true, section: "Risikoprofil" },
-  { id: "products", label: "Produkte & Dienstleistungen", type: "multi", options: ["Zahlungsabwicklung", "Kreditvergabe / Leasing", "Vermögensverwaltung", "Custody / Verwahrung", "Crypto-Exchange", "Tokenisierung", "Beratung"], required: true, section: "Risikoprofil" },
+  { id: "products", label: "Produkte & Dienstleistungen", type: "multi", options: ["Zahlungsabwicklung", "Kreditvergabe / Leasing", "Vermögensverwaltung", "Custody / Verwahrung", "Crypto-Exchange", "Tokenisierung", "Beratung", "Crowdfunding", "Investment / Fondsmanagement"], required: true, section: "Risikoprofil" },
   { id: "crypto", label: "Crypto/DLT-Bezug", type: "toggle", required: true, section: "Risikoprofil" },
   { id: "cross_border", label: "Grenzüberschreitende Tätigkeit", type: "toggle", required: true, section: "Risikoprofil" },
   { id: "existing_infra", label: "Bestehende Compliance-Infrastruktur", type: "multi", options: ["KYC-Software", "Transaktionsmonitoring", "Sanktionslisten-Screening", "Schulungsplattform", "DMS", "Keine"], required: false, section: "Risikoprofil" },

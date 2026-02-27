@@ -2070,24 +2070,64 @@ function DraftDetailView({ alert, organizations, onBack, onPublished }: DraftDet
               <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
                 Kundenauswirkung ({affectedClients.length})
               </div>
-              {availableOrgs.length > 0 && (
-                <button
-                  onClick={() => setShowAddClient(!showAddClient)}
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    padding: "4px 10px",
-                    borderRadius: 8,
-                    border: `1px solid ${T.accent}`,
-                    background: T.accentS,
-                    color: T.accent,
-                    cursor: "pointer",
-                    fontFamily: T.sans,
-                  }}
-                >
-                  + Kunde hinzufuegen
-                </button>
-              )}
+              <div style={{ display: "flex", gap: 6 }}>
+                {availableOrgs.length > 0 && (
+                  <button
+                    onClick={() => {
+                      // Match orgs by country → alert jurisdiction
+                      const jur = jurisdiction.toUpperCase();
+                      const matched = availableOrgs.filter((o) => {
+                        const orgCountry = (o.country || "CH").toUpperCase();
+                        // Direct match or EU umbrella
+                        return orgCountry === jur || (jur === "EU" && orgCountry !== "CH");
+                      });
+                      if (matched.length === 0) {
+                        window.alert("Keine passenden Kunden f\u00FCr Jurisdiktion \u201E" + jurisdiction + "\u201C gefunden.");
+                        return;
+                      }
+                      const newClients = matched.map((o) => ({
+                        organization_id: o.id,
+                        risk: "medium" as const,
+                        reason: `Land ${o.country || "CH"} passt zu Jurisdiktion ${jurisdiction}`,
+                        elena_comment: "",
+                        org_name: o.name,
+                      }));
+                      setAffectedClients((prev) => [...prev, ...newClients]);
+                    }}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                      border: `1px solid ${T.primary}`,
+                      background: "#eff6ff",
+                      color: T.primary,
+                      cursor: "pointer",
+                      fontFamily: T.sans,
+                    }}
+                  >
+                    Automatisch zuordnen
+                  </button>
+                )}
+                {availableOrgs.length > 0 && (
+                  <button
+                    onClick={() => setShowAddClient(!showAddClient)}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                      border: `1px solid ${T.accent}`,
+                      background: T.accentS,
+                      color: T.accent,
+                      cursor: "pointer",
+                      fontFamily: T.sans,
+                    }}
+                  >
+                    + Kunde hinzufuegen
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Add client dropdown */}
