@@ -628,7 +628,7 @@ export function ProfilePage({ profile, setProfile, onSave, saving, orgId, orgNam
                         }}
                       >
                         <option value="draft">Entwurf</option>
-                        <option value="review">In Pr\u00FCfung</option>
+                        <option value="review">In Prüfung</option>
                         <option value="current">Aktuell</option>
                         <option value="outdated">Veraltet</option>
                       </select>
