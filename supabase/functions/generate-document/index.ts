@@ -109,7 +109,14 @@ FORMATIERUNGSREGELN FÜR DAS DOKUMENT:
 - Verwende \`_____\` (5+ Underscores) für ausfüllbare Formularfelder, z.B. "Name: _____________________"
 - Verwende KEINE Sonderzeichen wie &, %, § als Aufzählungszeichen oder Dekoration
 - Halte das Format schlicht, druckfreundlich und professionell
-- Formatiere das Dokument in Markdown mit klarer Kapitelstruktur`;
+- Formatiere das Dokument in Markdown mit klarer Kapitelstruktur
+- Verwende Blockquotes (>) für wichtige Hinweise:
+  > **Wichtig:** für zentrale Compliance-Hinweise
+  > **Achtung:** für Warnungen und Risiken
+  > **Rechtsgrundlage:** für Gesetzesreferenzen
+- Beginne das Dokument mit einer kurzen Zusammenfassung (3-4 Sätze)
+- Verwende Tabellen wo sinnvoll (Risikokategorien, Schwellenwerte, Zuständigkeiten)
+- Nummeriere Hauptkapitel (1. Einleitung, 2. Geltungsbereich, ...)`;
 
     const profileSummary = Object.entries(companyProfile)
       .filter(([, v]) => v !== undefined && v !== "" && v !== null)

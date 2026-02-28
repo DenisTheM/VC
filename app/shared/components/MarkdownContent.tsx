@@ -14,24 +14,28 @@ const STYLE_TAG_DOCUMENT = `
   font-weight: 700;
   color: ${T.primary};
   font-family: ${T.serif};
-  border-bottom: 1px solid ${T.border};
-  padding-bottom: 8px;
+  border-left: 3px solid ${T.accent};
+  background: #f0fdf4;
+  padding: 10px 14px;
   margin: 28px 0 14px;
   line-height: 1.35;
+  border-radius: 0 6px 6px 0;
 }
 .vc-md h1:first-child { margin-top: 0; }
 .vc-md h2 {
   font-size: 17px;
   font-weight: 700;
-  color: ${T.ink};
+  color: ${T.primary};
   font-family: ${T.serif};
+  border-bottom: 1px solid ${T.border};
+  padding-bottom: 8px;
   margin: 24px 0 10px;
   line-height: 1.35;
 }
 .vc-md h3 {
   font-size: 14.5px;
   font-weight: 700;
-  color: ${T.ink2};
+  color: ${T.accent};
   font-family: ${T.serif};
   margin: 20px 0 8px;
   line-height: 1.4;
@@ -61,26 +65,35 @@ const STYLE_TAG_DOCUMENT = `
 }
 .vc-md table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   margin: 12px 0;
   font-size: 12.5px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
 }
 .vc-md th {
   text-align: left;
   font-weight: 700;
-  color: ${T.ink};
-  padding: 8px 10px;
-  border-bottom: 2px solid ${T.border};
-  background: ${T.s1};
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #fff;
+  padding: 9px 10px;
+  background: #0f3d2e;
 }
 .vc-md td {
   padding: 7px 10px;
   border-bottom: 1px solid ${T.borderL};
   color: ${T.ink2};
 }
+.vc-md tr:nth-child(even) td {
+  background: #f9fafb;
+}
 .vc-md blockquote {
-  border-left: 3px solid ${T.accent};
-  background: ${T.accentS};
+  border-left: 4px solid ${T.accent};
+  background: #f0fdf4;
   margin: 12px 0;
   padding: 10px 16px;
   border-radius: 0 6px 6px 0;
@@ -88,6 +101,25 @@ const STYLE_TAG_DOCUMENT = `
 .vc-md blockquote p {
   margin: 0;
   color: ${T.ink2};
+}
+.vc-md blockquote.vc-callout-info {
+  border-left: 4px solid ${T.accent};
+  background: #f0fdf4;
+}
+.vc-md blockquote.vc-callout-warn {
+  border-left: 4px solid #f59e0b;
+  background: #fffbeb;
+}
+.vc-md blockquote.vc-callout-legal {
+  border-left: 4px solid #9ca3af;
+  background: #f9fafb;
+  font-style: italic;
+}
+.vc-md li input[type="checkbox"] {
+  accent-color: ${T.accent};
+  margin-right: 6px;
+  transform: scale(1.1);
+  vertical-align: middle;
 }
 .vc-md code {
   font-family: 'SF Mono', Consolas, monospace;
@@ -222,7 +254,13 @@ const STYLE_TAG_COMPACT = `
 export function MarkdownContent({ content, variant = "document" }: MarkdownContentProps) {
   const html = useMemo(() => {
     const raw = marked.parse(content, { async: false }) as string;
-    return DOMPurify.sanitize(raw);
+    const sanitized = DOMPurify.sanitize(raw, { ADD_ATTR: ["class"] });
+    // Post-process: add callout classes to blockquotes starting with keyword
+    const processed = sanitized
+      .replace(/<blockquote>\s*<p>\s*<strong>Wichtig:/g, '<blockquote class="vc-callout-info"><p><strong>Wichtig:')
+      .replace(/<blockquote>\s*<p>\s*<strong>Achtung:/g, '<blockquote class="vc-callout-warn"><p><strong>Achtung:')
+      .replace(/<blockquote>\s*<p>\s*<strong>Rechtsgrundlage:/g, '<blockquote class="vc-callout-legal"><p><strong>Rechtsgrundlage:');
+    return processed;
   }, [content]);
 
   const isCompact = variant === "compact";

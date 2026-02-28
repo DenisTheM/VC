@@ -182,14 +182,19 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
 
       if (isHeader) {
         doc.setFont("helvetica", "bold");
-        // Header background
-        doc.setFillColor(249, 250, 251);
+        // Header background — brand green
+        doc.setFillColor(15, 61, 46);
         doc.rect(MARGIN_LEFT, y - FONT_SIZE_BODY * 0.4, maxWidth, rowHeight, "F");
+        doc.setTextColor(255, 255, 255);
       } else {
         doc.setFont("helvetica", "normal");
+        // Zebra striping for even data rows
+        if (r % 2 === 0) {
+          doc.setFillColor(249, 250, 251);
+          doc.rect(MARGIN_LEFT, y - FONT_SIZE_BODY * 0.4, maxWidth, rowHeight, "F");
+        }
+        doc.setTextColor(17, 24, 39);
       }
-
-      doc.setTextColor(17, 24, 39);
       for (let c = 0; c < numCols; c++) {
         const cellText = rows[r][c] || "";
         const cellX = MARGIN_LEFT + c * colWidth + cellPad;
@@ -207,34 +212,70 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
     y += 3;
   };
 
-  // Start rendering
+  // ── Cover page ──
+  const renderCoverPage = () => {
+    // "Virtue Compliance" brand name
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(15, 61, 46);
+    doc.text("Virtue Compliance", PAGE_WIDTH / 2, 40, { align: "center" });
+
+    // Horizontal line
+    doc.setDrawColor(15, 61, 46);
+    doc.setLineWidth(0.5);
+    doc.line(60, 46, PAGE_WIDTH - 60, 46);
+
+    // Document title
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(17, 24, 39);
+    const coverTitleLines = doc.splitTextToSize(opts.name, maxWidth);
+    let titleY = 100;
+    for (const line of coverTitleLines) {
+      doc.text(line, PAGE_WIDTH / 2, titleY, { align: "center" });
+      titleY += 10;
+    }
+
+    // Subtitle: org name
+    if (opts.orgName) {
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(107, 114, 128);
+      doc.text(`Erstellt für ${opts.orgName}`, PAGE_WIDTH / 2, titleY + 5, { align: "center" });
+    }
+
+    // Meta info at bottom of cover page
+    const metaY = 220;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(107, 114, 128);
+    doc.text(`Version: ${opts.version}`, MARGIN_LEFT, metaY);
+    doc.text(
+      `Datum: ${new Date().toLocaleDateString("de-CH", { day: "numeric", month: "long", year: "numeric" })}`,
+      MARGIN_LEFT,
+      metaY + 6,
+    );
+    if (opts.legalBasis) {
+      doc.text(`Rechtsgrundlage: ${opts.legalBasis}`, MARGIN_LEFT, metaY + 12);
+    }
+
+    // Bottom line
+    doc.setDrawColor(15, 61, 46);
+    doc.setLineWidth(0.5);
+    doc.line(60, 260, PAGE_WIDTH - 60, 260);
+    doc.setFontSize(8);
+    doc.setTextColor(156, 163, 175);
+    doc.text("Vertraulich — Nur für den internen Gebrauch", PAGE_WIDTH / 2, 266, { align: "center" });
+  };
+
+  // Render cover page (no header/footer)
+  renderCoverPage();
+  doc.addPage();
+  pageNum++;
+
+  // Start content on page 2
   addHeader();
-
-  // Title
-  doc.setFontSize(FONT_SIZE_H1);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(15, 61, 46);
-  const titleLines = doc.splitTextToSize(opts.name, maxWidth);
-  for (const line of titleLines) {
-    doc.text(line, MARGIN_LEFT, y);
-    y += FONT_SIZE_H1 * 0.55;
-  }
-  y += 2;
-
-  // Meta info
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(107, 114, 128);
-  doc.text(`Version ${opts.version}`, MARGIN_LEFT, y);
-  if (opts.legalBasis) {
-    doc.text(`Rechtsgrundlage: ${opts.legalBasis}`, MARGIN_LEFT, y + 4);
-    y += 4;
-  }
-  y += LINE_HEIGHT + 4;
-
-  doc.setDrawColor(229, 231, 235);
-  doc.line(MARGIN_LEFT, y - 2, PAGE_WIDTH - MARGIN_RIGHT, y - 2);
-  y += 4;
+  y = MARGIN_TOP;
 
   // Parse content line by line
   const contentLines = opts.content.split("\n");
@@ -274,7 +315,7 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
       const indent = line.search(/\S/);
       ensureSpace(LINE_HEIGHT);
       const boxX = MARGIN_LEFT + Math.min(indent, 10);
-      doc.setDrawColor(80, 80, 80);
+      doc.setDrawColor(15, 61, 46);
       doc.setLineWidth(0.3);
       doc.rect(boxX, y - 3, 3.5, 3.5);
       if (checked) {
@@ -301,7 +342,7 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
       const indent = line.search(/&/);
       ensureSpace(LINE_HEIGHT);
       const boxX = MARGIN_LEFT + Math.min(indent, 10);
-      doc.setDrawColor(80, 80, 80);
+      doc.setDrawColor(15, 61, 46);
       doc.setLineWidth(0.3);
       doc.rect(boxX, y - 3, 3.5, 3.5);
       doc.setFontSize(FONT_SIZE_BODY);
@@ -339,13 +380,76 @@ export function exportDocumentAsPdf(opts: PdfExportOpts) {
       continue;
     }
 
+    // ── Blockquote / callout detection: lines starting with "> " ──
+    if (/^\s*>\s/.test(line)) {
+      const bqLines: string[] = [];
+      // Current line (already incremented i)
+      bqLines.push(line.replace(/^\s*>\s?/, ""));
+      // Collect consecutive blockquote lines
+      while (i < contentLines.length && /^\s*>\s/.test(contentLines[i].trimEnd())) {
+        bqLines.push(contentLines[i].trimEnd().replace(/^\s*>\s?/, ""));
+        i++;
+      }
+      const bqText = bqLines.join(" ").replace(/\*\*/g, "").trim();
+
+      // Determine callout type
+      let bgR = 240, bgG = 253, bgB = 244;  // green tint
+      let brR = 15, brG = 61, brB = 46;      // green border
+      if (bqText.startsWith("Achtung:") || bqText.startsWith("Warnung:")) {
+        bgR = 255; bgG = 251; bgB = 235;  // yellow tint
+        brR = 245; brG = 158; brB = 11;    // yellow border
+      } else if (bqText.startsWith("Rechtsgrundlage:")) {
+        bgR = 249; bgG = 250; bgB = 251;  // gray tint
+        brR = 156; brG = 163; brB = 175;   // gray border
+      }
+
+      // Calculate box height
+      doc.setFontSize(FONT_SIZE_BODY);
+      doc.setFont("helvetica", "normal");
+      const wrappedBq = doc.splitTextToSize(bqText, maxWidth - 12);
+      const boxHeight = wrappedBq.length * (FONT_SIZE_BODY * 0.55) + 6;
+
+      ensureSpace(boxHeight + 4);
+
+      // Background rect
+      doc.setFillColor(bgR, bgG, bgB);
+      doc.roundedRect(MARGIN_LEFT, y - 3, maxWidth, boxHeight, 1.5, 1.5, "F");
+      // Left border
+      doc.setFillColor(brR, brG, brB);
+      doc.rect(MARGIN_LEFT, y - 3, 1.2, boxHeight, "F");
+
+      // Text
+      doc.setFontSize(FONT_SIZE_BODY);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(17, 24, 39);
+      let bqY = y;
+      for (const bql of wrappedBq) {
+        doc.text(bql, MARGIN_LEFT + 5, bqY);
+        bqY += FONT_SIZE_BODY * 0.55;
+      }
+      y = bqY + 4;
+      continue;
+    }
+
     // Headings
     if (line.startsWith("### ")) {
       renderText(line.slice(4), FONT_SIZE_H3, "bold", 6);
     } else if (line.startsWith("## ")) {
-      renderText(line.slice(3), FONT_SIZE_H2, "bold", 8);
+      doc.setTextColor(15, 61, 46);
+      renderText(line.slice(3), FONT_SIZE_H2, "bold", 10);
+      // Add subtle line under H2
+      doc.setDrawColor(15, 61, 46);
+      doc.setLineWidth(0.15);
+      doc.line(MARGIN_LEFT, y - 1, MARGIN_LEFT + maxWidth * 0.4, y - 1);
+      y += 1;
     } else if (line.startsWith("# ")) {
-      renderText(line.slice(2), FONT_SIZE_H1, "bold", 12);
+      doc.setTextColor(15, 61, 46);
+      renderText(line.slice(2), FONT_SIZE_H1, "bold", 14);
+      // Add line under H1
+      doc.setDrawColor(15, 61, 46);
+      doc.setLineWidth(0.4);
+      doc.line(MARGIN_LEFT, y - 1, PAGE_WIDTH - MARGIN_RIGHT, y - 1);
+      y += 2;
     }
     // List items
     else if (/^\s*[-*]\s/.test(line)) {
