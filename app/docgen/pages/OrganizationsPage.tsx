@@ -18,7 +18,7 @@ const INDUSTRIES = [
   "Andere",
 ];
 
-const SROS = ["VQF", "PolyReg", "SO-FIT", "ARIF", "OAR-G", "Keine / In Bearbeitung"];
+const SROS = ["VQF", "PolyReg", "SO-FIT", "ARIF", "OAR-G", "SRO SAV/SNV", "SRO Treuhand Suisse", "SRO Leasingverband", "SRO SVV", "Keine / In Bearbeitung"];
 
 const COUNTRIES = [
   { value: "CH", label: "\u{1F1E8}\u{1F1ED} Schweiz" },

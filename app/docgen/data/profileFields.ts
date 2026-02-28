@@ -16,7 +16,7 @@ export const PROFILE_FIELDS: ProfileFieldDef[] = [
   { id: "geschaeftsleitung", label: "Geschäftsleitung", type: "text", required: true, section: "Organisation", placeholder: "z.B. Max Muster (CEO), Anna Beispiel (CFO)" },
   { id: "verwaltungsrat", label: "Verwaltungsrat (VR)", type: "text", required: true, section: "Organisation", placeholder: "z.B. Peter Keller (Präsident), Lisa Meier" },
   { id: "compliance_officer", label: "Compliance Officer", type: "text", required: true, section: "Organisation", hint: "Art. 24 AMLO-FINMA", placeholder: "Name (intern/extern)" },
-  { id: "sro", label: "SRO-Mitgliedschaft", type: "select", options: ["VQF", "PolyReg", "SO-FIT", "ARIF", "OAR-G", "Keine / In Bearbeitung"], required: true, section: "Regulierung" },
+  { id: "sro", label: "SRO-Mitgliedschaft", type: "select", options: ["VQF", "PolyReg", "SO-FIT", "ARIF", "OAR-G", "SRO SAV/SNV", "SRO Treuhand Suisse", "SRO Leasingverband", "SRO SVV", "Keine / In Bearbeitung"], required: true, section: "Regulierung" },
   { id: "sro_status", label: "SRO-Status", type: "select", options: ["Aktives Mitglied", "Aufnahme beantragt", "In Vorbereitung", "Nicht erforderlich"], required: true, section: "Regulierung" },
   { id: "finma_license", label: "FINMA-Lizenz", type: "select", options: ["Keine", "Fintech-Lizenz", "Banklizenz", "Effektenhändler", "Vermögensverwalter"], required: false, section: "Regulierung" },
   { id: "tx_volume", label: "Transaktionsvolumen (jährl.)", type: "select", options: ["< CHF 1 Mio.", "CHF 1-10 Mio.", "CHF 10-50 Mio.", "CHF 50-100 Mio.", "> CHF 100 Mio."], required: true, section: "Risikoprofil" },
