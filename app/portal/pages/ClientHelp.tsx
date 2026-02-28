@@ -25,6 +25,7 @@ export function ClientHelp({ org }: Props) {
   const [message, setMessage] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!org) return;
@@ -50,7 +51,8 @@ export function ClientHelp({ org }: Props) {
   }
 
   const handleSubmit = async () => {
-    if (!subject.trim() || !message.trim()) { alert("Betreff und Nachricht sind Pflichtfelder."); return; }
+    setFormError(null);
+    if (!subject.trim() || !message.trim()) { setFormError("Betreff und Nachricht sind Pflichtfelder."); return; }
     setSaving(true);
     try {
       await createHelpRequest({
@@ -62,11 +64,12 @@ export function ClientHelp({ org }: Props) {
       setSubject("");
       setMessage("");
       setCustomerId("");
+      setFormError(null);
       setShowForm(false);
       load();
     } catch (err) {
       console.error("Create help request:", err);
-      alert("Fehler beim Senden der Anfrage.");
+      setFormError("Fehler beim Senden der Anfrage. Bitte versuchen Sie es erneut.");
     } finally {
       setSaving(false);
     }
@@ -235,6 +238,12 @@ export function ClientHelp({ org }: Props) {
                 </div>
               )}
             </div>
+
+            {formError && (
+              <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 8, background: T.redS, color: T.red, fontSize: 13, fontWeight: 500 }}>
+                {formError}
+              </div>
+            )}
 
             <div style={{ marginTop: 20, display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button onClick={() => setShowForm(false)} style={btnSec}>Abbrechen</button>

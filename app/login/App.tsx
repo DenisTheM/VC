@@ -4,7 +4,7 @@ import { Icon, icons } from "@shared/components/Icon";
 import { signIn, getRedirectPath, getProfile } from "@shared/lib/auth";
 import { supabase } from "@shared/lib/supabase";
 
-type Mode = "login" | "set-password";
+type Mode = "login" | "set-password" | "forgot-password";
 
 export function LoginApp() {
   const [email, setEmail] = useState("");
@@ -18,6 +18,8 @@ export function LoginApp() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [settingPassword, setSettingPassword] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   // Check if already logged in OR handle recovery token from URL hash
   useEffect(() => {
@@ -86,8 +88,7 @@ export function LoginApp() {
       if (profile) {
         window.location.href = getRedirectPath(profile.role);
       } else {
-        // Debug: show user ID so we can troubleshoot
-        setError(`Kein Profil gefunden für User ${data.user.id} (${data.user.email}). Bitte kontaktieren Sie den Administrator.`);
+        setError("Kein Profil gefunden. Bitte kontaktieren Sie den Administrator.");
         setLoading(false);
       }
     }
@@ -131,6 +132,30 @@ export function LoginApp() {
 
     // Fallback: redirect to portal
     window.location.href = "/app/portal";
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!email.trim()) {
+      setError("Bitte geben Sie Ihre E-Mail-Adresse ein.");
+      return;
+    }
+
+    setResetLoading(true);
+    const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/app/login`,
+    });
+
+    if (resetErr) {
+      setError("Fehler beim Senden der E-Mail. Bitte versuchen Sie es erneut.");
+      setResetLoading(false);
+      return;
+    }
+
+    setResetSent(true);
+    setResetLoading(false);
   };
 
   if (checkingSession) {
@@ -195,7 +220,117 @@ export function LoginApp() {
           </div>
         </div>
 
-        {mode === "set-password" ? (
+        {mode === "forgot-password" ? (
+          /* ── Forgot Password Form ─────────────────────────────── */
+          <>
+            <h1
+              style={{
+                fontFamily: T.serif,
+                fontSize: 24,
+                fontWeight: 700,
+                color: T.ink,
+                margin: "0 0 6px",
+              }}
+            >
+              Passwort zurücksetzen
+            </h1>
+            <p style={{ fontSize: 14, color: T.ink3, margin: "0 0 28px" }}>
+              Geben Sie Ihre E-Mail-Adresse ein. Sie erhalten einen Link zum Zurücksetzen.
+            </p>
+
+            {resetSent ? (
+              <div
+                style={{
+                  padding: "16px 20px",
+                  borderRadius: T.r,
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  fontSize: 14,
+                  color: "#166534",
+                  lineHeight: 1.5,
+                  fontFamily: T.sans,
+                  marginBottom: 16,
+                }}
+              >
+                Falls ein Konto mit dieser E-Mail existiert, erhalten Sie in Kürze einen Link zum Zurücksetzen Ihres Passworts.
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPassword}>
+                <div style={{ marginBottom: 24 }}>
+                  <label style={{ fontSize: 13, fontWeight: 500, color: T.ink, display: "block", marginBottom: 5 }}>
+                    E-Mail
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    placeholder="name@firma.ch"
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      borderRadius: T.r,
+                      border: `1px solid ${T.border}`,
+                      fontSize: 14,
+                      fontFamily: T.sans,
+                      color: T.ink,
+                      outline: "none",
+                      background: "#fff",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+
+                {error && (
+                  <div
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: T.r,
+                      background: T.redS,
+                      color: T.red,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      marginBottom: 16,
+                      fontFamily: T.sans,
+                    }}
+                  >
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  style={{
+                    width: "100%",
+                    padding: "12px 24px",
+                    borderRadius: 8,
+                    border: "none",
+                    cursor: resetLoading ? "not-allowed" : "pointer",
+                    background: T.primary,
+                    color: "#fff",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    fontFamily: T.sans,
+                    opacity: resetLoading ? 0.7 : 1,
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {resetLoading ? "Wird gesendet..." : "Link senden"}
+                </button>
+              </form>
+            )}
+
+            <div style={{ textAlign: "center", marginTop: 16 }}>
+              <button
+                onClick={() => { setMode("login"); setError(null); setResetSent(false); }}
+                style={{ fontSize: 13, color: T.accent, fontWeight: 500, background: "none", border: "none", cursor: "pointer", fontFamily: T.sans }}
+              >
+                &larr; Zurück zur Anmeldung
+              </button>
+            </div>
+          </>
+        ) : mode === "set-password" ? (
           /* ── Set Password Form (for invited users) ──────────────── */
           <>
             <h1
@@ -411,6 +546,16 @@ export function LoginApp() {
               >
                 {loading ? "Wird angemeldet..." : "Anmelden"}
               </button>
+
+              <div style={{ textAlign: "center", marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => { setMode("forgot-password"); setError(null); }}
+                  style={{ fontSize: 13, color: T.ink3, fontWeight: 500, background: "none", border: "none", cursor: "pointer", fontFamily: T.sans }}
+                >
+                  Passwort vergessen?
+                </button>
+              </div>
             </form>
           </>
         )}

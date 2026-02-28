@@ -10,7 +10,6 @@
 // alert_affected_clients.notified_at + notification_status.
 // =============================================================================
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -40,7 +39,7 @@ interface AlertData {
   source_url: string | null;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" } });
@@ -112,16 +111,21 @@ serve(async (req) => {
       let orgSentCount = 0;
       let orgFailCount = 0;
 
-      for (const profile of profiles ?? []) {
-        // Get the user's email from auth.users
+      // Batch-fetch emails (avoid N+1 getUserById)
+      const emailMap = new Map<string, string>();
+      await Promise.all((profiles ?? []).map(async (profile: { id: string }) => {
         const { data: authUser } = await supabase.auth.admin.getUserById(profile.id);
-        const email = authUser?.user?.email;
+        if (authUser?.user?.email) emailMap.set(profile.id, authUser.user.email);
+      }));
+
+      for (const profile of profiles ?? []) {
+        const email = emailMap.get(profile.id);
         if (!email) continue;
 
         try {
           await sendEmail({
             to: email,
-            subject: `Regulatorische Meldung: ${(alert as AlertData).title}`,
+            subject: `Regulatorische Meldung: ${(alert as AlertData).title}`,  // Subject is plain text, no HTML escaping needed
             html: buildAlertEmail(
               alert as AlertData,
               client,
@@ -164,7 +168,7 @@ serve(async (req) => {
           type: "new_alert",
           title: "Neue regulatorische Meldung",
           body: (alert as AlertData).title,
-          link: "/portal/alerts",
+          link: "/app/portal#alerts",
         }).catch(() => { /* ignore notification insert errors */ });
       }
 
@@ -267,12 +271,12 @@ function buildAlertEmail(
         <span style="display:inline-block;font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;background:${sev.bg};color:${sev.color};border:1px solid ${sev.color}20;">
           ${sev.label}
         </span>
-        ${alert.category ? `<span style="display:inline-block;font-size:12px;padding:4px 12px;border-radius:20px;background:#f3f4f6;color:#374151;margin-left:8px;">${alert.category}</span>` : ""}
+        ${alert.category ? `<span style="display:inline-block;font-size:12px;padding:4px 12px;border-radius:20px;background:#f3f4f6;color:#374151;margin-left:8px;">${escapeHtml(alert.category)}</span>` : ""}
       </div>
 
       <!-- Title -->
       <h1 style="font-size:20px;font-weight:700;color:#111827;margin:0 0 16px;line-height:1.3;">
-        ${alert.title}
+        ${escapeHtml(alert.title)}
       </h1>
 
       <!-- Greeting -->
@@ -282,7 +286,7 @@ function buildAlertEmail(
 
       <!-- Summary -->
       <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 24px;">
-        ${alert.summary || ""}
+        ${escapeHtml(alert.summary || "")}
       </p>
 
       <!-- Client-specific impact -->
@@ -290,23 +294,23 @@ function buildAlertEmail(
         <div style="font-size:14px;font-weight:700;color:${risk.color};margin-bottom:8px;">
           Auswirkung auf ${orgName}: ${risk.label}
         </div>
-        ${client.reason ? `<p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 12px;">${client.reason}</p>` : ""}
+        ${client.reason ? `<p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 12px;">${escapeHtml(client.reason)}</p>` : ""}
         ${client.elena_comment ? `
         <div style="background:#0f3d2e0a;border-radius:6px;padding:14px;margin-top:12px;">
           <div style="font-size:12px;font-weight:600;color:#0f3d2e;margin-bottom:6px;">Empfehlung von Virtue Compliance:</div>
-          <p style="font-size:14px;color:#374151;line-height:1.6;margin:0;">${client.elena_comment}</p>
+          <p style="font-size:14px;color:#374151;line-height:1.6;margin:0;">${escapeHtml(client.elena_comment!)}</p>
         </div>` : ""}
       </div>
 
       ${alert.legal_basis ? `
       <div style="font-size:13px;color:#6b7280;padding:12px;background:#f9fafb;border-radius:6px;margin-bottom:16px;">
-        <strong>Rechtsgrundlage:</strong> ${alert.legal_basis}
-        ${alert.deadline ? ` &middot; <strong>Frist:</strong> ${alert.deadline}` : ""}
+        <strong>Rechtsgrundlage:</strong> ${escapeHtml(alert.legal_basis!)}
+        ${alert.deadline ? ` &middot; <strong>Frist:</strong> ${escapeHtml(alert.deadline)}` : ""}
       </div>` : ""}
 
       <!-- CTA -->
       <div style="text-align:center;margin-top:24px;">
-        <a href="${PORTAL_URL}/portal/alerts"
+        <a href="${PORTAL_URL}/app/portal#alerts"
            style="display:inline-block;background:#0f3d2e;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">
           Im Portal ansehen
         </a>

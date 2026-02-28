@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { T } from "../styles/tokens";
 import { Icon, icons } from "./Icon";
 import { DiffViewer } from "./DiffViewer";
+import { formatDate } from "../lib/format";
 
 export interface VersionEntry {
   id: string;
@@ -16,20 +17,6 @@ interface VersionHistoryProps {
   currentContent: string | null;
   currentVersion: string;
   loading?: boolean;
-}
-
-function formatDate(dateStr: string): string {
-  try {
-    return new Date(dateStr).toLocaleDateString("de-CH", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return dateStr;
-  }
 }
 
 export function VersionHistory({ versions, currentContent, currentVersion, loading }: VersionHistoryProps) {
@@ -144,7 +131,7 @@ export function VersionHistory({ versions, currentContent, currentVersion, loadi
                           {v.version}
                         </div>
                         <div style={{ fontSize: 11, fontFamily: T.sans, color: T.ink4, marginTop: 1 }}>
-                          {formatDate(v.created_at)}
+                          {formatDate(v.created_at, true)}
                         </div>
                       </div>
                       {v.content && currentContent && (

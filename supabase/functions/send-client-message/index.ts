@@ -101,10 +101,15 @@ Deno.serve(async (req) => {
     let sentCount = 0;
     const errors: string[] = [];
 
-    for (const p of profiles ?? []) {
-      // Get email from auth
+    // Batch-fetch emails (avoid N+1 getUserById)
+    const emailMap = new Map<string, string>();
+    await Promise.all((profiles ?? []).map(async (p: { id: string }) => {
       const { data: authUser } = await supabase.auth.admin.getUserById(p.id);
-      const email = authUser?.user?.email;
+      if (authUser?.user?.email) emailMap.set(p.id, authUser.user.email);
+    }));
+
+    for (const p of profiles ?? []) {
+      const email = emailMap.get(p.id);
 
       // Create in-app notification
       try {
@@ -176,11 +181,11 @@ function buildMessageEmail(subject: string, body: string, orgName: string, recip
       <div style="font-size:12px;color:#6b7280;margin-top:4px;">Nachricht</div>
     </div>
     <div style="background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e5e7eb;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
-      <h1 style="font-size:20px;font-weight:700;color:#111827;margin:0 0 16px;line-height:1.3;">${subject}</h1>
-      <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 16px;">Guten Tag ${recipientName},</p>
+      <h1 style="font-size:20px;font-weight:700;color:#111827;margin:0 0 16px;line-height:1.3;">${escapeHtml(subject)}</h1>
+      <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 16px;">Guten Tag ${escapeHtml(recipientName)},</p>
       <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 24px;">${safeBody}</p>
       <div style="text-align:center;margin-top:24px;">
-        <a href="${PORTAL_URL}/portal"
+        <a href="${PORTAL_URL}/app/portal"
            style="display:inline-block;background:#0f3d2e;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">
           Im Portal ansehen
         </a>
@@ -193,6 +198,14 @@ function buildMessageEmail(subject: string, body: string, orgName: string, recip
   </div>
 </body>
 </html>`;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function jsonResponse(data: Record<string, unknown>, status = 200) {

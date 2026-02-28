@@ -1,4 +1,5 @@
 import { supabase } from "@shared/lib/supabase";
+import { formatDate } from "@shared/lib/format";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -127,17 +128,7 @@ export interface CustomerStats {
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
-function formatDate(dateStr: string): string {
-  try {
-    return new Date(dateStr).toLocaleDateString("de-CH", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return dateStr;
-  }
-}
+// formatDate imported from @shared/lib/format
 
 function customerDisplayName(c: { customer_type: string; first_name?: string | null; last_name?: string | null; company_name?: string | null }): string {
   if (c.customer_type === "natural_person") {

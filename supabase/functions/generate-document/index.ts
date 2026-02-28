@@ -369,7 +369,7 @@ Erstelle das Dokument "${docReadableName}" mit allen relevanten Kapiteln. Beacht
     // Call Claude API with timeout
     console.log(`[generate-document] Starting generation: docType=${docType}, orgId=${organizationId}, jurisdiction=${jurisdiction}`);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120_000);
+    const timeout = setTimeout(() => controller.abort(), 240_000);
 
     let claudeResponse: Response;
     try {
@@ -381,8 +381,8 @@ Erstelle das Dokument "${docReadableName}" mit allen relevanten Kapiteln. Beacht
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-opus-4-6",
-          max_tokens: 16000,
+          model: "claude-sonnet-4-6",
+          max_tokens: 8192,
           temperature: 0,
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],
@@ -395,7 +395,7 @@ Erstelle das Dokument "${docReadableName}" mit allen relevanten Kapiteln. Beacht
       console.error(`[generate-document] Claude API ${isAbort ? "timeout" : "fetch error"}:`, fetchErr);
       return new Response(JSON.stringify({
         error: isAbort
-          ? "Die Generierung hat das Zeitlimit von 2 Minuten überschritten. Bitte versuchen Sie es erneut."
+          ? "Die Generierung hat das Zeitlimit von 4 Minuten überschritten. Bitte versuchen Sie es erneut."
           : "Verbindung zur Claude API fehlgeschlagen.",
         code: isAbort ? "timeout" : "connection_error",
       }), {

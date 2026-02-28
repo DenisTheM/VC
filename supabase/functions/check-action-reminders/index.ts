@@ -9,7 +9,6 @@
 //   - 1 day after due_date (overdue) → reminder_sent_overdue
 // =============================================================================
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -18,11 +17,10 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 const FROM_EMAIL = Deno.env.get("VC_FROM_EMAIL") || "Virtue Compliance <alerts@virtue-compliance.ch>";
 const PORTAL_URL = Deno.env.get("VC_PORTAL_URL") || "https://app.virtue-compliance.ch";
 
-serve(async () => {
+Deno.serve(async () => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
   const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
 
   // Load all open actions with due_date
   const { data: actions, error } = await supabase
@@ -71,7 +69,7 @@ serve(async () => {
       subject = `Heute fällig: Massnahme erfordert Handlung`;
       urgencyLabel = "Heute fällig";
       urgencyColor = "#dc2626";
-    } else if (dueDate === yesterday && !a.reminder_sent_overdue) {
+    } else if (dueDate < today && !a.reminder_sent_overdue) {
       reminderType = "overdue";
       subject = `Überfällig: Massnahme erfordert sofortige Handlung`;
       urgencyLabel = "Überfällig";
@@ -94,9 +92,15 @@ serve(async () => {
       .select("id, full_name")
       .in("id", userIds);
 
-    for (const profile of profiles ?? []) {
+    // Batch-fetch emails (avoid N+1 getUserById)
+    const emailMap = new Map<string, string>();
+    await Promise.all((profiles ?? []).map(async (profile: { id: string }) => {
       const { data: authUser } = await supabase.auth.admin.getUserById(profile.id);
-      const email = authUser?.user?.email;
+      if (authUser?.user?.email) emailMap.set(profile.id, authUser.user.email);
+    }));
+
+    for (const profile of profiles ?? []) {
+      const email = emailMap.get(profile.id);
       if (!email) continue;
 
       try {
@@ -180,21 +184,21 @@ function buildReminderEmail(opts: {
         </span>
       </div>
       <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 16px;">
-        Guten Tag ${opts.recipientName},
+        Guten Tag ${escapeHtml(opts.recipientName)},
       </p>
       <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 20px;">
         Eine Massnahme im Zusammenhang mit der regulatorischen Meldung
-        <strong>${opts.alertTitle}</strong> erfordert Ihre Aufmerksamkeit.
+        <strong>${escapeHtml(opts.alertTitle)}</strong> erfordert Ihre Aufmerksamkeit.
       </p>
       <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:24px;">
         <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:8px;">Massnahme:</div>
-        <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 12px;">${opts.actionText}</p>
+        <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 12px;">${escapeHtml(opts.actionText)}</p>
         <div style="font-size:13px;color:${opts.urgencyColor};font-weight:600;">
           Frist: ${opts.dueDate}
         </div>
       </div>
       <div style="text-align:center;">
-        <a href="${PORTAL_URL}/portal/alerts"
+        <a href="${PORTAL_URL}/app/portal#alerts"
            style="display:inline-block;background:#0f3d2e;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">
           Im Portal ansehen
         </a>
@@ -206,6 +210,14 @@ function buildReminderEmail(opts: {
   </div>
 </body>
 </html>`;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function jsonResponse(data: Record<string, unknown>, status = 200) {

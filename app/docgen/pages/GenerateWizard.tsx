@@ -661,57 +661,57 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
     );
   }
 
+  // Trigger generation when step 3 is entered (via useEffect to avoid React Strict Mode double-fire)
+  useEffect(() => {
+    if (step !== 3 || !doc || generating || result || error) return;
+    if (!orgId) {
+      setError("Keine Organisation ausgewählt. Bitte wählen Sie zuerst eine Organisation.");
+      return;
+    }
+    setGenerating(true);
+    setGeneratingStart(Date.now());
+    setSlowHint(false);
+    supabase.functions
+      .invoke("generate-document", {
+        body: {
+          docType: docKey,
+          jurisdiction,
+          companyProfile: profile,
+          answers,
+          organizationId: orgId,
+          chapters: chapters.filter((c) => c.trim()),
+        },
+      })
+      .then(({ data, error: fnError }) => {
+        setGenerating(false);
+        setGeneratingStart(null);
+        setSlowHint(false);
+        if (fnError) {
+          let msg = "Fehler bei der Generierung.";
+          try {
+            const parsed = typeof fnError.message === "string" ? JSON.parse(fnError.message) : null;
+            if (parsed?.error) msg = parsed.error;
+          } catch {
+            msg = fnError.message || msg;
+          }
+          if (data?.error) msg = data.error;
+          setError(msg);
+        } else {
+          const content = data?.document?.content;
+          setResult(content || (typeof data === "string" ? data : "Dokument wurde generiert, aber kein Inhalt erhalten."));
+          autosave.clear();
+        }
+      })
+      .catch((err: Error) => {
+        setGenerating(false);
+        setGeneratingStart(null);
+        setSlowHint(false);
+        setError(err.message || "Unbekannter Fehler.");
+      });
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* Step 3: Generation — call edge function */
   if (step === 3 && doc) {
-    // Trigger generation on mount
-    if (!generating && !result && !error) {
-      if (!orgId) {
-        setError("Keine Organisation ausgewählt. Bitte wählen Sie zuerst eine Organisation.");
-      } else {
-        setGenerating(true);
-        setGeneratingStart(Date.now());
-        setSlowHint(false);
-        supabase.functions
-          .invoke("generate-document", {
-            body: {
-              docType: docKey,
-              jurisdiction,
-              companyProfile: profile,
-              answers,
-              organizationId: orgId,
-              chapters: chapters.filter((c) => c.trim()),
-            },
-          })
-          .then(({ data, error: fnError }) => {
-            setGenerating(false);
-            setGeneratingStart(null);
-            setSlowHint(false);
-            if (fnError) {
-              // Try to parse the edge function's detailed error
-              let msg = "Fehler bei der Generierung.";
-              try {
-                const parsed = typeof fnError.message === "string" ? JSON.parse(fnError.message) : null;
-                if (parsed?.error) msg = parsed.error;
-              } catch {
-                msg = fnError.message || msg;
-              }
-              // Also check if data contains an error (Supabase returns 2xx with error in body sometimes)
-              if (data?.error) msg = data.error;
-              setError(msg);
-            } else {
-              const content = data?.document?.content;
-              setResult(content || (typeof data === "string" ? data : "Dokument wurde generiert, aber kein Inhalt erhalten."));
-              autosave.clear();
-            }
-          })
-          .catch((err: Error) => {
-            setGenerating(false);
-            setGeneratingStart(null);
-            setSlowHint(false);
-            setError(err.message || "Unbekannter Fehler.");
-          });
-      }
-    }
 
     /* Loading state */
     if (generating) {

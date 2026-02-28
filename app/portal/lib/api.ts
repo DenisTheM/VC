@@ -1,4 +1,5 @@
 import { supabase } from "@shared/lib/supabase";
+import { formatDate } from "@shared/lib/format";
 
 // ─── Organization ───────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ export async function loadClientAlerts(organizationId: string): Promise<PortalAl
       reason,
       risk,
       elena_comment,
-      regulatory_alerts(
+      regulatory_alerts!inner(
         id, title, source, date, severity, status,
         category, summary, legal_basis, deadline
       ),
@@ -65,16 +66,14 @@ export async function loadClientAlerts(organizationId: string): Promise<PortalAl
       alert_related_documents(name, type, date)
     `)
     .eq("organization_id", organizationId)
+    .neq("regulatory_alerts.status", "draft")
+    .neq("regulatory_alerts.status", "dismissed")
     .order("created_at", { ascending: false });
 
   if (error) throw error;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data ?? []).filter((row: any) => {
-    // Exclude draft and dismissed alerts from client portal
-    const status = row.regulatory_alerts?.status;
-    return status && status !== "draft" && status !== "dismissed";
-  }).map((row: any) => {
+  return (data ?? []).map((row: any) => {
     const alert = row.regulatory_alerts;
     return {
       id: row.id,
@@ -200,17 +199,6 @@ export interface PortalDoc {
   content: string | null;
 }
 
-function formatDate(dateStr: string): string {
-  try {
-    return new Date(dateStr).toLocaleDateString("de-CH", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return dateStr;
-  }
-}
 
 export async function loadClientDocuments(organizationId: string): Promise<PortalDoc[]> {
   const { data, error } = await supabase
@@ -323,7 +311,9 @@ export async function loadPortalStats(organizationId: string) {
     supabase
       .from("alert_affected_clients")
       .select("id, risk, regulatory_alerts!inner(status)")
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .neq("regulatory_alerts.status", "draft")
+      .neq("regulatory_alerts.status", "dismissed"),
     supabase
       .from("documents")
       .select("id, status")
@@ -331,12 +321,7 @@ export async function loadPortalStats(organizationId: string) {
   ]);
 
   const docs = docsRes.data ?? [];
-  // Exclude draft and dismissed alerts from portal stats
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const alerts = (alertsRes.data ?? []).filter((a: any) => {
-    const status = a.regulatory_alerts?.status;
-    return status && status !== "draft" && status !== "dismissed";
-  });
+  const alerts = alertsRes.data ?? [];
 
   return {
     totalAlerts: alerts.length,

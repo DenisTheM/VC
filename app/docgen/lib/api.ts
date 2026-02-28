@@ -20,27 +20,20 @@ export async function saveCompanyProfile(
   userId: string,
 ): Promise<string> {
   const now = new Date().toISOString();
-  // Upsert: update if exists, insert if not
-  const existing = await loadCompanyProfile(organizationId);
 
-  if (existing) {
-    const { error } = await supabase
-      .from("company_profiles")
-      .update({
+  const { error } = await supabase
+    .from("company_profiles")
+    .upsert(
+      {
+        organization_id: organizationId,
         data: profileData,
         updated_at: now,
         updated_by: userId,
-      })
-      .eq("id", existing.id);
-    if (error) throw error;
-  } else {
-    const { error } = await supabase.from("company_profiles").insert({
-      organization_id: organizationId,
-      data: profileData,
-      updated_by: userId,
-    });
-    if (error) throw error;
-  }
+      },
+      { onConflict: "organization_id" },
+    );
+
+  if (error) throw error;
   return now;
 }
 

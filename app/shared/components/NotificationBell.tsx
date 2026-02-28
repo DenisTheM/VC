@@ -14,6 +14,8 @@ const TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
   action_due: { icon: icons.clock, color: "#dc2626" },
   doc_approved: { icon: icons.check, color: T.accent },
   doc_updated: { icon: icons.doc, color: "#2563eb" },
+  doc_approval_needed: { icon: icons.doc, color: "#d97706" },
+  admin_message: { icon: icons.mail, color: T.accent },
 };
 
 function timeAgo(dateStr: string): string {

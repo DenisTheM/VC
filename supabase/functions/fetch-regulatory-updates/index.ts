@@ -9,7 +9,6 @@
 // Trigger: Supabase Cron (pg_cron) — 1x daily
 // =============================================================================
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parseFeed, type FeedEntry } from "../_shared/rss-parser.ts";
 
@@ -48,7 +47,7 @@ interface AiAlertAnalysis {
   }[];
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -260,9 +259,9 @@ async function analyzeWithClaude(
       if (o.sro) parts.push(`SRO: ${o.sro}`);
       if (o.profile_data) {
         const pd = o.profile_data;
-        if (pd.jurisdiction) parts.push(`Jurisdiktion: ${pd.jurisdiction}`);
-        if (pd.businessFields) parts.push(`Geschaeftsfelder: ${pd.businessFields}`);
-        if (pd.services) parts.push(`Dienstleistungen: ${pd.services}`);
+        if (pd.geo_focus) parts.push(`Geogr. Fokus: ${pd.geo_focus}`);
+        if (pd.industry) parts.push(`Branche: ${pd.industry}`);
+        if (pd.products) parts.push(`Produkte: ${pd.products}`);
       }
       return parts.join(" | ");
     })
@@ -321,7 +320,7 @@ ${entry.summary || "(kein Inhalt verfuegbar)"}`;
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 2048,
       system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],

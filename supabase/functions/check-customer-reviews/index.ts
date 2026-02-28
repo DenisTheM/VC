@@ -9,7 +9,6 @@
 //   - On/after next_review (overdue) → reminder_sent_overdue
 // =============================================================================
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -18,7 +17,7 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 const FROM_EMAIL = Deno.env.get("VC_FROM_EMAIL") || "Virtue Compliance <alerts@virtue-compliance.ch>";
 const PORTAL_URL = Deno.env.get("VC_PORTAL_URL") || "https://app.virtue-compliance.ch";
 
-serve(async () => {
+Deno.serve(async () => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const today = new Date().toISOString().split("T")[0];
   const in30Days = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
@@ -93,9 +92,15 @@ serve(async () => {
       .select("id, full_name")
       .in("id", userIds);
 
-    for (const profile of profiles ?? []) {
+    // Batch-fetch emails (avoid N+1 getUserById)
+    const emailMap = new Map<string, string>();
+    await Promise.all((profiles ?? []).map(async (profile: { id: string }) => {
       const { data: authUser } = await supabase.auth.admin.getUserById(profile.id);
-      const email = authUser?.user?.email;
+      if (authUser?.user?.email) emailMap.set(profile.id, authUser.user.email);
+    }));
+
+    for (const profile of profiles ?? []) {
+      const email = emailMap.get(profile.id);
       if (!email) continue;
 
       try {
@@ -123,7 +128,7 @@ serve(async () => {
         user_id: uid,
         title: subject,
         body: `Die periodische Überprüfung für ${customerName} ist ${reminderType === "overdue" ? "überfällig" : "bald fällig"}.`,
-        link: "/portal/customers",
+        link: "/app/portal#customers",
       }).catch(() => {});
     }
 
@@ -187,21 +192,21 @@ function buildReminderEmail(opts: {
         </span>
       </div>
       <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 16px;">
-        Guten Tag ${opts.recipientName},
+        Guten Tag ${escapeHtml(opts.recipientName)},
       </p>
       <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 20px;">
-        Die periodische Überprüfung des Kunden <strong>${opts.customerName}</strong>
+        Die periodische Überprüfung des Kunden <strong>${escapeHtml(opts.customerName)}</strong>
         erfordert Ihre Aufmerksamkeit.
       </p>
       <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:24px;">
         <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:8px;">Kunde:</div>
-        <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 12px;">${opts.customerName}</p>
+        <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 12px;">${escapeHtml(opts.customerName)}</p>
         <div style="font-size:13px;color:${opts.urgencyColor};font-weight:600;">
           Überprüfungsdatum: ${opts.reviewDate}
         </div>
       </div>
       <div style="text-align:center;">
-        <a href="${PORTAL_URL}/portal/customers"
+        <a href="${PORTAL_URL}/app/portal#customers"
            style="display:inline-block;background:#0f3d2e;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">
           Im Portal ansehen
         </a>
@@ -213,6 +218,14 @@ function buildReminderEmail(opts: {
   </div>
 </body>
 </html>`;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function jsonResponse(data: Record<string, unknown>, status = 200) {

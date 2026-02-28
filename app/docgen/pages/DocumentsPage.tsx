@@ -471,7 +471,6 @@ function DocDetailView({
     setContentSaved(false);
     try {
       await updateDocumentContent(doc.id, editContent);
-      doc.content = editContent;
       setContentSaved(true);
       setTimeout(() => setContentSaved(false), 3000);
     } catch (err) {
