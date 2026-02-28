@@ -7,6 +7,7 @@ import { usePageNav } from "@shared/hooks/usePageNav";
 import { useBreakpoint } from "@shared/hooks/useBreakpoint";
 import { signOut } from "@shared/lib/auth";
 import { NotificationBell } from "@shared/components/NotificationBell";
+import { LanguageSwitcher } from "@shared/components/LanguageSwitcher";
 import { loadUserOrganization, type ClientOrg } from "./lib/api";
 
 const ClientDashboard = lazy(() => import("./pages/ClientDashboard").then((m) => ({ default: m.ClientDashboard })));
@@ -17,6 +18,12 @@ const ClientHelp = lazy(() => import("./pages/ClientHelp").then((m) => ({ defaul
 const ClientMessages = lazy(() => import("./pages/ClientMessages").then((m) => ({ default: m.ClientMessages })));
 const ClientAuditReadiness = lazy(() => import("./pages/ClientAuditReadiness").then((m) => ({ default: m.ClientAuditReadiness })));
 const DocumentApproval = lazy(() => import("./pages/DocumentApproval").then((m) => ({ default: m.DocumentApproval })));
+const KycOnboardingPage = lazy(() => import("./pages/KycOnboardingPage").then((m) => ({ default: m.KycOnboardingPage })));
+const MrosWizardPage = lazy(() => import("./pages/MrosWizardPage").then((m) => ({ default: m.MrosWizardPage })));
+const ComplianceChecklistPage = lazy(() => import("./pages/ComplianceChecklistPage").then((m) => ({ default: m.ComplianceChecklistPage })));
+const PkycDashboardPage = lazy(() => import("./pages/PkycDashboardPage").then((m) => ({ default: m.PkycDashboardPage })));
+const UboDeclarationPage = lazy(() => import("./pages/UboDeclarationPage").then((m) => ({ default: m.UboDeclarationPage })));
+const ElearningPage = lazy(() => import("./pages/ElearningPage").then((m) => ({ default: m.ElearningPage })));
 
 /* ------------------------------------------------------------------ */
 /*  Client Sidebar                                                    */
@@ -28,6 +35,12 @@ const BASE_NAV_ITEMS: readonly { id: string; icon: string; label: string; approv
   { id: "docs", icon: icons.doc, label: "Dokumente" },
   { id: "approvals", icon: icons.check, label: "Freigaben", approverOnly: true },
   { id: "customers", icon: icons.users, label: "Kunden" },
+  { id: "kyc", icon: icons.clipboard, label: "KYC Onboarding" },
+  { id: "mros", icon: icons.flag, label: "Verdachtsmeldung" },
+  { id: "checklist", icon: icons.list, label: "Compliance Checkliste" },
+  { id: "pkyc", icon: icons.eye, label: "pKYC Monitoring" },
+  { id: "ubo", icon: icons.building, label: "UBO / LETA" },
+  { id: "training", icon: icons.academic, label: "Schulungen" },
   { id: "readiness", icon: icons.shield, label: "Audit Readiness" },
   { id: "messages", icon: icons.mail, label: "Nachrichten" },
   { id: "help", icon: icons.phone, label: "Hilfe" },
@@ -235,6 +248,11 @@ function ClientSidebar({
         </div>
       </div>
 
+      {/* Language switcher */}
+      <div style={{ padding: "0 12px 8px" }}>
+        <LanguageSwitcher />
+      </div>
+
       {/* Client info footer */}
       <div
         style={{
@@ -429,6 +447,12 @@ function PortalContent() {
           {page === "docs" && <ClientDocs org={org} initialDocName={pendingDocName} onDocConsumed={() => setPendingDocName(null)} onAlertNav={handleAlertNav} />}
           {page === "approvals" && <DocumentApproval org={org} />}
           {page === "customers" && <ClientCustomers org={org} onNav={handleNav} />}
+          {page === "kyc" && <KycOnboardingPage org={org} />}
+          {page === "mros" && <MrosWizardPage org={org} />}
+          {page === "checklist" && <ComplianceChecklistPage org={org} />}
+          {page === "pkyc" && <PkycDashboardPage org={org} />}
+          {page === "ubo" && <UboDeclarationPage org={org} />}
+          {page === "training" && <ElearningPage org={org} />}
           {page === "readiness" && <ClientAuditReadiness org={org} />}
           {page === "messages" && <ClientMessages org={org} />}
           {page === "help" && <ClientHelp org={org} />}

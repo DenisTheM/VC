@@ -9,6 +9,8 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { getCorsHeaders, corsResponse } from "../_shared/cors.ts";
+import { checkRateLimit, getClientIp, rateLimitResponse } from "../_shared/rate-limit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -18,12 +20,6 @@ const FROM_EMAIL =
   "Virtue Compliance <portal@virtue-compliance.ch>";
 const PORTAL_URL =
   Deno.env.get("VC_PORTAL_URL") || "https://app.virtue-compliance.ch";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
 
 const VALID_ROLES = ["viewer", "editor", "approver"];
 
@@ -35,8 +31,22 @@ const ROLE_LABELS: Record<string, string> = {
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return corsResponse(req);
+
+  const corsHeaders = getCorsHeaders(req);
+
+  function jsonResponse(data: Record<string, unknown>, status = 200) {
+    return new Response(JSON.stringify(data), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Rate limiting: 10 requests per minute for member invitations
+  const ip = getClientIp(req);
+  const rateCheck = await checkRateLimit(ip, "invite-member", 10, 60_000);
+  if (!rateCheck.allowed) {
+    return rateLimitResponse(corsHeaders, rateCheck.retryAfter);
   }
 
   try {
@@ -440,9 +450,3 @@ function buildAddedToOrgEmail(
 </html>`;
 }
 
-function jsonResponse(data: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}

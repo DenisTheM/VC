@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCorsHeaders, corsResponse } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -30,7 +31,18 @@ const TRANSLATIONS: Record<string, {
   },
 };
 
-serve(async () => {
+serve(async (req) => {
+  if (req.method === "OPTIONS") return corsResponse(req);
+
+  const corsHeaders = getCorsHeaders(req);
+
+  function jsonRes(data: Record<string, unknown>, status = 200) {
+    return new Response(JSON.stringify(data), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: overdueUsers, error: queryErr } = await supabase
@@ -97,6 +109,3 @@ ${phone ? `<p style="color:#a3a3a3;font-size:13px;">Phone on file: ${phone}</p>`
 <p>Sent by Still Alive — stillalive.app</p></div></div></body></html>`;
 }
 
-function jsonRes(data: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
-}

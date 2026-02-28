@@ -404,6 +404,339 @@ export async function loadPortalStats(organizationId: string) {
   };
 }
 
+// ─── KYC Onboarding ────────────────────────────────────────────────
+
+export interface KycCase {
+  id: string;
+  case_type: string;
+  status: string;
+  form_data: Record<string, unknown>;
+  risk_category: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function loadKycCases(orgId: string): Promise<KycCase[]> {
+  const { data, error } = await supabase
+    .from("kyc_cases")
+    .select("*")
+    .eq("organization_id", orgId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as KycCase[];
+}
+
+export async function createKycCase(
+  orgId: string,
+  caseType: "form_a" | "form_k",
+): Promise<KycCase> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from("kyc_cases")
+    .insert({
+      organization_id: orgId,
+      case_type: caseType,
+      status: "draft",
+      created_by: user?.id,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as KycCase;
+}
+
+export async function updateKycCase(
+  caseId: string,
+  updates: { form_data?: Record<string, unknown>; status?: string; risk_category?: string },
+): Promise<void> {
+  const { error } = await supabase
+    .from("kyc_cases")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", caseId);
+
+  if (error) throw error;
+}
+
+// ─── MROS / SAR Reports ───────────────────────────────────────────
+
+export interface SarReport {
+  id: string;
+  status: string;
+  report_data: Record<string, unknown>;
+  goaml_xml: string | null;
+  submitted_at: string | null;
+  reference_number: string | null;
+  created_at: string;
+}
+
+export async function loadSarReports(orgId: string): Promise<SarReport[]> {
+  const { data, error } = await supabase
+    .from("sar_reports")
+    .select("*")
+    .eq("organization_id", orgId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as SarReport[];
+}
+
+export async function createSarReport(orgId: string): Promise<SarReport> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from("sar_reports")
+    .insert({
+      organization_id: orgId,
+      status: "draft",
+      submitted_by: user?.id,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as SarReport;
+}
+
+export async function updateSarReport(
+  reportId: string,
+  updates: { report_data?: Record<string, unknown>; goaml_xml?: string; status?: string },
+): Promise<void> {
+  const { error } = await supabase
+    .from("sar_reports")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", reportId);
+
+  if (error) throw error;
+}
+
+// ─── Compliance Checklist ──────────────────────────────────────────
+
+export async function loadMyChecklist(orgId: string) {
+  const [pkgRes, progressRes] = await Promise.all([
+    supabase.from("sro_compliance_packages").select("*").order("sro"),
+    supabase.from("organization_checklist_progress").select("*").eq("organization_id", orgId),
+  ]);
+
+  if (pkgRes.error) throw pkgRes.error;
+  if (progressRes.error) throw progressRes.error;
+
+  return {
+    packages: pkgRes.data ?? [],
+    progress: progressRes.data ?? [],
+  };
+}
+
+export async function updateChecklistItem(
+  orgId: string,
+  packageId: string,
+  itemId: string,
+  checked: boolean,
+): Promise<void> {
+  // Load current progress
+  const { data: existing } = await supabase
+    .from("organization_checklist_progress")
+    .select("checklist_status")
+    .eq("organization_id", orgId)
+    .eq("package_id", packageId)
+    .maybeSingle();
+
+  const status = (existing?.checklist_status as Record<string, boolean>) ?? {};
+  status[itemId] = checked;
+
+  const { error } = await supabase
+    .from("organization_checklist_progress")
+    .upsert(
+      {
+        organization_id: orgId,
+        package_id: packageId,
+        checklist_status: status,
+        last_updated: new Date().toISOString(),
+      },
+      { onConflict: "organization_id,package_id" },
+    );
+
+  if (error) throw error;
+}
+
+// ─── pKYC Monitoring ───────────────────────────────────────────────
+
+export interface PkycTrigger {
+  id: string;
+  customer_id: string;
+  trigger_type: string;
+  severity: string;
+  description: string;
+  status: string;
+  created_at: string;
+  customer_name?: string;
+}
+
+export async function loadMyTriggers(orgId: string): Promise<PkycTrigger[]> {
+  const { data, error } = await supabase
+    .from("pkyc_triggers")
+    .select("*, client_customers(name)")
+    .eq("organization_id", orgId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => ({
+    ...r,
+    customer_name: r.client_customers?.name ?? "Unbekannt",
+  }));
+}
+
+export async function resolveTrigger(
+  triggerId: string,
+  status: "resolved" | "dismissed",
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase
+    .from("pkyc_triggers")
+    .update({
+      status,
+      resolved_by: user?.id,
+      resolved_at: new Date().toISOString(),
+    })
+    .eq("id", triggerId);
+
+  if (error) throw error;
+}
+
+export async function updatePkycConfig(
+  orgId: string,
+  config: {
+    sanctions_monitoring?: boolean;
+    adverse_media_monitoring?: boolean;
+    registry_monitoring?: boolean;
+    review_cycle_months?: number;
+    auto_screening_interval_days?: number;
+  },
+): Promise<void> {
+  const { error } = await supabase
+    .from("pkyc_monitoring_config")
+    .upsert(
+      { organization_id: orgId, ...config, updated_at: new Date().toISOString() },
+      { onConflict: "organization_id" },
+    );
+
+  if (error) throw error;
+}
+
+// ─── UBO / LETA ────────────────────────────────────────────────────
+
+export interface UboEntry {
+  id: string;
+  name: string;
+  birth_date: string | null;
+  nationality: string | null;
+  share_percent: number | null;
+  control_type: string | null;
+  leta_status: string;
+  discrepancy_detected_at: string | null;
+}
+
+export async function loadUboDeclaration(orgId: string, customerId?: string): Promise<UboEntry[]> {
+  let query = supabase
+    .from("ubo_declarations")
+    .select("*")
+    .eq("organization_id", orgId);
+
+  if (customerId) query = query.eq("customer_id", customerId);
+
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) throw error;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((d: any) => ({
+    id: d.id,
+    name: (d.ubo_data as unknown[])?.[0] && typeof d.ubo_data[0] === "object" ? (d.ubo_data[0] as Record<string, string>).name ?? "" : "",
+    birth_date: d.ubo_data?.[0]?.birthDate ?? null,
+    nationality: d.ubo_data?.[0]?.nationality ?? null,
+    share_percent: d.ubo_data?.[0]?.share_percent ?? null,
+    control_type: d.ubo_data?.[0]?.control_type ?? null,
+    leta_status: d.leta_status ?? "not_checked",
+    discrepancy_detected_at: d.leta_status === "discrepancy" ? d.updated_at : null,
+  }));
+}
+
+export async function saveUboDeclaration(
+  orgId: string,
+  customerId: string | null,
+  uboData: unknown[],
+): Promise<void> {
+  const { error } = await supabase
+    .from("ubo_declarations")
+    .upsert(
+      {
+        organization_id: orgId,
+        customer_id: customerId,
+        ubo_data: uboData,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "customer_id" },
+    );
+
+  if (error) throw error;
+}
+
+// ─── E-Learning ────────────────────────────────────────────────────
+
+export async function loadMyProgress(orgId: string) {
+  const { data, error } = await supabase
+    .from("elearning_progress")
+    .select("*")
+    .eq("organization_id", orgId);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function updateElearningProgress(
+  orgId: string,
+  moduleId: string,
+  updates: { status?: string; score?: number; completed_at?: string },
+): Promise<void> {
+  const { error } = await supabase
+    .from("elearning_progress")
+    .upsert(
+      {
+        organization_id: orgId,
+        module_id: moduleId,
+        ...updates,
+        started_at: new Date().toISOString(),
+      },
+      { onConflict: "organization_id,module_id" },
+    );
+
+  if (error) throw error;
+}
+
+// ─── Sanctions Screening ───────────────────────────────────────────
+
+export async function triggerScreening(customerId: string): Promise<void> {
+  const { error } = await supabase.functions.invoke("sanctions-screening", {
+    body: { customer_id: customerId },
+  });
+
+  if (error) throw error;
+}
+
+export async function loadCustomerScreenings(orgId: string, customerId?: string) {
+  let query = supabase
+    .from("screening_results")
+    .select("*")
+    .eq("organization_id", orgId)
+    .order("screened_at", { ascending: false });
+
+  if (customerId) query = query.eq("customer_id", customerId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ─── Document ↔ Alert Links ──────────────────────────────────────────
 
 export interface LinkedAlert {

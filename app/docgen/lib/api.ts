@@ -994,6 +994,355 @@ export async function cacheAuditScore(orgId: string, score: number, scoreData: u
   if (error) throw error;
 }
 
+// ─── Risk Scoring ──────────────────────────────────────────────────
+
+export interface RiskScoringProfile {
+  id: string;
+  sro: string;
+  name: string;
+  weights: Record<string, number>;
+  country_risk_map: Record<string, number>;
+  created_at: string;
+}
+
+export async function loadRiskScoringProfiles(): Promise<RiskScoringProfile[]> {
+  const { data, error } = await supabase
+    .from("risk_scoring_profiles")
+    .select("*")
+    .order("sro");
+
+  if (error) throw error;
+  return (data ?? []) as RiskScoringProfile[];
+}
+
+export async function saveRiskScoringProfile(
+  id: string,
+  updates: { weights?: Record<string, number>; country_risk_map?: Record<string, number> },
+): Promise<void> {
+  const { error } = await supabase
+    .from("risk_scoring_profiles")
+    .update(updates)
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
+export interface CustomerRiskScore {
+  id: string;
+  customer_id: string;
+  organization_id: string;
+  overall_score: number;
+  risk_level: string;
+  factors: Record<string, number>;
+  calculated_at: string;
+  customer_name?: string;
+}
+
+export async function loadCustomerRiskScores(orgId: string): Promise<CustomerRiskScore[]> {
+  const { data, error } = await supabase
+    .from("customer_risk_scores")
+    .select("*, client_customers(name)")
+    .eq("organization_id", orgId)
+    .order("overall_score", { ascending: false });
+
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => ({
+    ...r,
+    customer_name: r.client_customers?.name ?? "Unbekannt",
+  }));
+}
+
+// ─── Sanctions Screening ───────────────────────────────────────────
+
+export interface ScreeningResult {
+  id: string;
+  customer_id: string;
+  organization_id: string;
+  screening_type: string;
+  query_name: string;
+  status: string;
+  matches: unknown[];
+  screened_at: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  notes: string | null;
+  customer_name?: string;
+}
+
+export async function loadScreeningResults(orgId?: string): Promise<ScreeningResult[]> {
+  let query = supabase
+    .from("screening_results")
+    .select("*, client_customers(name)")
+    .order("screened_at", { ascending: false });
+
+  if (orgId) query = query.eq("organization_id", orgId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => ({
+    ...r,
+    customer_name: r.client_customers?.name ?? "Unbekannt",
+  }));
+}
+
+export async function saveScreeningReview(
+  resultId: string,
+  updates: { status: string; notes?: string },
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("screening_results")
+    .update({
+      status: updates.status,
+      notes: updates.notes ?? null,
+      reviewed_by: userId,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", resultId);
+
+  if (error) throw error;
+}
+
+// ─── KYC Cases ─────────────────────────────────────────────────────
+
+export interface KycCase {
+  id: string;
+  organization_id: string;
+  customer_id: string | null;
+  case_type: string;
+  status: string;
+  form_data: Record<string, unknown>;
+  risk_category: string | null;
+  created_at: string;
+  org_name?: string;
+}
+
+export async function loadKycCases(orgId?: string): Promise<KycCase[]> {
+  let query = supabase
+    .from("kyc_cases")
+    .select("*, organizations(name)")
+    .order("created_at", { ascending: false });
+
+  if (orgId) query = query.eq("organization_id", orgId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => ({
+    ...r,
+    org_name: r.organizations?.name ?? "Unbekannt",
+  }));
+}
+
+// ─── SAR Reports ───────────────────────────────────────────────────
+
+export interface SarReportSummary {
+  id: string;
+  organization_id: string;
+  status: string;
+  created_at: string;
+  submitted_at: string | null;
+  reference_number: string | null;
+  org_name?: string;
+}
+
+export async function loadSarReports(orgId?: string): Promise<SarReportSummary[]> {
+  let query = supabase
+    .from("sar_reports")
+    .select("id, organization_id, status, created_at, submitted_at, reference_number, organizations(name)")
+    .order("created_at", { ascending: false });
+
+  if (orgId) query = query.eq("organization_id", orgId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => ({
+    ...r,
+    org_name: r.organizations?.name ?? "Unbekannt",
+  }));
+}
+
+// ─── SRO Compliance Packages ───────────────────────────────────────
+
+export interface SroPackage {
+  id: string;
+  sro: string;
+  name: string;
+  description: string | null;
+  checklist: { id: string; text: string; category: string; required: boolean }[];
+  document_templates: string[];
+  review_cycle_months: number;
+}
+
+export async function loadSroPackages(): Promise<SroPackage[]> {
+  const { data, error } = await supabase
+    .from("sro_compliance_packages")
+    .select("*")
+    .order("sro");
+
+  if (error) throw error;
+  return (data ?? []) as SroPackage[];
+}
+
+export async function loadChecklistProgress(orgId: string): Promise<Record<string, boolean>> {
+  const { data, error } = await supabase
+    .from("organization_checklist_progress")
+    .select("checklist_status")
+    .eq("organization_id", orgId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data?.checklist_status as Record<string, boolean>) ?? {};
+}
+
+// ─── pKYC Triggers ─────────────────────────────────────────────────
+
+export interface PkycTrigger {
+  id: string;
+  customer_id: string;
+  organization_id: string;
+  trigger_type: string;
+  severity: string;
+  description: string;
+  status: string;
+  created_at: string;
+  customer_name?: string;
+  org_name?: string;
+}
+
+export async function loadPkycTriggers(orgId?: string): Promise<PkycTrigger[]> {
+  let query = supabase
+    .from("pkyc_triggers")
+    .select("*, client_customers(name), organizations(name)")
+    .order("created_at", { ascending: false });
+
+  if (orgId) query = query.eq("organization_id", orgId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => ({
+    ...r,
+    customer_name: r.client_customers?.name ?? "Unbekannt",
+    org_name: r.organizations?.name ?? "Unbekannt",
+  }));
+}
+
+export async function loadPkycConfig(orgId: string) {
+  const { data, error } = await supabase
+    .from("pkyc_monitoring_config")
+    .select("*")
+    .eq("organization_id", orgId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+// ─── UBO / LETA ────────────────────────────────────────────────────
+
+export interface UboDeclaration {
+  id: string;
+  customer_id: string;
+  organization_id: string;
+  ubo_data: unknown[];
+  leta_status: string;
+  leta_check_date: string | null;
+  created_at: string;
+  customer_name?: string;
+  org_name?: string;
+}
+
+export async function loadUboDeclarations(orgId?: string): Promise<UboDeclaration[]> {
+  let query = supabase
+    .from("ubo_declarations")
+    .select("*, client_customers(name), organizations(name)")
+    .order("created_at", { ascending: false });
+
+  if (orgId) query = query.eq("organization_id", orgId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => ({
+    ...r,
+    customer_name: r.client_customers?.name ?? "Unbekannt",
+    org_name: r.organizations?.name ?? "Unbekannt",
+  }));
+}
+
+// ─── Training / E-Learning ─────────────────────────────────────────
+
+export interface TrainingStatus {
+  user_id: string;
+  user_name: string;
+  organization_id: string;
+  org_name: string;
+  module_id: string;
+  module_title: string;
+  status: string;
+  score: number | null;
+  completed_at: string | null;
+}
+
+export async function loadTrainingStatus(orgId?: string): Promise<TrainingStatus[]> {
+  let query = supabase
+    .from("elearning_progress")
+    .select("*, elearning_modules(title), organizations(name), profiles:user_id(full_name)")
+    .order("completed_at", { ascending: false });
+
+  if (orgId) query = query.eq("organization_id", orgId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => ({
+    user_id: r.user_id,
+    user_name: r.profiles?.full_name ?? "Unbekannt",
+    organization_id: r.organization_id,
+    org_name: r.organizations?.name ?? "Unbekannt",
+    module_id: r.module_id,
+    module_title: r.elearning_modules?.title ?? "Unbekannt",
+    status: r.status,
+    score: r.score,
+    completed_at: r.completed_at,
+  }));
+}
+
+export async function loadElearningModules() {
+  const { data, error } = await supabase
+    .from("elearning_modules")
+    .select("id, title, description, category, duration_minutes, passing_score")
+    .order("sort_order");
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+// ─── AI Regulatory Interpretation ──────────────────────────────────
+
+export async function triggerInterpretation(alertId: string, orgId: string): Promise<void> {
+  const { error } = await supabase.functions.invoke("interpret-regulation", {
+    body: { alert_id: alertId, organization_id: orgId },
+  });
+
+  if (error) throw error;
+}
+
+export async function loadInterpretation(alertId: string) {
+  const { data, error } = await supabase
+    .from("regulatory_alerts")
+    .select("ai_interpretation, interpretation_model, interpreted_at")
+    .eq("id", alertId)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 // ─── Dashboard Stats ───────────────────────────────────────────────
 
 export async function loadDashboardStats() {

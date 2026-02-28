@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCorsHeaders, corsResponse } from "../_shared/cors.ts";
 
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY")!;
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
@@ -13,7 +14,11 @@ const TRANSLATIONS: Record<string, { title: string; body: string }> = {
   fr: { title: "Encore là ?", body: "Appuyez pour confirmer que tout va bien." },
 };
 
-serve(async () => {
+serve(async (req) => {
+  if (req.method === "OPTIONS") return corsResponse(req);
+
+  const corsHeaders = getCorsHeaders(req);
+
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: candidates, error: queryErr } = await supabase
@@ -22,7 +27,7 @@ serve(async () => {
     if (queryErr) throw queryErr;
     if (!candidates || candidates.length === 0) {
       return new Response(JSON.stringify({ sent: 0, message: "No reminders needed" }), {
-        status: 200, headers: { "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     let sentCount = 0;
@@ -66,11 +71,11 @@ serve(async () => {
       }
     }
     return new Response(JSON.stringify({ sent: sentCount, errors: errors.length }), {
-      status: 200, headers: { "Content-Type": "application/json" },
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500, headers: { "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

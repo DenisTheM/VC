@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getCorsHeaders, corsResponse } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -11,8 +12,12 @@ const PRICES: Record<string, string> = {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization" } });
+  if (req.method === "OPTIONS") return corsResponse(req);
+
+  const corsHeaders = getCorsHeaders(req);
+
+  function err(msg: string, status: number) {
+    return new Response(JSON.stringify({ error: msg }), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   try {
@@ -51,7 +56,7 @@ serve(async (req) => {
       allow_promotion_codes: "true",
     });
 
-    return new Response(JSON.stringify({ url: session.url }), { status: 200, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    return new Response(JSON.stringify({ url: session.url }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("Checkout error:", e);
     return err(String(e), 500);
@@ -68,6 +73,3 @@ async function stripe(method: string, path: string, params: Record<string, strin
   return res.json();
 }
 
-function err(msg: string, status: number) {
-  return new Response(JSON.stringify({ error: msg }), { status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
-}

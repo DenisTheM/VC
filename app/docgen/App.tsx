@@ -7,6 +7,7 @@ import { useAuthContext } from "@shared/components/AuthContext";
 import { usePageNav } from "@shared/hooks/usePageNav";
 import { useBreakpoint } from "@shared/hooks/useBreakpoint";
 import { signOut } from "@shared/lib/auth";
+import { LanguageSwitcher } from "@shared/components/LanguageSwitcher";
 import { PROFILE_FIELDS } from "./data/profileFields";
 import { loadOrganizations, loadCompanyProfile, saveCompanyProfile, loadDashboardStats, type Organization, type ZefixResult } from "./lib/api";
 
@@ -17,6 +18,14 @@ const GenerateWizard = lazy(() => import("./pages/GenerateWizard").then((m) => (
 const DocumentsPage = lazy(() => import("./pages/DocumentsPage").then((m) => ({ default: m.DocumentsPage })));
 const AlertsPage = lazy(() => import("./pages/AlertsPage").then((m) => ({ default: m.AlertsPage })));
 const AuditReadinessPage = lazy(() => import("./pages/AuditReadinessPage").then((m) => ({ default: m.AuditReadinessPage })));
+const RiskScoringPage = lazy(() => import("./pages/RiskScoringPage").then((m) => ({ default: m.RiskScoringPage })));
+const ScreeningPage = lazy(() => import("./pages/ScreeningPage").then((m) => ({ default: m.ScreeningPage })));
+const KycCasesPage = lazy(() => import("./pages/KycCasesPage").then((m) => ({ default: m.KycCasesPage })));
+const SarOverviewPage = lazy(() => import("./pages/SarOverviewPage").then((m) => ({ default: m.SarOverviewPage })));
+const SroPackagesPage = lazy(() => import("./pages/SroPackagesPage").then((m) => ({ default: m.SroPackagesPage })));
+const PkycOverviewPage = lazy(() => import("./pages/PkycOverviewPage").then((m) => ({ default: m.PkycOverviewPage })));
+const LetaOverviewPage = lazy(() => import("./pages/LetaOverviewPage").then((m) => ({ default: m.LetaOverviewPage })));
+const TrainingOverviewPage = lazy(() => import("./pages/TrainingOverviewPage").then((m) => ({ default: m.TrainingOverviewPage })));
 
 function DocGenInner() {
   const { user, profile: authProfile } = useAuthContext();
@@ -183,6 +192,14 @@ function DocGenInner() {
     { id: "documents", icon: icons.doc, label: "Dokumente" },
     { id: "alerts", icon: icons.alert, label: "Reg. Alerts", badge: dashStats.draftAlertCount || undefined },
     { id: "readiness", icon: icons.shield, label: "Audit Readiness" },
+    { id: "risk_scoring", icon: icons.chart, label: "Risk Scoring" },
+    { id: "screening", icon: icons.search, label: "Sanctions Screening" },
+    { id: "kyc_cases", icon: icons.clipboard, label: "KYC Cases" },
+    { id: "sar", icon: icons.flag, label: "SAR-Übersicht" },
+    { id: "sro_packages", icon: icons.list, label: "SRO-Pakete" },
+    { id: "pkyc", icon: icons.eye, label: "pKYC Monitor" },
+    { id: "leta", icon: icons.building, label: "LETA / UBO" },
+    { id: "training", icon: icons.academic, label: "Schulungen" },
   ];
 
   const footer = (
@@ -234,6 +251,9 @@ function DocGenInner() {
       >
         Abmelden
       </button>
+      <div style={{ marginTop: 8 }}>
+        <LanguageSwitcher />
+      </div>
     </div>
   );
 
@@ -353,6 +373,14 @@ function DocGenInner() {
           {page === "documents" && <DocumentsPage />}
           {page === "alerts" && <AlertsPage profile={profile} organizations={organizations} />}
           {page === "readiness" && <AuditReadinessPage organizations={organizations} />}
+          {page === "risk_scoring" && <RiskScoringPage organizations={organizations} />}
+          {page === "screening" && <ScreeningPage organizations={organizations} />}
+          {page === "kyc_cases" && <KycCasesPage organizations={organizations} />}
+          {page === "sar" && <SarOverviewPage organizations={organizations} />}
+          {page === "sro_packages" && <SroPackagesPage organizations={organizations} />}
+          {page === "pkyc" && <PkycOverviewPage organizations={organizations} />}
+          {page === "leta" && <LetaOverviewPage organizations={organizations} />}
+          {page === "training" && <TrainingOverviewPage organizations={organizations} />}
         </Suspense>
       </main>
     </div>

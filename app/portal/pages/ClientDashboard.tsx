@@ -8,6 +8,7 @@ import { loadClientAlerts, loadPortalStats, loadClientProfile, type ClientOrg, t
 import { loadCustomerStats, type CustomerStats } from "../lib/customerApi";
 import { PROFILE_FIELDS } from "@shared/data/profileFields";
 import { calcProfileCompletion, completionColor } from "@shared/lib/profileCompletion";
+import { TrustBadge } from "@shared/components/TrustBadge";
 
 interface ClientDashboardProps {
   onNav: (id: string) => void;
@@ -77,6 +78,9 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
       <p style={{ fontSize: 15, color: T.ink3, fontFamily: T.sans, margin: "0 0 32px" }}>
         Willkommen im Compliance-Portal von {orgShort}. Hier finden Sie aktuelle regulatorische Updates und Ihre Dokumente.
       </p>
+      <div style={{ marginBottom: 24 }}>
+        <TrustBadge />
+      </div>
 
       {/* Critical alert banner */}
       {criticalAlert && (
