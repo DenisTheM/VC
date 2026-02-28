@@ -16,6 +16,7 @@ const OrganizationsPage = lazy(() => import("./pages/OrganizationsPage").then((m
 const GenerateWizard = lazy(() => import("./pages/GenerateWizard").then((m) => ({ default: m.GenerateWizard })));
 const DocumentsPage = lazy(() => import("./pages/DocumentsPage").then((m) => ({ default: m.DocumentsPage })));
 const AlertsPage = lazy(() => import("./pages/AlertsPage").then((m) => ({ default: m.AlertsPage })));
+const AuditReadinessPage = lazy(() => import("./pages/AuditReadinessPage").then((m) => ({ default: m.AuditReadinessPage })));
 
 function DocGenInner() {
   const { user, profile: authProfile } = useAuthContext();
@@ -30,7 +31,7 @@ function DocGenInner() {
   const [saving, setSaving] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedDocKey, setSelectedDocKey] = useState<string | null>(null);
-  const [dashStats, setDashStats] = useState({ documentCount: 0, alertCount: 0, draftAlertCount: 0 });
+  const [dashStats, setDashStats] = useState({ documentCount: 0, alertCount: 0, draftAlertCount: 0, expiringDocCount: 0 });
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<Record<string, unknown>>(() => {
@@ -181,6 +182,7 @@ function DocGenInner() {
     { id: "generate", icon: icons.plus, label: "Neues Dokument" },
     { id: "documents", icon: icons.doc, label: "Dokumente" },
     { id: "alerts", icon: icons.alert, label: "Reg. Alerts", badge: dashStats.draftAlertCount || undefined },
+    { id: "readiness", icon: icons.shield, label: "Audit Readiness" },
   ];
 
   const footer = (
@@ -350,6 +352,7 @@ function DocGenInner() {
           )}
           {page === "documents" && <DocumentsPage />}
           {page === "alerts" && <AlertsPage profile={profile} organizations={organizations} />}
+          {page === "readiness" && <AuditReadinessPage organizations={organizations} />}
         </Suspense>
       </main>
     </div>

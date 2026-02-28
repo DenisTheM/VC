@@ -768,3 +768,103 @@ export function exportAuditTrailAsPdf(opts: AuditTrailPdfOpts) {
   addFooter();
   doc.save(`${fileName}.pdf`);
 }
+
+// =============================================================================
+// Audit Readiness PDF
+// =============================================================================
+
+interface AuditScorePdf {
+  total: number;
+  label: string;
+  categories: Record<string, { score: number; weight: number; details: string[] }>;
+}
+
+export function exportAuditReadinessPdf(orgName: string, score: AuditScorePdf) {
+  const pdf = new jsPDF({ unit: "mm", format: "a4" });
+  const maxW = PAGE_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
+  let y = MARGIN_TOP;
+
+  // Header
+  pdf.setFontSize(8);
+  pdf.setTextColor(15, 61, 46);
+  pdf.text("Virtue Compliance", MARGIN_LEFT, 15);
+  pdf.setTextColor(156, 163, 175);
+  pdf.text(`SRO Audit Readiness Report — ${new Date().toLocaleDateString("de-CH")}`, PAGE_WIDTH - MARGIN_RIGHT, 15, { align: "right" });
+
+  // Title
+  pdf.setFontSize(20);
+  pdf.setTextColor(17, 24, 39);
+  pdf.text("Audit Readiness Report", MARGIN_LEFT, y);
+  y += 10;
+
+  pdf.setFontSize(14);
+  pdf.text(orgName, MARGIN_LEFT, y);
+  y += 10;
+
+  // Overall score
+  pdf.setFontSize(12);
+  pdf.setTextColor(15, 61, 46);
+  pdf.text(`Gesamtscore: ${score.total}% — ${score.label}`, MARGIN_LEFT, y);
+  y += 12;
+
+  // Category details
+  const catLabels: Record<string, string> = {
+    documents: "Dokumente (30%)",
+    profile: "Firmenprofil (15%)",
+    customers: "KYC-Kunden (25%)",
+    actions: "Offene Massnahmen (15%)",
+    training: "Schulung & Dokumentation (15%)",
+  };
+
+  for (const [key, label] of Object.entries(catLabels)) {
+    const cat = score.categories[key];
+    if (!cat) continue;
+
+    if (y > 270) {
+      pdf.addPage();
+      y = MARGIN_TOP;
+    }
+
+    pdf.setFontSize(11);
+    pdf.setTextColor(17, 24, 39);
+    pdf.text(`${label}: ${cat.score}%`, MARGIN_LEFT, y);
+    y += 6;
+
+    // Progress bar
+    const barWidth = maxW * 0.6;
+    pdf.setDrawColor(229, 231, 235);
+    pdf.setFillColor(229, 231, 235);
+    pdf.roundedRect(MARGIN_LEFT, y, barWidth, 3, 1.5, 1.5, "F");
+
+    const fillColor = cat.score >= 80 ? [22, 101, 78] : cat.score >= 50 ? [217, 119, 6] : [220, 38, 38];
+    pdf.setFillColor(fillColor[0], fillColor[1], fillColor[2]);
+    const filledWidth = (cat.score / 100) * barWidth;
+    if (filledWidth > 0) {
+      pdf.roundedRect(MARGIN_LEFT, y, filledWidth, 3, 1.5, 1.5, "F");
+    }
+    y += 7;
+
+    // Details
+    if (cat.details && cat.details.length > 0) {
+      pdf.setFontSize(9);
+      pdf.setTextColor(107, 114, 128);
+      for (const detail of cat.details) {
+        const lines = pdf.splitTextToSize(`• ${detail}`, maxW - 10);
+        for (const line of lines) {
+          pdf.text(line, MARGIN_LEFT + 4, y);
+          y += 4.5;
+        }
+      }
+    }
+    y += 4;
+  }
+
+  // Footer
+  pdf.setFontSize(8);
+  pdf.setTextColor(156, 163, 175);
+  pdf.text("Virtue Compliance GmbH · Uznach, Schweiz", MARGIN_LEFT, 285);
+  pdf.text("www.virtue-compliance.ch", PAGE_WIDTH - MARGIN_RIGHT, 285, { align: "right" });
+
+  const fileName = `audit-readiness-${orgName.replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().split("T")[0]}`;
+  pdf.save(`${fileName}.pdf`);
+}

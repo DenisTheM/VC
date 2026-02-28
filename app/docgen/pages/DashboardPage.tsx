@@ -10,7 +10,7 @@ interface DashboardPageProps {
   onGenerateDoc: (docKey: string) => void;
   profile: Record<string, unknown>;
   profOk: boolean;
-  stats: { documentCount: number; alertCount: number };
+  stats: { documentCount: number; alertCount: number; expiringDocCount?: number };
 }
 
 export function DashboardPage({ onNav, onGenerateDoc, profile, profOk, stats: dbStats }: DashboardPageProps) {
@@ -21,6 +21,7 @@ export function DashboardPage({ onNav, onGenerateDoc, profile, profOk, stats: db
     { label: "Dokumente", value: dbStats.documentCount, icon: icons.doc, color: T.primary, nav: "documents" },
     { label: "Jurisdiktionen", value: Object.values(JURIS).filter((j) => !j.soon).length, icon: icons.shield, color: T.accent, nav: "generate" },
     { label: "Reg. Alerts", value: dbStats.alertCount, icon: icons.alert, color: T.amber, nav: "alerts" },
+    ...(dbStats.expiringDocCount != null ? [{ label: "Ablaufend (30d)", value: dbStats.expiringDocCount, icon: icons.clock, color: "#dc2626", nav: "documents" }] : []),
   ];
 
   return (
@@ -71,7 +72,7 @@ export function DashboardPage({ onNav, onGenerateDoc, profile, profOk, stats: db
       )}
 
       {/* Stat cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 28 }}>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(stats.length, 4)}, 1fr)`, gap: 16, marginBottom: 28 }}>
         {stats.map((s) => (
           <div
             key={s.label}

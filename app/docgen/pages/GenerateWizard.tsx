@@ -9,6 +9,8 @@ import { JURIS } from "../data/jurisdictions";
 import { supabase } from "@shared/lib/supabase";
 import { useAutosave, readAutosave } from "@shared/hooks/useAutosave";
 import { MarkdownContent } from "@shared/components/MarkdownContent";
+import { PROFILE_FIELDS } from "@shared/data/profileFields";
+import { calcProfileCompletion } from "@shared/lib/profileCompletion";
 
 interface GenerateWizardProps {
   profile: Record<string, unknown>;
@@ -473,6 +475,26 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
           <Icon d={icons.back} size={14} color={T.ink3} />
           Zurück
         </button>
+        {/* Profile completeness warning */}
+        {(() => {
+          const pct = calcProfileCompletion(profile, PROFILE_FIELDS);
+          if (pct >= 70) return null;
+          return (
+            <div
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 14px", borderRadius: 8,
+                background: "#fffbeb", border: "1px solid #d9770622",
+                marginBottom: 14,
+              }}
+            >
+              <span style={{ fontSize: 16 }}>&#9888;</span>
+              <div style={{ flex: 1, fontSize: 12.5, color: "#92400e", fontFamily: T.sans }}>
+                <strong>Profil nur {pct}% vollständig</strong> — unvollständige Profile können zu ungenauen Angaben im Dokument führen.
+              </div>
+            </div>
+          );
+        })()}
         <h1
           style={{
             fontFamily: T.serif,

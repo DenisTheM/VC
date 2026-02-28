@@ -7,8 +7,10 @@ import {
   loadDocuments,
   loadDocumentAuditLog,
   loadDocumentVersions,
+  loadDocumentVersionCounts,
   updateDocumentStatus,
   updateDocumentContent,
+  updateDocumentReviewDate,
   bulkUpdateDocumentStatus,
   notifyApproval,
   type DbDocument,
@@ -50,12 +52,19 @@ export function DocumentsPage({ organizations }: DocumentsPageProps) {
   const [orgFilter, setOrgFilter] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<string | null>(null);
+  const [versionCounts, setVersionCounts] = useState<Record<string, number>>({});
 
   const load = () => {
     setLoading(true);
     setError(false);
     loadDocuments()
-      .then(setDocuments)
+      .then((docs) => {
+        setDocuments(docs);
+        const ids = docs.map((d) => d.id);
+        if (ids.length > 0) {
+          loadDocumentVersionCounts(ids).then(setVersionCounts).catch(() => {});
+        }
+      })
       .catch((err) => {
         console.error("Failed to load documents:", err);
         setError(true);
@@ -390,8 +399,28 @@ export function DocumentsPage({ organizations }: DocumentsPageProps) {
                         </div>
                       </div>
 
-                      {/* Version */}
-                      <span style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, flexShrink: 0 }}>{doc.version}</span>
+                      {/* Version + count badge */}
+                      <span style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}>
+                        {doc.version}
+                        {(versionCounts[doc.id] ?? 0) > 0 && (
+                          <span style={{ fontSize: 9, fontWeight: 700, color: T.accent, background: T.accentS, padding: "1px 5px", borderRadius: 4 }}>
+                            +{versionCounts[doc.id]}
+                          </span>
+                        )}
+                      </span>
+
+                      {/* Expiry badge */}
+                      {doc.status === "current" && doc.next_review && (() => {
+                        const days = Math.ceil((new Date(doc.next_review).getTime() - Date.now()) / 86400000);
+                        if (days > 30) return null;
+                        const expiryColor = days <= 0 ? { bg: "#fef2f2", color: "#dc2626" } : days <= 7 ? { bg: "#fef2f2", color: "#dc2626" } : { bg: "#fffbeb", color: "#d97706" };
+                        const label = days <= 0 ? "Abgelaufen" : `${days}d`;
+                        return (
+                          <span style={{ fontSize: 9, fontWeight: 700, color: expiryColor.color, background: expiryColor.bg, padding: "1px 5px", borderRadius: 4, flexShrink: 0 }}>
+                            {label}
+                          </span>
+                        );
+                      })()}
 
                       {/* Status badge */}
                       <span
@@ -442,6 +471,7 @@ function DocDetailView({
   const fmt = FORMAT_COLORS[doc.format] ?? FORMAT_COLORS.DOCX;
   const date = new Date(doc.updated_at).toLocaleDateString("de-CH", { day: "numeric", month: "short", year: "numeric" });
   const [changingStatus, setChangingStatus] = useState(false);
+  const [localNextReview, setLocalNextReview] = useState<string | null>(doc.next_review);
   const [versions, setVersions] = useState<DocVersion[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(true);
 
@@ -560,6 +590,39 @@ function DocDetailView({
           <div style={{ fontSize: 13, color: T.ink2, fontFamily: T.sans }}>{doc.legal_basis ?? "—"}</div>
         </div>
       </div>
+
+      {/* Next review date */}
+      {doc.status === "current" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, padding: "10px 14px", background: T.s1, borderRadius: T.r, border: `1px solid ${T.border}` }}>
+          <Icon d={icons.clock} size={14} color={T.ink3} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: T.ink2, fontFamily: T.sans }}>Nächste Überprüfung:</span>
+          <input
+            type="date"
+            value={localNextReview ?? ""}
+            onChange={async (e) => {
+              const val = e.target.value || null;
+              setLocalNextReview(val);
+              try {
+                await updateDocumentReviewDate(doc.id, val);
+              } catch (err) {
+                console.error("Failed to update review date:", err);
+                setLocalNextReview(doc.next_review); // revert on error
+              }
+            }}
+            style={{
+              padding: "4px 8px", borderRadius: 6,
+              border: `1px solid ${T.border}`, fontSize: 12, fontFamily: T.sans,
+              color: T.ink, background: "#fff",
+            }}
+          />
+          {localNextReview && (() => {
+            const days = Math.ceil((new Date(localNextReview).getTime() - Date.now()) / 86400000);
+            const color = days <= 0 ? "#dc2626" : days <= 7 ? "#dc2626" : days <= 30 ? "#d97706" : T.accent;
+            const label = days <= 0 ? "Abgelaufen" : `in ${days} Tagen`;
+            return <span style={{ fontSize: 11, fontWeight: 600, color, fontFamily: T.sans }}>{label}</span>;
+          })()}
+        </div>
+      )}
 
       {/* Status change — only show valid transitions */}
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>

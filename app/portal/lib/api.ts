@@ -30,6 +30,73 @@ export async function loadUserOrganization(userId: string): Promise<ClientOrg | 
   return { ...org, userRole: (data.role as OrgRole) || "viewer" };
 }
 
+// ─── Client Profile ─────────────────────────────────────────────────
+
+export async function loadClientProfile(orgId: string): Promise<Record<string, unknown> | null> {
+  const { data, error } = await supabase
+    .from("company_profiles")
+    .select("data")
+    .eq("organization_id", orgId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.data || typeof data.data !== "object") return null;
+  return data.data as Record<string, unknown>;
+}
+
+// ─── Client Messages ────────────────────────────────────────────────
+
+export interface ClientMessage {
+  id: string;
+  subject: string;
+  body: string;
+  created_at: string;
+  is_read: boolean;
+}
+
+export async function loadClientMessages(orgId: string): Promise<ClientMessage[]> {
+  const { data: messages, error } = await supabase
+    .from("admin_messages")
+    .select("id, subject, body, created_at")
+    .eq("organization_id", orgId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  if (!messages || messages.length === 0) return [];
+
+  // Load read status for current user (RLS filters to auth.uid())
+  const { data: reads, error: readsError } = await supabase
+    .from("admin_message_reads")
+    .select("message_id")
+    .in("message_id", messages.map((m: { id: string }) => m.id));
+
+  if (readsError) console.error("Failed to load read status:", readsError);
+
+  const readSet = new Set((reads ?? []).map((r: { message_id: string }) => r.message_id));
+
+  return messages.map((m: { id: string; subject: string; body: string; created_at: string }) => ({
+    id: m.id,
+    subject: m.subject,
+    body: m.body,
+    created_at: m.created_at,
+    is_read: readSet.has(m.id),
+  }));
+}
+
+export async function markMessageAsRead(messageId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase
+    .from("admin_message_reads")
+    .upsert(
+      { message_id: messageId, user_id: user.id },
+      { onConflict: "message_id,user_id" },
+    );
+
+  if (error) console.error("Failed to mark message as read:", error);
+}
+
 // ─── Client Alerts ──────────────────────────────────────────────────
 
 export interface PortalAlert {
@@ -185,6 +252,7 @@ export async function deleteActionComment(commentId: string): Promise<void> {
 export interface PortalDoc {
   id: string;
   category: string;
+  docType: string;
   name: string;
   desc: string;
   version: string;
@@ -192,6 +260,7 @@ export interface PortalDoc {
   updatedBy: string;
   updatedAt: string;
   approvedAt: string | null;
+  nextReview: string | null;
   format: "DOCX" | "PDF" | "PPTX" | "XLSX";
   pages: number;
   legalBasis: string;
@@ -214,6 +283,7 @@ export async function loadClientDocuments(organizationId: string): Promise<Porta
   return (data ?? []).map((doc: any) => ({
     id: doc.id,
     category: doc.category ?? doc.doc_type ?? "Allgemein",
+    docType: doc.doc_type ?? "",
     name: doc.name,
     desc: doc.description ?? "",
     version: doc.version ?? "v1.0",
@@ -226,6 +296,7 @@ export async function loadClientDocuments(organizationId: string): Promise<Porta
     alert: doc.alert_notice ?? null,
     content: doc.content ?? null,
     approvedAt: doc.approved_at ? formatDate(doc.approved_at) : null,
+    nextReview: doc.next_review ?? null,
   }));
 }
 

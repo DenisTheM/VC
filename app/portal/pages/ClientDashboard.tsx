@@ -4,8 +4,10 @@ import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import { useAuthContext } from "@shared/components/AuthContext";
 import { SEV } from "../data/clientData";
-import { loadClientAlerts, loadPortalStats, type ClientOrg, type PortalAlert } from "../lib/api";
+import { loadClientAlerts, loadPortalStats, loadClientProfile, type ClientOrg, type PortalAlert } from "../lib/api";
 import { loadCustomerStats, type CustomerStats } from "../lib/customerApi";
+import { PROFILE_FIELDS } from "@shared/data/profileFields";
+import { calcProfileCompletion, completionColor } from "@shared/lib/profileCompletion";
 
 interface ClientDashboardProps {
   onNav: (id: string) => void;
@@ -21,6 +23,7 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
   const [alerts, setAlerts] = useState<PortalAlert[]>([]);
   const [stats, setStats] = useState({ totalAlerts: 0, newAlerts: 0, totalDocs: 0, currentDocs: 0 });
   const [custStats, setCustStats] = useState<CustomerStats>({ total: 0, active: 0, reviewDue: 0, docsDraft: 0, docsReview: 0, docsApproved: 0 });
+  const [profilePct, setProfilePct] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,11 +32,13 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
       loadClientAlerts(org.id),
       loadPortalStats(org.id),
       loadCustomerStats(org.id),
+      loadClientProfile(org.id),
     ])
-      .then(([alertsData, statsData, custStatsData]) => {
+      .then(([alertsData, statsData, custStatsData, profileData]) => {
         setAlerts(alertsData);
         setStats(statsData);
         setCustStats(custStatsData);
+        setProfilePct(calcProfileCompletion(profileData, PROFILE_FIELDS));
       })
       .catch((err) => console.error("Dashboard load error:", err))
       .finally(() => setLoading(false));
@@ -228,12 +233,28 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
             </div>
             <span style={{ fontSize: 12.5, color: T.ink3, fontFamily: T.sans, fontWeight: 500 }}>Compliance Status</span>
           </div>
-          <div style={{ fontSize: 32, fontWeight: 700, color: T.accent, fontFamily: T.sans, letterSpacing: "-1px" }}>
-            Aktiv
-          </div>
-          <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
-            Betreuung durch Elena Hartmann
-          </div>
+          {profilePct != null ? (
+            <>
+              <div style={{ fontSize: 32, fontWeight: 700, color: completionColor(profilePct).color, fontFamily: T.sans, letterSpacing: "-1px" }}>
+                {profilePct}%
+              </div>
+              <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
+                Profil-Vollständigkeit
+              </div>
+              <div style={{ marginTop: 6, height: 4, borderRadius: 2, background: T.s2 }}>
+                <div style={{ height: 4, borderRadius: 2, background: completionColor(profilePct).color, width: `${profilePct}%`, transition: "width 0.3s" }} />
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 32, fontWeight: 700, color: T.accent, fontFamily: T.sans, letterSpacing: "-1px" }}>
+                Aktiv
+              </div>
+              <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
+                Betreuung durch Virtue Compliance
+              </div>
+            </>
+          )}
         </div>
       </div>
 

@@ -49,13 +49,14 @@ export interface Organization {
   contact_name: string | null;
   contact_role: string | null;
   contact_email: string | null;
+  digest_opt_out: boolean;
   created_at: string;
 }
 
 export async function loadOrganizations(): Promise<Organization[]> {
   const { data, error } = await supabase
     .from("organizations")
-    .select("id, name, short_name, industry, sro, country, contact_name, contact_role, contact_email, created_at")
+    .select("id, name, short_name, industry, sro, country, contact_name, contact_role, contact_email, digest_opt_out, created_at")
     .order("name");
 
   if (error) throw error;
@@ -75,7 +76,7 @@ export async function createOrganization(org: {
   const { data, error } = await supabase
     .from("organizations")
     .insert(org)
-    .select("id, name, short_name, industry, sro, country, contact_name, contact_role, contact_email, created_at")
+    .select("id, name, short_name, industry, sro, country, contact_name, contact_role, contact_email, digest_opt_out, created_at")
     .single();
 
   if (error) throw error;
@@ -84,7 +85,7 @@ export async function createOrganization(org: {
 
 export async function updateOrganization(
   orgId: string,
-  updates: { contact_email?: string | null },
+  updates: { contact_email?: string | null; digest_opt_out?: boolean },
 ): Promise<void> {
   const { error } = await supabase
     .from("organizations")
@@ -536,6 +537,7 @@ export interface DbDocument {
   pages: number | null;
   legal_basis: string | null;
   wizard_answers: Record<string, unknown> | null;
+  next_review: string | null;
   created_at: string;
   updated_at: string;
   organizations?: { name: string; short_name: string | null } | null;
@@ -746,6 +748,21 @@ export interface DocVersion {
   created_at: string;
 }
 
+export async function loadDocumentVersionCounts(docIds: string[]): Promise<Record<string, number>> {
+  if (docIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from("document_versions")
+    .select("document_id")
+    .in("document_id", docIds);
+
+  if (error) throw error;
+  const counts: Record<string, number> = {};
+  (data ?? []).forEach((row: { document_id: string }) => {
+    counts[row.document_id] = (counts[row.document_id] || 0) + 1;
+  });
+  return counts;
+}
+
 export async function loadDocumentVersions(docId: string): Promise<DocVersion[]> {
   const { data, error } = await supabase
     .from("document_versions")
@@ -878,10 +895,111 @@ export async function loadAdminMessages(organizationId: string) {
   return data ?? [];
 }
 
+// ─── Document Review Date ────────────────────────────────────────────
+
+export async function updateDocumentReviewDate(
+  docId: string,
+  nextReview: string | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from("documents")
+    .update({ next_review: nextReview, updated_at: new Date().toISOString() })
+    .eq("id", docId);
+
+  if (error) throw error;
+}
+
+// ─── Company Profiles (Batch) ───────────────────────────────────────
+
+export async function loadAllCompanyProfiles(): Promise<Map<string, Record<string, unknown>>> {
+  const { data, error } = await supabase
+    .from("company_profiles")
+    .select("organization_id, data");
+
+  if (error) throw error;
+  const map = new Map<string, Record<string, unknown>>();
+  (data ?? []).forEach((row: { organization_id: string; data: unknown }) => {
+    if (row.data && typeof row.data === "object") {
+      map.set(row.organization_id, row.data as Record<string, unknown>);
+    }
+  });
+  return map;
+}
+
+// ─── Audit Score ────────────────────────────────────────────────────
+
+export interface OrgAuditData {
+  orgId: string;
+  documents: { doc_type: string; status: string; next_review: string | null }[];
+  openActionCount: number;
+  overdueActionCount: number;
+}
+
+export async function loadAllAuditData(): Promise<OrgAuditData[]> {
+  // Batch-load documents and actions for all orgs
+  const [docsRes, actionsRes] = await Promise.all([
+    supabase
+      .from("documents")
+      .select("organization_id, doc_type, status, next_review"),
+    supabase
+      .from("client_alert_actions")
+      .select("status, due_date, alert_affected_clients!inner(organization_id)")
+      .eq("status", "offen"),
+  ]);
+
+  if (docsRes.error) throw docsRes.error;
+  if (actionsRes.error) throw actionsRes.error;
+
+  // Group by org
+  const orgDocs = new Map<string, { doc_type: string; status: string; next_review: string | null }[]>();
+  for (const doc of docsRes.data ?? []) {
+    const arr = orgDocs.get(doc.organization_id) ?? [];
+    arr.push({ doc_type: doc.doc_type, status: doc.status, next_review: doc.next_review });
+    orgDocs.set(doc.organization_id, arr);
+  }
+
+  const orgActions = new Map<string, { open: number; overdue: number }>();
+  const today = new Date().toISOString().split("T")[0];
+  for (const action of actionsRes.data ?? []) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const orgId = (action as any).alert_affected_clients?.organization_id;
+    if (!orgId) continue;
+    const current = orgActions.get(orgId) ?? { open: 0, overdue: 0 };
+    current.open++;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((action as any).due_date && (action as any).due_date < today) current.overdue++;
+    orgActions.set(orgId, current);
+  }
+
+  // Combine all org IDs
+  const allOrgIds = new Set([...orgDocs.keys(), ...orgActions.keys()]);
+  return [...allOrgIds].map((orgId) => ({
+    orgId,
+    documents: orgDocs.get(orgId) ?? [],
+    openActionCount: orgActions.get(orgId)?.open ?? 0,
+    overdueActionCount: orgActions.get(orgId)?.overdue ?? 0,
+  }));
+}
+
+export async function cacheAuditScore(orgId: string, score: number, scoreData: unknown): Promise<void> {
+  const { error } = await supabase
+    .from("organizations")
+    .update({
+      audit_score: Math.round(score),
+      audit_score_data: scoreData,
+      audit_score_at: new Date().toISOString(),
+    })
+    .eq("id", orgId);
+
+  if (error) throw error;
+}
+
 // ─── Dashboard Stats ───────────────────────────────────────────────
 
 export async function loadDashboardStats() {
-  const [docsRes, activeAlertsRes, draftAlertsRes] = await Promise.all([
+  const thirtyDaysFromNow = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
+
+  const [docsRes, activeAlertsRes, draftAlertsRes, expiringRes] = await Promise.all([
     supabase.from("documents").select("id", { count: "exact", head: true }),
     supabase
       .from("regulatory_alerts")
@@ -891,11 +1009,18 @@ export async function loadDashboardStats() {
       .from("regulatory_alerts")
       .select("id", { count: "exact", head: true })
       .eq("status", "draft"),
+    supabase
+      .from("documents")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "current")
+      .not("next_review", "is", null)
+      .lte("next_review", thirtyDaysFromNow),
   ]);
 
   return {
     documentCount: docsRes.count ?? 0,
     alertCount: activeAlertsRes.count ?? 0,
     draftAlertCount: draftAlertsRes.count ?? 0,
+    expiringDocCount: expiringRes.count ?? 0,
   };
 }

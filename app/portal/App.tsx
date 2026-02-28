@@ -14,6 +14,8 @@ const ClientAlerts = lazy(() => import("./pages/ClientAlerts").then((m) => ({ de
 const ClientDocs = lazy(() => import("./pages/ClientDocs").then((m) => ({ default: m.ClientDocs })));
 const ClientCustomers = lazy(() => import("./pages/ClientCustomers").then((m) => ({ default: m.ClientCustomers })));
 const ClientHelp = lazy(() => import("./pages/ClientHelp").then((m) => ({ default: m.ClientHelp })));
+const ClientMessages = lazy(() => import("./pages/ClientMessages").then((m) => ({ default: m.ClientMessages })));
+const ClientAuditReadiness = lazy(() => import("./pages/ClientAuditReadiness").then((m) => ({ default: m.ClientAuditReadiness })));
 const DocumentApproval = lazy(() => import("./pages/DocumentApproval").then((m) => ({ default: m.DocumentApproval })));
 
 /* ------------------------------------------------------------------ */
@@ -26,7 +28,9 @@ const BASE_NAV_ITEMS: readonly { id: string; icon: string; label: string; approv
   { id: "docs", icon: icons.doc, label: "Dokumente" },
   { id: "approvals", icon: icons.check, label: "Freigaben", approverOnly: true },
   { id: "customers", icon: icons.users, label: "Kunden" },
-  { id: "help", icon: icons.mail, label: "Hilfe" },
+  { id: "readiness", icon: icons.shield, label: "Audit Readiness" },
+  { id: "messages", icon: icons.mail, label: "Nachrichten" },
+  { id: "help", icon: icons.phone, label: "Hilfe" },
 ];
 
 function ClientSidebar({
@@ -425,6 +429,8 @@ function PortalContent() {
           {page === "docs" && <ClientDocs org={org} initialDocName={pendingDocName} onDocConsumed={() => setPendingDocName(null)} onAlertNav={handleAlertNav} />}
           {page === "approvals" && <DocumentApproval org={org} />}
           {page === "customers" && <ClientCustomers org={org} onNav={handleNav} />}
+          {page === "readiness" && <ClientAuditReadiness org={org} />}
+          {page === "messages" && <ClientMessages org={org} />}
           {page === "help" && <ClientHelp org={org} />}
         </Suspense>
       </div>

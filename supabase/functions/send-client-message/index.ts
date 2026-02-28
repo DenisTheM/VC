@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
           type: "admin_message",
           title: subject,
           body: body.length > 200 ? body.substring(0, 200) + "..." : body,
-          link: "/app/portal#dashboard",
+          link: "/app/portal#messages",
         });
       } catch { /* ignore notification insert errors */ }
 
@@ -185,7 +185,7 @@ function buildMessageEmail(subject: string, body: string, orgName: string, recip
       <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 16px;">Guten Tag ${escapeHtml(recipientName)},</p>
       <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 24px;">${safeBody}</p>
       <div style="text-align:center;margin-top:24px;">
-        <a href="${PORTAL_URL}/app/portal"
+        <a href="${PORTAL_URL}/app/portal#messages"
            style="display:inline-block;background:#0f3d2e;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">
           Im Portal ansehen
         </a>

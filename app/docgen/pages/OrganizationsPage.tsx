@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
-import { createOrganization, updateOrganization, deleteOrganization, loadDocCountsByOrg, searchZefix, loadOrgMembers, updateOrgMemberRole, removeOrgMember, inviteMember, sendClientMessage, type Organization, type ZefixResult, type OrgMember, type OrgRole } from "../lib/api";
+import { createOrganization, updateOrganization, deleteOrganization, loadDocCountsByOrg, loadAllCompanyProfiles, searchZefix, loadOrgMembers, updateOrgMemberRole, removeOrgMember, inviteMember, sendClientMessage, type Organization, type ZefixResult, type OrgMember, type OrgRole } from "../lib/api";
 import { useAutosave, readAutosave } from "@shared/hooks/useAutosave";
+import { PROFILE_FIELDS } from "@shared/data/profileFields";
+import { calcProfileCompletion, completionColor } from "@shared/lib/profileCompletion";
+import { MESSAGE_TEMPLATES, fillTemplate } from "../data/messageTemplates";
 
 const INDUSTRIES = [
   "Fintech",
@@ -56,6 +59,7 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
   const [membersOrgId, setMembersOrgId] = useState<string | null>(null);
   const [messageOrgId, setMessageOrgId] = useState<string | null>(null);
+  const [profileData, setProfileData] = useState<Map<string, Record<string, unknown>>>(new Map());
 
   // Zefix search state
   const [zefixQuery, setZefixQuery] = useState("");
@@ -66,6 +70,7 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
 
   useEffect(() => {
     loadDocCountsByOrg().then(setDocCounts).catch(console.error);
+    loadAllCompanyProfiles().then(setProfileData).catch(console.error);
   }, []);
   const orgDefaults = { name: "", short_name: "", industry: "", sro: "", country: "CH", contact_name: "", contact_role: "", contact_email: "" };
   const [newOrg, setNewOrg] = useState(() => readAutosave<typeof orgDefaults>("vc:docgen:create-org") ?? orgDefaults);
@@ -594,8 +599,17 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
                     {org.contact_role ? ` (${org.contact_role})` : ""}
                   </span>
                 )}
-                <span style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, marginLeft: "auto" }}>
-                  <Icon d={icons.doc} size={12} color={T.ink4} /> {docCounts[org.id] || 0} Dok.
+                <span style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+                  {(() => {
+                    const pct = calcProfileCompletion(profileData.get(org.id) ?? null, PROFILE_FIELDS);
+                    const c = completionColor(pct);
+                    return (
+                      <span style={{ fontSize: 10, fontWeight: 600, color: c.color, background: c.bg, padding: "1px 6px", borderRadius: 4 }}>
+                        {pct}%
+                      </span>
+                    );
+                  })()}
+                  <span><Icon d={icons.doc} size={12} color={T.ink4} /> {docCounts[org.id] || 0} Dok.</span>
                 </span>
               </div>
               {org.contact_email && (
@@ -603,6 +617,29 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
                   CO: {org.contact_email}
                 </div>
               )}
+              {/* Digest toggle */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                <label style={{ fontSize: 11, color: T.ink3, fontFamily: T.sans, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={!org.digest_opt_out}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={async (e) => {
+                      const newVal = !e.target.checked;
+                      try {
+                        await updateOrganization(org.id, { digest_opt_out: newVal });
+                        // Update the org in-place (React reconciles via key prop)
+                        (org as unknown as Record<string, unknown>).digest_opt_out = newVal;
+                        setDocCounts((prev) => ({ ...prev })); // force re-render
+                      } catch (err) {
+                        console.error("Failed to update digest setting:", err);
+                      }
+                    }}
+                    style={{ accentColor: T.accent }}
+                  />
+                  Wöchentlicher Digest
+                </label>
+              </div>
               {/* Actions row */}
               <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
                 <button
@@ -697,6 +734,8 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
         <SendMessagePanel
           orgId={messageOrgId}
           orgName={organizations.find((o) => o.id === messageOrgId)?.name ?? ""}
+          orgContactName={organizations.find((o) => o.id === messageOrgId)?.contact_name}
+          orgContactSalutation={null}
           onClose={() => setMessageOrgId(null)}
         />
       )}
@@ -1058,10 +1097,14 @@ function OrgMembersPanel({
 function SendMessagePanel({
   orgId,
   orgName,
+  orgContactName,
+  orgContactSalutation,
   onClose,
 }: {
   orgId: string;
   orgName: string;
+  orgContactName?: string | null;
+  orgContactSalutation?: string | null;
   onClose: () => void;
 }) {
   const [subject, setSubject] = useState("");
@@ -1124,6 +1167,45 @@ function SendMessagePanel({
         >
           <Icon d="M6 18L18 6M6 6l12 12" size={16} color={T.ink4} />
         </button>
+      </div>
+
+      {/* Template Gallery */}
+      <div style={{ padding: "12px 22px", borderBottom: `1px solid ${T.borderL}` }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: T.ink4, fontFamily: T.sans, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          Vorlagen
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {MESSAGE_TEMPLATES.map((tpl) => {
+            const catColors: Record<string, { bg: string; color: string }> = {
+              "Erinnerung": { bg: "#fffbeb", color: "#d97706" },
+              "Information": { bg: "#eff6ff", color: "#3b82f6" },
+              "Warnung": { bg: "#fef2f2", color: "#dc2626" },
+              "Onboarding": { bg: T.accentS, color: T.accent },
+            };
+            const cat = catColors[tpl.category] ?? { bg: T.s2, color: T.ink3 };
+            return (
+              <button
+                key={tpl.id}
+                onClick={() => {
+                  const filled = fillTemplate(tpl, { name: orgName, contact_name: orgContactName, contact_salutation: orgContactSalutation });
+                  setSubject(filled.subject);
+                  setBody(filled.body);
+                  setResult(null);
+                }}
+                style={{
+                  padding: "6px 12px", borderRadius: 8,
+                  border: `1px solid ${cat.color}22`, background: cat.bg,
+                  fontSize: 11.5, fontWeight: 600, color: cat.color,
+                  cursor: "pointer", fontFamily: T.sans,
+                  display: "flex", alignItems: "center", gap: 4,
+                }}
+              >
+                {tpl.name}
+                <span style={{ fontSize: 9, opacity: 0.7 }}>{tpl.category}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Form */}

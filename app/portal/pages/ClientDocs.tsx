@@ -494,6 +494,15 @@ export function ClientDocs({ org, initialDocName, onDocConsumed, onAlertNav }: C
                           </span>
                           <span style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, flexShrink: 0 }}>{doc.version}</span>
                         </div>
+                        {/* Expiry info */}
+                        {doc.status === "current" && doc.nextReview && (() => {
+                          const days = Math.ceil((new Date(doc.nextReview).getTime() - Date.now()) / 86400000);
+                          const expiryColor = days <= 0 ? "#dc2626" : days <= 30 ? "#d97706" : T.ink4;
+                          const label = days <= 0 ? "Abgelaufen" : days <= 30 ? `Läuft in ${days} Tagen ab` : `Gültig bis ${new Date(doc.nextReview).toLocaleDateString("de-CH")}`;
+                          return (
+                            <div style={{ fontSize: 11, color: expiryColor, fontFamily: T.sans, marginTop: 2 }}>{label}</div>
+                          );
+                        })()}
                       </div>
 
                       {/* Status badge */}
