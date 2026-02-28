@@ -1,5 +1,5 @@
 {
-  "regions": ["zrh1"],
+  "regions": ["fra1"],
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "trailingSlash": false,
