@@ -25,4 +25,23 @@ export const T = {
   shLg: "0 10px 40px rgba(0,0,0,0.08)",
   sans: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
   serif: "'Source Serif 4', Georgia, serif",
+
+  // Typography scale
+  fs: {
+    xs: 11,
+    sm: 13,
+    md: 14.5,
+    lg: 18,
+    xl: 24,
+    xxl: 28,
+  },
+
+  // Spacing scale
+  sp: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+  },
 } as const;

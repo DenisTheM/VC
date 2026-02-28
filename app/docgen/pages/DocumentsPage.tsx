@@ -445,11 +445,13 @@ function DocDetailView({
   const [versions, setVersions] = useState<DocVersion[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(true);
 
-  // Content editing state (only for draft documents)
+  // Content editing state
+  const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(doc.content ?? "");
   const [savingContent, setSavingContent] = useState(false);
   const [contentSaved, setContentSaved] = useState(false);
   const isDraft = doc.status === "draft";
+  const showEditor = isDraft || editing;
   const contentDirty = editContent !== (doc.content ?? "");
 
   useEffect(() => {
@@ -599,12 +601,12 @@ function DocDetailView({
                 exportDocumentAsPdf({
                   name: doc.name,
                   version: doc.version,
-                  content: isDraft ? editContent : doc.content!,
+                  content: showEditor ? editContent : doc.content!,
                   legalBasis: doc.legal_basis || undefined,
                   orgName: doc.organizations?.name || undefined,
                 });
               }}
-              disabled={!(isDraft ? editContent : doc.content)}
+              disabled={!(showEditor ? editContent : doc.content)}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -623,7 +625,36 @@ function DocDetailView({
               <Icon d={icons.download} size={13} color="#fff" />
               PDF Download
             </button>
-            {isDraft && (
+            {/* Edit toggle — show for non-draft documents with content */}
+            {!isDraft && doc.content && (
+              <button
+                onClick={() => {
+                  if (editing) {
+                    // Switching back to preview — discard unsaved changes
+                    setEditContent(doc.content ?? "");
+                  }
+                  setEditing(!editing);
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  border: `1px solid ${T.border}`,
+                  background: editing ? T.accentS : "#fff",
+                  color: editing ? T.accent : T.ink2,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: T.sans,
+                }}
+              >
+                <Icon d={editing ? "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" : "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"} size={13} color={editing ? T.accent : T.ink2} />
+                {editing ? "Vorschau" : "Bearbeiten"}
+              </button>
+            )}
+            {showEditor && (
               <>
                 <button
                   onClick={handleSaveContent}
@@ -654,7 +685,22 @@ function DocDetailView({
               </>
             )}
           </div>
-          {isDraft ? (
+          {/* Warning for editing non-draft documents */}
+          {editing && !isDraft && (
+            <div style={{
+              fontSize: 12.5,
+              color: T.amber,
+              fontFamily: T.sans,
+              padding: "8px 14px",
+              background: T.amberS,
+              borderRadius: 8,
+              marginBottom: 10,
+              border: `1px solid ${T.amber}22`,
+            }}>
+              Achtung: Dieses Dokument hat den Status &laquo;{STATUS_COLORS[doc.status]?.label ?? doc.status}&raquo;. Änderungen werden gespeichert, aber der Status bleibt unverändert.
+            </div>
+          )}
+          {showEditor ? (
             <textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}

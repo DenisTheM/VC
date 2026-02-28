@@ -841,6 +841,40 @@ export async function resendAlertNotification(alertId: string): Promise<{ sent: 
   return data as { sent: number; errors: number };
 }
 
+// ─── Admin Messages ─────────────────────────────────────────────────
+
+export async function sendClientMessage(
+  organizationId: string,
+  subject: string,
+  body: string,
+): Promise<{ success: boolean; sent: number; message?: string }> {
+  const { data, error } = await supabase.functions.invoke("send-client-message", {
+    body: { organization_id: organizationId, subject, body },
+  });
+
+  if (error) {
+    const msg = typeof error === "object" && "message" in error ? error.message : String(error);
+    return { success: false, sent: 0, message: msg };
+  }
+
+  return {
+    success: data?.success ?? true,
+    sent: data?.sent ?? 0,
+    message: data?.message,
+  };
+}
+
+export async function loadAdminMessages(organizationId: string) {
+  const { data, error } = await supabase
+    .from("admin_messages")
+    .select("id, subject, body, sent_by, created_at")
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ─── Dashboard Stats ───────────────────────────────────────────────
 
 export async function loadDashboardStats() {

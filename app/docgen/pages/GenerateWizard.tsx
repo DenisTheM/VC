@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
@@ -25,12 +25,86 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
   const [docKey, setDocKey] = useState<string | null>(saved?.docKey ?? initialDocKey ?? null);
   const [jurisdiction, setJurisdiction] = useState<string | null>(saved?.jurisdiction ?? null);
   const [answers, setAnswers] = useState<Record<string, unknown>>(saved?.answers ?? {});
+  const [chapters, setChapters] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [generatingStart, setGeneratingStart] = useState<number | null>(null);
+  const [slowHint, setSlowHint] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const autosave = useAutosave({ key: autosaveKey, data: { step, docKey, jurisdiction, answers }, enabled: step < 3 });
-
   const doc: DocType | null = docKey ? DOC_TYPES[docKey] : null;
+
+  // Initialize chapters from doc type when entering step 2
+  useEffect(() => {
+    if (doc && step === 2 && chapters.length === 0) {
+      setChapters([...doc.chapters]);
+    }
+  }, [doc, step]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Show slow-generation hint after 60 seconds
+  useEffect(() => {
+    if (!generating || !generatingStart) return;
+    const timer = setTimeout(() => setSlowHint(true), 60_000);
+    return () => clearTimeout(timer);
+  }, [generating, generatingStart]);
+
+  const STEP_LABELS = ["Dokumenttyp", "Jurisdiktion", "Fragen & Kapitel", "Generierung"];
+
+  const StepIndicator = () => (
+    <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 24 }}>
+      {STEP_LABELS.map((label, i) => {
+        const isActive = step === i;
+        const isDone = step > i;
+        return (
+          <div key={i} style={{ display: "flex", alignItems: "center", flex: i < STEP_LABELS.length - 1 ? 1 : "none" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: "50%",
+                  background: isDone ? T.accent : isActive ? T.accent : T.s2,
+                  color: isDone || isActive ? "#fff" : T.ink4,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: T.sans,
+                  flexShrink: 0,
+                }}
+              >
+                {isDone ? "\u2713" : i + 1}
+              </div>
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? T.ink : isDone ? T.accent : T.ink4,
+                  fontFamily: T.sans,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {label}
+              </span>
+            </div>
+            {i < STEP_LABELS.length - 1 && (
+              <div
+                style={{
+                  flex: 1,
+                  height: 2,
+                  background: isDone ? T.accent : T.s2,
+                  margin: "0 8px",
+                  borderRadius: 1,
+                  minWidth: 16,
+                }}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 
   /* Guard: no org selected */
   if (!orgId) {
@@ -69,6 +143,7 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
   if (step === 0) {
     return (
       <div>
+        <StepIndicator />
         <SectionLabel text="Ebene B" />
         <h1
           style={{
@@ -171,6 +246,7 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
 
     return (
       <div>
+        <StepIndicator />
         <SectionLabel text="Ebene B" />
         <button
           onClick={() => {
@@ -376,6 +452,7 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
   if (step === 2 && doc) {
     return (
       <div>
+        <StepIndicator />
         <SectionLabel text="Ebene B" />
         <button
           onClick={() => setStep(1)}
@@ -429,6 +506,135 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
               onChange={(v) => setAnswers((prev) => ({ ...prev, [f.id]: v }))}
             />
           ))}
+
+          {/* Custom prompt field */}
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${T.borderL}` }}>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: T.ink2, fontFamily: T.sans, marginBottom: 6 }}>
+              Zusätzliche Anweisungen (optional)
+            </label>
+            <textarea
+              value={(answers.__customPrompt as string) ?? ""}
+              onChange={(e) => setAnswers((prev) => ({ ...prev, __customPrompt: e.target.value }))}
+              placeholder="z.B. Bitte besonders auf Crypto-Risiken eingehen..."
+              rows={3}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                borderRadius: 8,
+                border: `1px solid ${T.border}`,
+                fontSize: 13,
+                fontFamily: T.sans,
+                color: T.ink2,
+                resize: "vertical",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+            <div style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans, marginTop: 4 }}>
+              Ihre Anweisungen werden bei der Generierung berücksichtigt.
+            </div>
+          </div>
+        </div>
+
+        {/* TOC Editor */}
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: T.rLg,
+            padding: "24px 28px",
+            border: `1px solid ${T.border}`,
+            boxShadow: T.shSm,
+            marginBottom: 24,
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans, marginBottom: 14 }}>
+            Kapitelstruktur anpassen
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {chapters.map((ch, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, width: 20, textAlign: "right", flexShrink: 0 }}>{i + 1}.</span>
+                <input
+                  type="text"
+                  value={ch}
+                  onChange={(e) => {
+                    const next = [...chapters];
+                    next[i] = e.target.value;
+                    setChapters(next);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "7px 10px",
+                    borderRadius: 6,
+                    border: `1px solid ${T.border}`,
+                    fontSize: 13,
+                    fontFamily: T.sans,
+                    color: T.ink2,
+                    outline: "none",
+                  }}
+                />
+                {/* Move up */}
+                <button
+                  onClick={() => {
+                    if (i === 0) return;
+                    const next = [...chapters];
+                    [next[i - 1], next[i]] = [next[i], next[i - 1]];
+                    setChapters(next);
+                  }}
+                  disabled={i === 0}
+                  style={{ background: "none", border: "none", cursor: i === 0 ? "default" : "pointer", padding: 2, opacity: i === 0 ? 0.3 : 1 }}
+                  title="Nach oben"
+                >
+                  <Icon d="M5 15l7-7 7 7" size={14} color={T.ink3} />
+                </button>
+                {/* Move down */}
+                <button
+                  onClick={() => {
+                    if (i === chapters.length - 1) return;
+                    const next = [...chapters];
+                    [next[i], next[i + 1]] = [next[i + 1], next[i]];
+                    setChapters(next);
+                  }}
+                  disabled={i === chapters.length - 1}
+                  style={{ background: "none", border: "none", cursor: i === chapters.length - 1 ? "default" : "pointer", padding: 2, opacity: i === chapters.length - 1 ? 0.3 : 1 }}
+                  title="Nach unten"
+                >
+                  <Icon d="M19 9l-7 7-7-7" size={14} color={T.ink3} />
+                </button>
+                {/* Delete */}
+                <button
+                  onClick={() => {
+                    setChapters(chapters.filter((_, j) => j !== i));
+                  }}
+                  disabled={chapters.length <= 1}
+                  style={{ background: "none", border: "none", cursor: chapters.length <= 1 ? "default" : "pointer", padding: 2, opacity: chapters.length <= 1 ? 0.3 : 1 }}
+                  title="Entfernen"
+                >
+                  <Icon d="M6 18L18 6M6 6l12 12" size={14} color={T.red} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => setChapters([...chapters, ""])}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              marginTop: 10,
+              padding: "6px 14px",
+              borderRadius: 6,
+              border: `1px dashed ${T.border}`,
+              background: "none",
+              color: T.ink3,
+              fontSize: 12.5,
+              cursor: "pointer",
+              fontFamily: T.sans,
+            }}
+          >
+            <Icon d={icons.plus} size={13} color={T.ink3} />
+            Kapitel hinzufügen
+          </button>
         </div>
 
         <button
@@ -463,6 +669,8 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
         setError("Keine Organisation ausgewählt. Bitte wählen Sie zuerst eine Organisation.");
       } else {
         setGenerating(true);
+        setGeneratingStart(Date.now());
+        setSlowHint(false);
         supabase.functions
           .invoke("generate-document", {
             body: {
@@ -471,12 +679,25 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
               companyProfile: profile,
               answers,
               organizationId: orgId,
+              chapters: chapters.filter((c) => c.trim()),
             },
           })
           .then(({ data, error: fnError }) => {
             setGenerating(false);
+            setGeneratingStart(null);
+            setSlowHint(false);
             if (fnError) {
-              setError(fnError.message || "Fehler bei der Generierung.");
+              // Try to parse the edge function's detailed error
+              let msg = "Fehler bei der Generierung.";
+              try {
+                const parsed = typeof fnError.message === "string" ? JSON.parse(fnError.message) : null;
+                if (parsed?.error) msg = parsed.error;
+              } catch {
+                msg = fnError.message || msg;
+              }
+              // Also check if data contains an error (Supabase returns 2xx with error in body sometimes)
+              if (data?.error) msg = data.error;
+              setError(msg);
             } else {
               const content = data?.document?.content;
               setResult(content || (typeof data === "string" ? data : "Dokument wurde generiert, aber kein Inhalt erhalten."));
@@ -485,6 +706,8 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
           })
           .catch((err: Error) => {
             setGenerating(false);
+            setGeneratingStart(null);
+            setSlowHint(false);
             setError(err.message || "Unbekannter Fehler.");
           });
       }
@@ -543,6 +766,11 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
             />
           </div>
           <style>{`@keyframes pulse { 0%, 100% { opacity: 0.4; transform: translateX(-30%); } 50% { opacity: 1; transform: translateX(70%); } }`}</style>
+          {slowHint && (
+            <div style={{ marginTop: 16, fontSize: 13, color: T.amber, fontFamily: T.sans, textAlign: "center" }}>
+              Generierung dauert länger als üblich — bitte haben Sie Geduld...
+            </div>
+          )}
           <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
             {doc.chapters.slice(0, 5).map((ch, i) => (
               <div
@@ -594,7 +822,7 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
           <p style={{ fontSize: 14, color: T.red, fontFamily: T.sans, margin: "0 0 24px", textAlign: "center", maxWidth: 400 }}>
             {error}
           </p>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button
               onClick={() => {
                 setError(null);
@@ -617,6 +845,31 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
               }}
             >
               Erneut versuchen
+            </button>
+            <button
+              onClick={() => {
+                setStep(2);
+                setResult(null);
+                setError(null);
+                setGenerating(false);
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 22px",
+                borderRadius: 8,
+                border: `1px solid ${T.border}`,
+                background: "#fff",
+                color: T.ink,
+                fontSize: 13.5,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: T.sans,
+              }}
+            >
+              <Icon d={icons.back} size={14} color={T.ink} />
+              Zurück zu Fragen
             </button>
             <button
               onClick={() => onNav("dashboard")}
@@ -725,10 +978,36 @@ export function GenerateWizard({ profile, onNav, orgId, orgName, initialDocKey }
             </button>
             <button
               onClick={() => {
+                setStep(2);
+                setResult(null);
+                setError(null);
+                setGenerating(false);
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "11px 24px",
+                borderRadius: 8,
+                border: `1px solid ${T.border}`,
+                background: "#fff",
+                color: T.ink,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: T.sans,
+              }}
+            >
+              <Icon d={icons.back} size={16} color={T.ink} />
+              Antworten anpassen
+            </button>
+            <button
+              onClick={() => {
                 setStep(0);
                 setDocKey(null);
                 setJurisdiction(null);
                 setAnswers({});
+                setChapters([]);
                 setResult(null);
                 setError(null);
               }}

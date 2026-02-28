@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
-import { createOrganization, updateOrganization, deleteOrganization, loadDocCountsByOrg, searchZefix, loadOrgMembers, updateOrgMemberRole, removeOrgMember, inviteMember, type Organization, type ZefixResult, type OrgMember, type OrgRole } from "../lib/api";
+import { createOrganization, updateOrganization, deleteOrganization, loadDocCountsByOrg, searchZefix, loadOrgMembers, updateOrgMemberRole, removeOrgMember, inviteMember, sendClientMessage, type Organization, type ZefixResult, type OrgMember, type OrgRole } from "../lib/api";
 import { useAutosave, readAutosave } from "@shared/hooks/useAutosave";
 
 const INDUSTRIES = [
@@ -55,6 +55,7 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
   const [deleting, setDeleting] = useState<string | null>(null);
   const [docCounts, setDocCounts] = useState<Record<string, number>>({});
   const [membersOrgId, setMembersOrgId] = useState<string | null>(null);
+  const [messageOrgId, setMessageOrgId] = useState<string | null>(null);
 
   // Zefix search state
   const [zefixQuery, setZefixQuery] = useState("");
@@ -630,6 +631,29 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    setMessageOrgId(messageOrgId === org.id ? null : org.id);
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    background: messageOrgId === org.id ? "#eff6ff" : T.s1,
+                    border: `1px solid ${messageOrgId === org.id ? "#3b82f622" : T.border}`,
+                    borderRadius: 6,
+                    padding: "5px 10px",
+                    fontSize: 11.5,
+                    fontWeight: 500,
+                    color: messageOrgId === org.id ? "#2563eb" : T.ink3,
+                    fontFamily: T.sans,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Icon d={icons.mail} size={12} color={messageOrgId === org.id ? "#2563eb" : T.ink4} />
+                  Nachricht
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
                     handleDelete(org);
                   }}
                   disabled={deleting === org.id}
@@ -665,6 +689,15 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
           orgId={membersOrgId}
           orgName={organizations.find((o) => o.id === membersOrgId)?.name ?? ""}
           onClose={() => setMembersOrgId(null)}
+        />
+      )}
+
+      {/* Message panel */}
+      {messageOrgId && (
+        <SendMessagePanel
+          orgId={messageOrgId}
+          orgName={organizations.find((o) => o.id === messageOrgId)?.name ?? ""}
+          onClose={() => setMessageOrgId(null)}
         />
       )}
     </div>
@@ -1013,6 +1046,175 @@ function OrgMembersPanel({
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  SendMessagePanel — send a message to all members of an org        */
+/* ------------------------------------------------------------------ */
+
+function SendMessagePanel({
+  orgId,
+  orgName,
+  onClose,
+}: {
+  orgId: string;
+  orgName: string;
+  onClose: () => void;
+}) {
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const handleSend = async () => {
+    if (!subject.trim() || !body.trim()) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const res = await sendClientMessage(orgId, subject.trim(), body.trim());
+      if (res.success) {
+        setResult({ ok: true, msg: `Nachricht gesendet (${res.sent} E-Mail${res.sent !== 1 ? "s" : ""}).` });
+        setSubject("");
+        setBody("");
+      } else {
+        setResult({ ok: false, msg: res.message || "Fehler beim Senden." });
+      }
+    } catch (err) {
+      setResult({ ok: false, msg: String(err) });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        marginTop: 20,
+        background: "#fff",
+        borderRadius: T.rLg,
+        border: `1px solid ${T.border}`,
+        boxShadow: T.shSm,
+        overflow: "hidden",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "16px 22px",
+          borderBottom: `1px solid ${T.borderL}`,
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
+            Nachricht senden — {orgName}
+          </div>
+          <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
+            Wird an alle Mitglieder per E-Mail und In-App Benachrichtigung gesendet.
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex" }}
+        >
+          <Icon d="M6 18L18 6M6 6l12 12" size={16} color={T.ink4} />
+        </button>
+      </div>
+
+      {/* Form */}
+      <div style={{ padding: "16px 22px" }}>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4, fontFamily: T.sans }}>
+            Betreff *
+          </label>
+          <input
+            type="text"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="z.B. Neue regulatorische Anforderungen"
+            style={inputStyle}
+          />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4, fontFamily: T.sans }}>
+            Nachricht *
+          </label>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Ihre Nachricht an den Kunden..."
+            rows={5}
+            style={{
+              ...inputStyle,
+              resize: "vertical",
+              minHeight: 100,
+            }}
+          />
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <button
+            onClick={handleSend}
+            disabled={sending || !subject.trim() || !body.trim()}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "9px 20px",
+              borderRadius: 8,
+              border: "none",
+              background: T.primary,
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: sending || !subject.trim() || !body.trim() ? "not-allowed" : "pointer",
+              fontFamily: T.sans,
+              opacity: sending || !subject.trim() || !body.trim() ? 0.6 : 1,
+            }}
+          >
+            <Icon d={icons.mail} size={14} color="#fff" />
+            {sending ? "Wird gesendet..." : "Nachricht senden"}
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "9px 20px",
+              borderRadius: 8,
+              border: `1px solid ${T.border}`,
+              background: "#fff",
+              color: T.ink3,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: T.sans,
+            }}
+          >
+            Abbrechen
+          </button>
+        </div>
+
+        {/* Result */}
+        {result && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: "8px 12px",
+              borderRadius: 7,
+              fontSize: 12.5,
+              fontWeight: 500,
+              fontFamily: T.sans,
+              background: result.ok ? "#f0fdf4" : T.redS,
+              color: result.ok ? "#16654e" : T.red,
+              border: `1px solid ${result.ok ? "#16654e20" : T.red + "20"}`,
+            }}
+          >
+            {result.msg}
+          </div>
+        )}
       </div>
     </div>
   );
