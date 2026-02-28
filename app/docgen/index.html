@@ -17,6 +17,35 @@
 </head>
 <body>
   <div id="root"></div>
+  <script>
+    // Chunk loading error recovery: if cached HTML references stale JS chunks,
+    // auto-reload once to get fresh HTML with correct chunk references.
+    window.addEventListener("error", function(e) {
+      var t = e && e.target;
+      if (t && t.tagName === "SCRIPT" && t.src && t.src.indexOf("/assets/") !== -1) {
+        var k = "vc_chunk_reload";
+        if (!sessionStorage.getItem(k)) {
+          sessionStorage.setItem(k, "1");
+          window.location.reload();
+        }
+      }
+    }, true);
+    // Also catch dynamic import() failures (Vite code-splitting)
+    window.addEventListener("unhandledrejection", function(e) {
+      var msg = e && e.reason && (e.reason.message || String(e.reason));
+      if (msg && (msg.indexOf("Failed to fetch dynamically imported module") !== -1 ||
+                  msg.indexOf("error loading dynamically imported module") !== -1 ||
+                  msg.indexOf("Importing a module script failed") !== -1)) {
+        var k = "vc_chunk_reload";
+        if (!sessionStorage.getItem(k)) {
+          sessionStorage.setItem(k, "1");
+          window.location.reload();
+        }
+      }
+    });
+    // Clear reload flag on successful load
+    window.addEventListener("load", function() { sessionStorage.removeItem("vc_chunk_reload"); });
+  </script>
   <script type="module" src="./main.tsx"></script>
 </body>
 </html>
