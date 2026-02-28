@@ -60,9 +60,22 @@ export function KycOnboardingPage({ org }: KycOnboardingPageProps) {
     }
   };
 
+  const getRequiredFieldsMissing = (): string[] => {
+    const required = fields.filter((f) => f.required);
+    return required
+      .filter((f) => {
+        const val = formData[f.id];
+        return val === undefined || val === "" || val === null;
+      })
+      .map((f) => f.label);
+  };
+
   const canProceed = () => {
     if (step === 0) return formType !== null;
-    if (step === 1) return true;
+    if (step === 1) {
+      // Check all required fields are filled
+      return getRequiredFieldsMissing().length === 0;
+    }
     if (step === 2) return true;
     return false;
   };
@@ -208,6 +221,14 @@ export function KycOnboardingPage({ org }: KycOnboardingPageProps) {
               </div>
             );
           })}
+          {/* Validation hint for required fields */}
+          {getRequiredFieldsMissing().length > 0 && (
+            <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 8, background: "#fffbeb", border: "1px solid #d9770622", fontSize: 12, fontFamily: T.sans, color: "#d97706" }}>
+              <span style={{ fontWeight: 600 }}>Pflichtfelder fehlen:</span>{" "}
+              {getRequiredFieldsMissing().slice(0, 5).join(", ")}
+              {getRequiredFieldsMissing().length > 5 && ` (+${getRequiredFieldsMissing().length - 5} weitere)`}
+            </div>
+          )}
         </div>
       )}
 

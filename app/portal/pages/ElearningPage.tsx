@@ -5,19 +5,39 @@ import { SectionLabel } from "@shared/components/SectionLabel";
 import { supabase } from "@shared/lib/supabase";
 import { type ClientOrg } from "../lib/api";
 
+// Content items stored in the content JSONB array
+interface TextContent {
+  type: "text";
+  title: string;
+  body: string;
+}
+
+interface QuizContent {
+  type: "quiz";
+  question: string;
+  options: string[];
+  correct: number;
+  explanation?: string;
+}
+
+type ContentItem = TextContent | QuizContent;
+
 interface ElearningModule {
   id: string;
+  slug: string;
   title: string;
   description: string;
+  category: string;
   duration_minutes: number;
   passing_score: number;
-  slides: { title: string; content: string }[];
-  quiz_questions: { question: string; options: string[]; correct_index: number }[];
-  sort_order: number;
+  sro_relevant: string[];
+  content: ContentItem[];
+  created_at: string;
 }
 
 interface ElearningProgress {
   module_id: string;
+  status: string;
   started_at: string | null;
   completed_at: string | null;
   score: number | null;
@@ -32,11 +52,11 @@ export function ElearningPage({ org }: ElearningPageProps) {
   const [progressMap, setProgressMap] = useState<Map<string, ElearningProgress>>(new Map());
   const [loading, setLoading] = useState(true);
   const [activeModule, setActiveModule] = useState<ElearningModule | null>(null);
-  const [slideIndex, setSlideIndex] = useState(0);
-  const [quizMode, setQuizMode] = useState(false);
+  const [contentIndex, setContentIndex] = useState(0);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!org) return;
@@ -46,14 +66,15 @@ export function ElearningPage({ org }: ElearningPageProps) {
   const loadData = async () => {
     if (!org) return;
     setLoading(true);
+    setError(null);
     try {
       const [modulesRes, progressRes] = await Promise.all([
-        supabase.from("elearning_modules").select("*").order("sort_order"),
+        supabase.from("elearning_modules").select("*").order("created_at"),
         supabase.from("elearning_progress").select("*").eq("organization_id", org.id),
       ]);
 
       if (modulesRes.error) throw modulesRes.error;
-      if (progressRes.error) throw progressRes.error;
+      // Note: progress query may return nothing for first-time users, that's OK
 
       setModules((modulesRes.data ?? []) as ElearningModule[]);
       const map = new Map<string, ElearningProgress>();
@@ -63,32 +84,46 @@ export function ElearningPage({ org }: ElearningPageProps) {
       setProgressMap(map);
     } catch (err) {
       console.error("E-Learning load error:", err);
+      setError("Schulungen konnten nicht geladen werden.");
     } finally {
       setLoading(false);
     }
   };
 
+  const getSlides = (mod: ElearningModule): TextContent[] =>
+    (mod.content ?? []).filter((c): c is TextContent => c.type === "text");
+
+  const getQuizzes = (mod: ElearningModule): QuizContent[] =>
+    (mod.content ?? []).filter((c): c is QuizContent => c.type === "quiz");
+
   const startModule = async (mod: ElearningModule) => {
-    if (!org) return;
     setActiveModule(mod);
-    setSlideIndex(0);
-    setQuizMode(false);
+    setContentIndex(0);
     setQuizAnswers({});
     setQuizSubmitted(false);
     setQuizScore(null);
 
-    // Track start
+    // Track start via upsert — use user_id from auth
     if (!progressMap.has(mod.id)) {
       try {
-        await supabase.from("elearning_progress").upsert(
-          { organization_id: org.id, module_id: mod.id, started_at: new Date().toISOString() },
-          { onConflict: "organization_id,module_id" },
-        );
-        setProgressMap((prev) => {
-          const next = new Map(prev);
-          next.set(mod.id, { module_id: mod.id, started_at: new Date().toISOString(), completed_at: null, score: null });
-          return next;
-        });
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from("elearning_progress").upsert(
+            {
+              user_id: user.id,
+              organization_id: org!.id,
+              module_id: mod.id,
+              status: "in_progress",
+              started_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id,module_id" },
+          );
+          setProgressMap((prev) => {
+            const next = new Map(prev);
+            next.set(mod.id, { module_id: mod.id, status: "in_progress", started_at: new Date().toISOString(), completed_at: null, score: null });
+            return next;
+          });
+        }
       } catch (err) {
         console.error("Progress tracking failed:", err);
       }
@@ -97,10 +132,10 @@ export function ElearningPage({ org }: ElearningPageProps) {
 
   const submitQuiz = async () => {
     if (!activeModule || !org) return;
-    const questions = activeModule.quiz_questions ?? [];
+    const questions = getQuizzes(activeModule);
     let correct = 0;
     questions.forEach((q, i) => {
-      if (quizAnswers[i] === q.correct_index) correct++;
+      if (quizAnswers[i] === q.correct) correct++;
     });
     const score = questions.length > 0 ? Math.round((correct / questions.length) * 100) : 100;
     setQuizScore(score);
@@ -108,21 +143,26 @@ export function ElearningPage({ org }: ElearningPageProps) {
 
     const passed = score >= activeModule.passing_score;
     try {
-      await supabase.from("elearning_progress").upsert(
-        {
-          organization_id: org.id,
-          module_id: activeModule.id,
-          score,
-          completed_at: passed ? new Date().toISOString() : null,
-        },
-        { onConflict: "organization_id,module_id" },
-      );
-      if (passed) {
-        setProgressMap((prev) => {
-          const next = new Map(prev);
-          next.set(activeModule.id, { ...prev.get(activeModule.id)!, completed_at: new Date().toISOString(), score });
-          return next;
-        });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("elearning_progress").upsert(
+          {
+            user_id: user.id,
+            organization_id: org.id,
+            module_id: activeModule.id,
+            status: passed ? "completed" : "failed",
+            score,
+            completed_at: passed ? new Date().toISOString() : null,
+          },
+          { onConflict: "user_id,module_id" },
+        );
+        if (passed) {
+          setProgressMap((prev) => {
+            const next = new Map(prev);
+            next.set(activeModule.id, { ...prev.get(activeModule.id)!, status: "completed", completed_at: new Date().toISOString(), score });
+            return next;
+          });
+        }
       }
     } catch (err) {
       console.error("Quiz save failed:", err);
@@ -130,7 +170,6 @@ export function ElearningPage({ org }: ElearningPageProps) {
   };
 
   const handleCertificateDownload = () => {
-    // Placeholder for jsPDF certificate generation
     alert("Zertifikat-Download wird in einer zukünftigen Version verfügbar sein (jsPDF).");
   };
 
@@ -145,12 +184,22 @@ export function ElearningPage({ org }: ElearningPageProps) {
     );
   }
 
-  // Module player modal
+  // Module player
   if (activeModule) {
-    const slides = activeModule.slides ?? [];
-    const questions = activeModule.quiz_questions ?? [];
+    const slides = getSlides(activeModule);
+    const questions = getQuizzes(activeModule);
+    const allContent = activeModule.content ?? [];
+    const currentItem = allContent[contentIndex];
+    const isQuizItem = currentItem?.type === "quiz";
+    const isLastItem = contentIndex >= allContent.length - 1;
     const progress = progressMap.get(activeModule.id);
     const isCompleted = !!progress?.completed_at;
+
+    // Calculate quiz index for this specific quiz item
+    const quizIndex = allContent.slice(0, contentIndex + 1).filter((c) => c.type === "quiz").length - 1;
+
+    // Check if we're done with all content → show final quiz review
+    const showQuizReview = contentIndex >= allContent.length;
 
     return (
       <div style={{ padding: "40px 48px", maxWidth: 800 }}>
@@ -169,70 +218,49 @@ export function ElearningPage({ org }: ElearningPageProps) {
           {activeModule.duration_minutes} Min. | Bestehensgrenze: {activeModule.passing_score}%
         </p>
 
-        {!quizMode ? (
-          <>
-            {/* Slide content */}
-            {slides.length > 0 && (
-              <div style={{ background: "#fff", borderRadius: T.rLg, border: `1px solid ${T.border}`, boxShadow: T.shMd, marginBottom: 24 }}>
-                <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: T.ink3, fontFamily: T.sans }}>
-                    Folie {slideIndex + 1} von {slides.length}
-                  </span>
-                  <div style={{ height: 3, flex: 1, marginLeft: 16, borderRadius: 2, background: T.s2 }}>
-                    <div style={{ height: 3, borderRadius: 2, background: T.accent, width: `${((slideIndex + 1) / slides.length) * 100}%`, transition: "width 0.3s" }} />
-                  </div>
-                </div>
-                <div style={{ padding: "28px 32px" }}>
+        {!showQuizReview ? (
+          <div style={{ background: "#fff", borderRadius: T.rLg, border: `1px solid ${T.border}`, boxShadow: T.shMd, marginBottom: 24 }}>
+            {/* Progress header */}
+            <div style={{ padding: "14px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: T.ink3, fontFamily: T.sans }}>
+                {contentIndex + 1} von {allContent.length}
+              </span>
+              <div style={{ height: 3, flex: 1, marginLeft: 16, borderRadius: 2, background: T.s2 }}>
+                <div style={{ height: 3, borderRadius: 2, background: T.accent, width: `${((contentIndex + 1) / allContent.length) * 100}%`, transition: "width 0.3s" }} />
+              </div>
+            </div>
+
+            <div style={{ padding: "28px 32px" }}>
+              {currentItem?.type === "text" && (
+                <>
                   <h3 style={{ fontSize: 18, fontWeight: 700, color: T.ink, fontFamily: T.sans, margin: "0 0 14px" }}>
-                    {slides[slideIndex]?.title}
+                    {(currentItem as TextContent).title}
                   </h3>
                   <div style={{ fontSize: 14, color: T.ink2, fontFamily: T.sans, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-                    {slides[slideIndex]?.content}
+                    {(currentItem as TextContent).body}
                   </div>
-                </div>
-                <div style={{ padding: "12px 20px", borderTop: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between" }}>
-                  <button onClick={() => setSlideIndex((i) => Math.max(0, i - 1))} disabled={slideIndex === 0}
-                    style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${T.border}`, background: "#fff", color: slideIndex === 0 ? T.ink4 : T.ink2, fontSize: 12, fontWeight: 600, cursor: slideIndex === 0 ? "default" : "pointer", fontFamily: T.sans }}>
-                    Zurück
-                  </button>
-                  {slideIndex < slides.length - 1 ? (
-                    <button onClick={() => setSlideIndex((i) => i + 1)}
-                      style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: T.accent, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: T.sans }}>
-                      Weiter
-                    </button>
-                  ) : questions.length > 0 ? (
-                    <button onClick={() => setQuizMode(true)}
-                      style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: T.primaryDeep, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: T.sans }}>
-                      Quiz starten
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            {/* Quiz */}
-            <div style={{ background: "#fff", borderRadius: T.rLg, border: `1px solid ${T.border}`, boxShadow: T.shMd, padding: "28px 32px", marginBottom: 24 }}>
-              <h3 style={{ fontSize: 17, fontWeight: 700, color: T.ink, fontFamily: T.sans, margin: "0 0 20px" }}>Wissenstest</h3>
-              {questions.map((q, qi) => (
-                <div key={qi} style={{ marginBottom: 24 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans, marginBottom: 10 }}>
-                    {qi + 1}. {q.question}
+                </>
+              )}
+
+              {currentItem?.type === "quiz" && (
+                <>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: T.accent, background: T.accentS, padding: "2px 8px", borderRadius: 6, fontFamily: T.sans, textTransform: "uppercase", display: "inline-block", marginBottom: 12 }}>
+                    Quizfrage
                   </div>
-                  {q.options.map((opt, oi) => {
-                    const isSelected = quizAnswers[qi] === oi;
-                    const isCorrect = quizSubmitted && oi === q.correct_index;
-                    const isWrong = quizSubmitted && isSelected && oi !== q.correct_index;
+                  <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans, marginBottom: 14 }}>
+                    {(currentItem as QuizContent).question}
+                  </div>
+                  {(currentItem as QuizContent).options.map((opt, oi) => {
+                    const isSelected = quizAnswers[quizIndex] === oi;
                     return (
                       <div
                         key={oi}
-                        onClick={() => { if (!quizSubmitted) setQuizAnswers((prev) => ({ ...prev, [qi]: oi })); }}
+                        onClick={() => setQuizAnswers((prev) => ({ ...prev, [quizIndex]: oi }))}
                         style={{
                           padding: "10px 14px", borderRadius: 8, marginBottom: 6,
-                          border: `1.5px solid ${isCorrect ? T.accent : isWrong ? T.red : isSelected ? T.accent : T.border}`,
-                          background: isCorrect ? T.accentS : isWrong ? T.redS : isSelected ? T.accentS : "#fff",
-                          cursor: quizSubmitted ? "default" : "pointer", fontSize: 13, color: T.ink, fontFamily: T.sans,
+                          border: `1.5px solid ${isSelected ? T.accent : T.border}`,
+                          background: isSelected ? T.accentS : "#fff",
+                          cursor: "pointer", fontSize: 13, color: T.ink, fontFamily: T.sans,
                           display: "flex", alignItems: "center", gap: 10,
                         }}
                       >
@@ -246,26 +274,75 @@ export function ElearningPage({ org }: ElearningPageProps) {
                       </div>
                     );
                   })}
-                </div>
-              ))}
-
-              {!quizSubmitted ? (
-                <button onClick={submitQuiz} disabled={Object.keys(quizAnswers).length < questions.length}
-                  style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: Object.keys(quizAnswers).length >= questions.length ? T.accent : T.s2, color: Object.keys(quizAnswers).length >= questions.length ? "#fff" : T.ink4, fontSize: 13, fontWeight: 700, cursor: Object.keys(quizAnswers).length >= questions.length ? "pointer" : "default", fontFamily: T.sans }}>
-                  Auswertung
-                </button>
-              ) : (
-                <div style={{ padding: "16px 20px", borderRadius: T.r, background: quizScore! >= activeModule.passing_score ? T.accentS : T.redS, border: `1px solid ${quizScore! >= activeModule.passing_score ? `${T.accent}33` : `${T.red}33`}` }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: quizScore! >= activeModule.passing_score ? T.accent : T.red, fontFamily: T.sans, marginBottom: 4 }}>
-                    {quizScore}%
-                  </div>
-                  <div style={{ fontSize: 13, color: quizScore! >= activeModule.passing_score ? T.accent : T.red, fontFamily: T.sans }}>
-                    {quizScore! >= activeModule.passing_score ? "Bestanden! Sie haben den Test erfolgreich abgeschlossen." : `Nicht bestanden. Mindestens ${activeModule.passing_score}% erforderlich.`}
-                  </div>
-                </div>
+                </>
               )}
             </div>
-          </>
+
+            {/* Navigation */}
+            <div style={{ padding: "12px 20px", borderTop: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between" }}>
+              <button onClick={() => setContentIndex((i) => Math.max(0, i - 1))} disabled={contentIndex === 0}
+                style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${T.border}`, background: "#fff", color: contentIndex === 0 ? T.ink4 : T.ink2, fontSize: 12, fontWeight: 600, cursor: contentIndex === 0 ? "default" : "pointer", fontFamily: T.sans }}>
+                Zurück
+              </button>
+              {!isLastItem ? (
+                <button onClick={() => setContentIndex((i) => i + 1)}
+                  disabled={isQuizItem && quizAnswers[quizIndex] === undefined}
+                  style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: (isQuizItem && quizAnswers[quizIndex] === undefined) ? T.s2 : T.accent, color: (isQuizItem && quizAnswers[quizIndex] === undefined) ? T.ink4 : "#fff", fontSize: 12, fontWeight: 600, cursor: (isQuizItem && quizAnswers[quizIndex] === undefined) ? "default" : "pointer", fontFamily: T.sans }}>
+                  Weiter
+                </button>
+              ) : questions.length > 0 ? (
+                <button onClick={() => { setContentIndex(allContent.length); submitQuiz(); }}
+                  disabled={isQuizItem && quizAnswers[quizIndex] === undefined}
+                  style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: T.primaryDeep, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: T.sans }}>
+                  Auswertung
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          /* Quiz results */
+          <div style={{ background: "#fff", borderRadius: T.rLg, border: `1px solid ${T.border}`, boxShadow: T.shMd, padding: "28px 32px", marginBottom: 24 }}>
+            <h3 style={{ fontSize: 17, fontWeight: 700, color: T.ink, fontFamily: T.sans, margin: "0 0 20px" }}>Ergebnis</h3>
+
+            {/* Score display */}
+            <div style={{ padding: "16px 20px", borderRadius: T.r, background: quizScore! >= activeModule.passing_score ? T.accentS : "#fef2f2", border: `1px solid ${quizScore! >= activeModule.passing_score ? `${T.accent}33` : "#dc262633"}`, marginBottom: 20 }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: quizScore! >= activeModule.passing_score ? T.accent : "#dc2626", fontFamily: T.sans, marginBottom: 4 }}>
+                {quizScore}%
+              </div>
+              <div style={{ fontSize: 13, color: quizScore! >= activeModule.passing_score ? T.accent : "#dc2626", fontFamily: T.sans }}>
+                {quizScore! >= activeModule.passing_score ? "Bestanden! Sie haben den Test erfolgreich abgeschlossen." : `Nicht bestanden. Mindestens ${activeModule.passing_score}% erforderlich.`}
+              </div>
+            </div>
+
+            {/* Show correct answers */}
+            {questions.map((q, qi) => {
+              const userAnswer = quizAnswers[qi];
+              const isCorrect = userAnswer === q.correct;
+              return (
+                <div key={qi} style={{ marginBottom: 16, padding: "12px 16px", borderRadius: 8, background: isCorrect ? T.accentS : "#fef2f2", border: `1px solid ${isCorrect ? `${T.accent}22` : "#dc262622"}` }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.ink, fontFamily: T.sans, marginBottom: 6 }}>
+                    {qi + 1}. {q.question}
+                  </div>
+                  <div style={{ fontSize: 12, fontFamily: T.sans, color: isCorrect ? T.accent : "#dc2626" }}>
+                    {isCorrect ? "Richtig" : `Falsch — Richtige Antwort: ${q.options[q.correct]}`}
+                  </div>
+                  {q.explanation && (
+                    <div style={{ fontSize: 12, color: T.ink3, fontFamily: T.sans, marginTop: 4, fontStyle: "italic" }}>
+                      {q.explanation}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Retry button if failed */}
+            {quizScore! < activeModule.passing_score && (
+              <button onClick={() => { setContentIndex(0); setQuizAnswers({}); setQuizSubmitted(false); setQuizScore(null); }}
+                style={{ padding: "10px 24px", borderRadius: 10, border: "none", background: T.accent, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: T.sans, marginTop: 8 }}>
+                Erneut versuchen
+              </button>
+            )}
+          </div>
         )}
 
         {/* Certificate download */}
@@ -290,6 +367,12 @@ export function ElearningPage({ org }: ElearningPageProps) {
       <p style={{ fontSize: 15, color: T.ink3, fontFamily: T.sans, margin: "0 0 28px" }}>
         Obligatorische und weiterführende Compliance-Schulungen für Ihr Team.
       </p>
+
+      {error && (
+        <div style={{ padding: "12px 16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #dc262622", color: "#dc2626", fontSize: 13, fontFamily: T.sans, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
 
       {/* Progress summary */}
       <div style={{ marginBottom: 28, background: "#fff", borderRadius: T.rLg, padding: "20px 24px", border: `1px solid ${T.border}`, boxShadow: T.shSm }}>
@@ -317,6 +400,8 @@ export function ElearningPage({ org }: ElearningPageProps) {
             const statusLabel = isCompleted ? "Abgeschlossen" : isStarted ? "Begonnen" : "Nicht gestartet";
             const statusColor = isCompleted ? T.accent : isStarted ? "#d97706" : T.ink4;
             const statusBg = isCompleted ? T.accentS : isStarted ? "#fffbeb" : T.s2;
+            const slideCount = getSlides(mod).length;
+            const quizCount = getQuizzes(mod).length;
 
             return (
               <div
@@ -347,7 +432,7 @@ export function ElearningPage({ org }: ElearningPageProps) {
                       <Icon d={icons.clock} size={12} color={T.ink4} />
                       {mod.duration_minutes} Min.
                     </span>
-                    <span>Bestehensgrenze: {mod.passing_score}%</span>
+                    <span>{slideCount} Folien, {quizCount} Fragen</span>
                   </div>
                 </div>
                 {isCompleted && (

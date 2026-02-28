@@ -5,20 +5,21 @@ import { SectionLabel } from "@shared/components/SectionLabel";
 import { supabase } from "@shared/lib/supabase";
 import { type Organization } from "../lib/api";
 
+interface ChecklistItem {
+  id: string;
+  text: string;
+  category: string;
+  required: boolean;
+}
+
 interface SroPackage {
   id: string;
   sro: string;
   name: string;
   description: string | null;
   review_cycle_months: number | null;
-  checklist_count?: number;
-  template_count?: number;
-}
-
-interface PackageAssignment {
-  id: string;
-  organization_id: string;
-  package_id: string;
+  checklist: ChecklistItem[];
+  document_templates: string[];
 }
 
 const SRO_COLORS: Record<string, { bg: string; color: string }> = {
@@ -35,11 +36,8 @@ interface SroPackagesPageProps {
 
 export function SroPackagesPage({ organizations }: SroPackagesPageProps) {
   const [packages, setPackages] = useState<SroPackage[]>([]);
-  const [assignments, setAssignments] = useState<PackageAssignment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [assignOrgId, setAssignOrgId] = useState<string>("");
-  const [assignPkgId, setAssignPkgId] = useState<string>("");
-  const [assigning, setAssigning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -47,61 +45,32 @@ export function SroPackagesPage({ organizations }: SroPackagesPageProps) {
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const [pkgRes, itemsRes, templatesRes, assignRes] = await Promise.all([
-        supabase.from("sro_compliance_packages").select("id, sro, name, description, review_cycle_months").order("sro"),
-        supabase.from("sro_checklist_items").select("package_id"),
-        supabase.from("sro_document_templates").select("package_id"),
-        supabase.from("organization_package_assignments").select("id, organization_id, package_id"),
-      ]);
+      const { data, error: fetchErr } = await supabase
+        .from("sro_compliance_packages")
+        .select("id, sro, name, description, review_cycle_months, checklist, document_templates")
+        .order("sro");
 
-      if (pkgRes.error) throw pkgRes.error;
-
-      // Count items per package
-      const itemCounts = new Map<string, number>();
-      (itemsRes.data ?? []).forEach((i: { package_id: string }) => {
-        itemCounts.set(i.package_id, (itemCounts.get(i.package_id) ?? 0) + 1);
-      });
-
-      const templateCounts = new Map<string, number>();
-      (templatesRes.data ?? []).forEach((t: { package_id: string }) => {
-        templateCounts.set(t.package_id, (templateCounts.get(t.package_id) ?? 0) + 1);
-      });
-
-      setPackages(
-        (pkgRes.data ?? []).map((p: SroPackage) => ({
-          ...p,
-          checklist_count: itemCounts.get(p.id) ?? 0,
-          template_count: templateCounts.get(p.id) ?? 0,
-        })),
-      );
-
-      setAssignments((assignRes.data ?? []) as PackageAssignment[]);
+      if (fetchErr) throw fetchErr;
+      setPackages((data ?? []) as SroPackage[]);
     } catch (err) {
       console.error("SRO packages load error:", err);
+      setError("Pakete konnten nicht geladen werden.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAssign = async () => {
-    if (!assignOrgId || !assignPkgId) return;
-    setAssigning(true);
-    try {
-      const { error } = await supabase.from("organization_package_assignments").upsert(
-        { organization_id: assignOrgId, package_id: assignPkgId },
-        { onConflict: "organization_id" },
-      );
-      if (error) throw error;
-      await loadData();
-      setAssignOrgId("");
-      setAssignPkgId("");
-    } catch (err) {
-      console.error("Assignment failed:", err);
-    } finally {
-      setAssigning(false);
+  // Build org → SRO mapping to show which orgs use which package
+  const orgsBySro = new Map<string, Organization[]>();
+  organizations.forEach((o) => {
+    if (o.sro) {
+      const list = orgsBySro.get(o.sro) ?? [];
+      list.push(o);
+      orgsBySro.set(o.sro, list);
     }
-  };
+  });
 
   // Group packages by SRO
   const sroGroups = new Map<string, SroPackage[]>();
@@ -110,9 +79,6 @@ export function SroPackagesPage({ organizations }: SroPackagesPageProps) {
     group.push(p);
     sroGroups.set(p.sro, group);
   });
-
-  const orgMap = new Map(organizations.map((o) => [o.id, o.name]));
-  const pkgMap = new Map(packages.map((p) => [p.id, p.name]));
 
   if (loading) {
     return (
@@ -129,8 +95,14 @@ export function SroPackagesPage({ organizations }: SroPackagesPageProps) {
         SRO Compliance-Pakete
       </h1>
       <p style={{ fontSize: 14.5, color: T.ink3, fontFamily: T.sans, margin: "0 0 24px" }}>
-        SRO-spezifische Checklisten und Dokumentvorlagen verwalten und Organisationen zuweisen.
+        SRO-spezifische Checklisten und Dokumentvorlagen verwalten.
       </p>
+
+      {error && (
+        <div style={{ padding: "12px 16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #dc262622", color: "#dc2626", fontSize: 13, fontFamily: T.sans, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
 
       {/* Packages grouped by SRO */}
       {sroGroups.size === 0 ? (
@@ -141,6 +113,7 @@ export function SroPackagesPage({ organizations }: SroPackagesPageProps) {
       ) : (
         [...sroGroups.entries()].map(([sro, pkgs]) => {
           const sroColor = SRO_COLORS[sro] ?? { bg: T.s2, color: T.ink3 };
+          const assignedOrgs = orgsBySro.get(sro) ?? [];
           return (
             <div key={sro} style={{ marginBottom: 28 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
@@ -155,7 +128,8 @@ export function SroPackagesPage({ organizations }: SroPackagesPageProps) {
 
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {pkgs.map((pkg) => {
-                  const assignedOrgs = assignments.filter((a) => a.package_id === pkg.id);
+                  const checklistCount = (pkg.checklist ?? []).length;
+                  const templateCount = (pkg.document_templates ?? []).length;
                   return (
                     <div key={pkg.id} style={{
                       background: "#fff", borderRadius: T.r, border: `1px solid ${T.border}`,
@@ -174,11 +148,11 @@ export function SroPackagesPage({ organizations }: SroPackagesPageProps) {
                       <div style={{ display: "flex", gap: 16, marginBottom: 10 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: T.ink3, fontFamily: T.sans }}>
                           <Icon d={icons.check} size={12} color={T.ink4} />
-                          {pkg.checklist_count} Checklist-Punkte
+                          {checklistCount} Checklist-Punkte
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: T.ink3, fontFamily: T.sans }}>
                           <Icon d={icons.doc} size={12} color={T.ink4} />
-                          {pkg.template_count} Vorlagen
+                          {templateCount} Vorlagen
                         </div>
                         {pkg.review_cycle_months && (
                           <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: T.ink3, fontFamily: T.sans }}>
@@ -188,17 +162,35 @@ export function SroPackagesPage({ organizations }: SroPackagesPageProps) {
                         )}
                       </div>
 
-                      {/* Assigned orgs */}
+                      {/* Assigned orgs (matched by SRO) */}
                       {assignedOrgs.length > 0 && (
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {assignedOrgs.map((a) => (
-                            <span key={a.id} style={{
+                          {assignedOrgs.map((o) => (
+                            <span key={o.id} style={{
                               fontSize: 10, fontWeight: 600, color: T.accent, background: T.accentS,
                               padding: "2px 8px", borderRadius: 6, fontFamily: T.sans,
                             }}>
-                              {orgMap.get(a.organization_id) ?? "Unbekannt"}
+                              {o.name}
                             </span>
                           ))}
+                        </div>
+                      )}
+
+                      {/* Checklist preview */}
+                      {checklistCount > 0 && (
+                        <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 8, background: T.s1, border: `1px solid ${T.border}` }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: T.ink3, fontFamily: T.sans, marginBottom: 6, textTransform: "uppercase" }}>Checkliste</div>
+                          {(pkg.checklist ?? []).slice(0, 5).map((item) => (
+                            <div key={item.id} style={{ fontSize: 12, color: T.ink2, fontFamily: T.sans, padding: "2px 0", display: "flex", gap: 6 }}>
+                              <span style={{ color: item.required ? T.red : T.ink4 }}>{item.required ? "*" : "-"}</span>
+                              {item.text}
+                            </div>
+                          ))}
+                          {checklistCount > 5 && (
+                            <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, marginTop: 4 }}>
+                              + {checklistCount - 5} weitere Punkte
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -209,41 +201,6 @@ export function SroPackagesPage({ organizations }: SroPackagesPageProps) {
           );
         })
       )}
-
-      {/* Assign section */}
-      <div style={{ marginTop: 32, background: "#fff", borderRadius: T.rLg, border: `1px solid ${T.border}`, boxShadow: T.shSm, padding: "24px" }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: T.ink, fontFamily: T.sans, margin: "0 0 14px" }}>
-          Paket zuweisen
-        </h3>
-        <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: T.ink2, fontFamily: T.sans, marginBottom: 4, display: "block" }}>Organisation</label>
-            <select value={assignOrgId} onChange={(e) => setAssignOrgId(e.target.value)}
-              style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, color: T.ink, background: "#fff", boxSizing: "border-box" }}>
-              <option value="">Wählen...</option>
-              {organizations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: T.ink2, fontFamily: T.sans, marginBottom: 4, display: "block" }}>Paket</label>
-            <select value={assignPkgId} onChange={(e) => setAssignPkgId(e.target.value)}
-              style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, color: T.ink, background: "#fff", boxSizing: "border-box" }}>
-              <option value="">Wählen...</option>
-              {packages.map((p) => <option key={p.id} value={p.id}>{p.sro} — {p.name}</option>)}
-            </select>
-          </div>
-          <button onClick={handleAssign} disabled={!assignOrgId || !assignPkgId || assigning}
-            style={{
-              padding: "9px 20px", borderRadius: 8, border: "none",
-              background: assignOrgId && assignPkgId ? T.accent : T.s2,
-              color: assignOrgId && assignPkgId ? "#fff" : T.ink4,
-              fontSize: 13, fontWeight: 700, cursor: assignOrgId && assignPkgId && !assigning ? "pointer" : "default",
-              fontFamily: T.sans, opacity: assigning ? 0.6 : 1, whiteSpace: "nowrap",
-            }}>
-            {assigning ? "Wird zugewiesen..." : "Zuweisen"}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

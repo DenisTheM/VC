@@ -6,12 +6,12 @@ import { supabase } from "@shared/lib/supabase";
 import { type Organization } from "../lib/api";
 
 type TriggerStatus = "new" | "investigating" | "resolved" | "dismissed";
-type TriggerSeverity = "critical" | "high" | "medium" | "low";
+type TriggerSeverity = "info" | "warning" | "critical";
 
 interface PkycTrigger {
   id: string;
   organization_id: string;
-  type: string;
+  trigger_type: string;
   description: string;
   severity: TriggerSeverity;
   status: TriggerStatus;
@@ -28,9 +28,17 @@ const STATUS_CONFIG: Record<TriggerStatus, { label: string; bg: string; color: s
 
 const SEVERITY_CONFIG: Record<TriggerSeverity, { label: string; bg: string; color: string }> = {
   critical: { label: "Kritisch", bg: "#fef2f2", color: "#dc2626" },
-  high: { label: "Hoch", bg: "#fff7ed", color: "#ea580c" },
-  medium: { label: "Mittel", bg: "#fffbeb", color: "#d97706" },
-  low: { label: "Tief", bg: T.accentS, color: T.accent },
+  warning: { label: "Warnung", bg: "#fffbeb", color: "#d97706" },
+  info: { label: "Info", bg: "#eff6ff", color: "#3b82f6" },
+};
+
+const TRIGGER_TYPE_LABELS: Record<string, string> = {
+  sanctions_hit: "Sanktionstreffer",
+  adverse_media: "Adverse Media",
+  registry_change: "Registeränderung",
+  transaction_anomaly: "Transaktionsanomalie",
+  review_due: "Review fällig",
+  manual: "Manuell",
 };
 
 interface PkycOverviewPageProps {
@@ -42,8 +50,7 @@ export function PkycOverviewPage({ organizations }: PkycOverviewPageProps) {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<TriggerStatus | "all">("all");
   const [orgFilter, setOrgFilter] = useState<string | null>(null);
-
-  const orgMap = new Map(organizations.map((o) => [o.id, o.name]));
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadTriggers();
@@ -51,13 +58,16 @@ export function PkycOverviewPage({ organizations }: PkycOverviewPageProps) {
 
   const loadTriggers = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const { data, error } = await supabase
+      const { data, error: fetchErr } = await supabase
         .from("pkyc_triggers")
-        .select("id, organization_id, type, description, severity, status, created_at")
+        .select("id, organization_id, trigger_type, description, severity, status, created_at")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (fetchErr) throw fetchErr;
+
+      const orgMap = new Map(organizations.map((o) => [o.id, o.name]));
       setTriggers(
         (data ?? []).map((t: PkycTrigger) => ({
           ...t,
@@ -66,6 +76,7 @@ export function PkycOverviewPage({ organizations }: PkycOverviewPageProps) {
       );
     } catch (err) {
       console.error("pKYC triggers load error:", err);
+      setError("Trigger konnten nicht geladen werden.");
     } finally {
       setLoading(false);
     }
@@ -103,6 +114,12 @@ export function PkycOverviewPage({ organizations }: PkycOverviewPageProps) {
         Cross-Client Übersicht aller pKYC-Trigger und deren Bearbeitungsstatus.
       </p>
 
+      {error && (
+        <div style={{ padding: "12px 16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #dc262622", color: "#dc2626", fontSize: 13, fontFamily: T.sans, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
+
       {/* Dashboard cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
         {/* Status counts */}
@@ -125,7 +142,7 @@ export function PkycOverviewPage({ organizations }: PkycOverviewPageProps) {
         <div style={{ background: "#fff", borderRadius: T.rLg, padding: "18px 22px", border: `1px solid ${T.border}`, boxShadow: T.shSm }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: T.ink3, fontFamily: T.sans, textTransform: "uppercase", letterSpacing: "0.3px", marginBottom: 12 }}>Nach Schweregrad</div>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            {(["critical", "high", "medium", "low"] as TriggerSeverity[]).map((s) => {
+            {(["critical", "warning", "info"] as TriggerSeverity[]).map((s) => {
               const cfg = SEVERITY_CONFIG[s];
               return (
                 <div key={s} style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -173,8 +190,9 @@ export function PkycOverviewPage({ organizations }: PkycOverviewPageProps) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.map((t) => {
-            const sev = SEVERITY_CONFIG[t.severity] ?? SEVERITY_CONFIG.medium;
+            const sev = SEVERITY_CONFIG[t.severity] ?? SEVERITY_CONFIG.info;
             const stat = STATUS_CONFIG[t.status] ?? STATUS_CONFIG.new;
+            const typeLabel = TRIGGER_TYPE_LABELS[t.trigger_type] ?? t.trigger_type;
             const date = new Date(t.created_at).toLocaleDateString("de-CH", { day: "numeric", month: "short", year: "numeric" });
 
             return (
@@ -191,7 +209,7 @@ export function PkycOverviewPage({ organizations }: PkycOverviewPageProps) {
                   <span style={{ fontSize: 10, fontWeight: 600, color: stat.color, background: stat.bg, padding: "2px 8px", borderRadius: 6, fontFamily: T.sans }}>
                     {stat.label}
                   </span>
-                  <span style={{ fontSize: 10, color: T.ink4, background: T.s2, padding: "2px 8px", borderRadius: 6, fontFamily: T.sans }}>{t.type}</span>
+                  <span style={{ fontSize: 10, color: T.ink4, background: T.s2, padding: "2px 8px", borderRadius: 6, fontFamily: T.sans }}>{typeLabel}</span>
                   <span style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, marginLeft: "auto" }}>{date}</span>
                 </div>
                 <div style={{ fontSize: 13, color: T.ink2, fontFamily: T.sans, lineHeight: 1.5 }}>

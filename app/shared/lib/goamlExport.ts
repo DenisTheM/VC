@@ -11,7 +11,7 @@ function esc(str: string): string {
 }
 
 function tag(name: string, value: string | undefined | null, indent = "    "): string {
-  if (!value) return "";
+  if (value === undefined || value === null || value === "") return "";
   return `${indent}<${name}>${esc(value)}</${name}>\n`;
 }
 
@@ -166,9 +166,13 @@ export function validateSarData(data: SarFormData): { valid: boolean; missing: s
   const missing: string[] = [];
   if (!data.suspicion_type) missing.push("Verdachtsgrund");
   if (!data.suspicion_indicators) missing.push("Verdachtsindikatoren");
+  if (!data.urgency) missing.push("Dringlichkeit");
   if (!data.subject_name) missing.push("Name der betroffenen Person/Firma");
   if (!data.tx_description) missing.push("Transaktionsbeschreibung");
   if (!data.tx_total_amount) missing.push("Gesamtbetrag");
+  if (!data.tx_currency) missing.push("Währung");
+  if (!data.tx_period_from) missing.push("Zeitraum von");
+  if (!data.tx_period_to) missing.push("Zeitraum bis");
   if (!data.narrative) missing.push("Begründung");
   return { valid: missing.length === 0, missing };
 }

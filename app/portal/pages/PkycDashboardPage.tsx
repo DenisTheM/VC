@@ -6,11 +6,11 @@ import { supabase } from "@shared/lib/supabase";
 import { type ClientOrg } from "../lib/api";
 
 type TriggerStatus = "new" | "investigating" | "resolved" | "dismissed";
-type TriggerSeverity = "critical" | "high" | "medium" | "low";
+type TriggerSeverity = "info" | "warning" | "critical";
 
 interface PkycTrigger {
   id: string;
-  type: string;
+  trigger_type: string;
   description: string;
   severity: TriggerSeverity;
   status: TriggerStatus;
@@ -27,9 +27,17 @@ const STATUS_CONFIG: Record<TriggerStatus, { label: string; bg: string; color: s
 
 const SEVERITY_CONFIG: Record<TriggerSeverity, { label: string; bg: string; color: string }> = {
   critical: { label: "Kritisch", bg: "#fef2f2", color: "#dc2626" },
-  high: { label: "Hoch", bg: "#fff7ed", color: "#ea580c" },
-  medium: { label: "Mittel", bg: "#fffbeb", color: "#d97706" },
-  low: { label: "Tief", bg: T.accentS, color: T.accent },
+  warning: { label: "Warnung", bg: "#fffbeb", color: "#d97706" },
+  info: { label: "Info", bg: "#eff6ff", color: "#3b82f6" },
+};
+
+const TRIGGER_TYPE_LABELS: Record<string, string> = {
+  sanctions_hit: "Sanktionstreffer",
+  adverse_media: "Adverse Media",
+  registry_change: "Registeränderung",
+  transaction_anomaly: "Transaktionsanomalie",
+  review_due: "Review fällig",
+  manual: "Manuell",
 };
 
 interface PkycDashboardPageProps {
@@ -41,6 +49,7 @@ export function PkycDashboardPage({ org }: PkycDashboardPageProps) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<TriggerStatus | "all">("all");
   const [updating, setUpdating] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!org) return;
@@ -50,17 +59,19 @@ export function PkycDashboardPage({ org }: PkycDashboardPageProps) {
   const loadTriggers = async () => {
     if (!org) return;
     setLoading(true);
+    setError(null);
     try {
-      const { data, error } = await supabase
+      const { data, error: fetchErr } = await supabase
         .from("pkyc_triggers")
-        .select("id, type, description, severity, status, created_at, resolved_at")
+        .select("id, trigger_type, description, severity, status, created_at, resolved_at")
         .eq("organization_id", org.id)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (fetchErr) throw fetchErr;
       setTriggers((data ?? []) as PkycTrigger[]);
     } catch (err) {
       console.error("pKYC load error:", err);
+      setError("Triggers konnten nicht geladen werden.");
     } finally {
       setLoading(false);
     }
@@ -73,12 +84,12 @@ export function PkycDashboardPage({ org }: PkycDashboardPageProps) {
       if (newStatus === "resolved") {
         updates.resolved_at = new Date().toISOString();
       }
-      const { error } = await supabase
+      const { error: updateErr } = await supabase
         .from("pkyc_triggers")
         .update(updates)
         .eq("id", triggerId);
 
-      if (error) throw error;
+      if (updateErr) throw updateErr;
       setTriggers((prev) =>
         prev.map((t) => t.id === triggerId ? { ...t, status: newStatus, resolved_at: newStatus === "resolved" ? new Date().toISOString() : t.resolved_at } : t),
       );
@@ -115,6 +126,12 @@ export function PkycDashboardPage({ org }: PkycDashboardPageProps) {
       <p style={{ fontSize: 15, color: T.ink3, fontFamily: T.sans, margin: "0 0 28px" }}>
         Perpetual KYC — Trigger-basierte laufende Überwachung Ihrer Geschäftsbeziehungen.
       </p>
+
+      {error && (
+        <div style={{ padding: "12px 16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #dc262622", color: "#dc2626", fontSize: 13, fontFamily: T.sans, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
 
       {/* Status filter pills */}
       <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
@@ -156,8 +173,9 @@ export function PkycDashboardPage({ org }: PkycDashboardPageProps) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {filteredTriggers.map((trigger) => {
-            const sev = SEVERITY_CONFIG[trigger.severity] ?? SEVERITY_CONFIG.medium;
+            const sev = SEVERITY_CONFIG[trigger.severity] ?? SEVERITY_CONFIG.info;
             const stat = STATUS_CONFIG[trigger.status] ?? STATUS_CONFIG.new;
+            const typeLabel = TRIGGER_TYPE_LABELS[trigger.trigger_type] ?? trigger.trigger_type;
             const date = new Date(trigger.created_at).toLocaleDateString("de-CH", { day: "numeric", month: "short", year: "numeric" });
             const isUpdating = updating === trigger.id;
 
@@ -182,7 +200,7 @@ export function PkycDashboardPage({ org }: PkycDashboardPageProps) {
                         {stat.label}
                       </span>
                       <span style={{ fontSize: 10, fontWeight: 500, color: T.ink4, background: T.s2, padding: "2px 8px", borderRadius: 6, fontFamily: T.sans }}>
-                        {trigger.type}
+                        {typeLabel}
                       </span>
                       <span style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, marginLeft: "auto" }}>{date}</span>
                     </div>

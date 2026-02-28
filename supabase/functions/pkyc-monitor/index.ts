@@ -9,12 +9,17 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getCorsHeaders, corsResponse } from "../_shared/cors.ts";
+import { verifyAuth, unauthorizedResponse } from "../_shared/auth.ts";
 
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return corsResponse(req);
 
   try {
+    // Auth check — only admin users or cron service can trigger this
+    const auth = await verifyAuth(req);
+    if (!auth.authenticated) return unauthorizedResponse(cors);
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",

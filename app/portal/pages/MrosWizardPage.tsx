@@ -214,7 +214,7 @@ export function MrosWizardPage({ org }: MrosWizardPageProps) {
           <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
             <button
               onClick={handleDownloadXml}
-              disabled={!xmlPreview}
+              disabled={!xmlPreview || validationErrors.length > 0}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 6,
                 padding: "10px 20px", borderRadius: 10, border: "none",

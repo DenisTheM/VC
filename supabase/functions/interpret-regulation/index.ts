@@ -8,14 +8,25 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getCorsHeaders, corsResponse } from "../_shared/cors.ts";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "../_shared/rate-limit.ts";
+import { verifyAuth, unauthorizedResponse } from "../_shared/auth.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+
+// Sanitize user-controlled strings before embedding in prompt
+function sanitize(str: string | null | undefined, maxLen = 500): string {
+  if (!str) return "";
+  return str.slice(0, maxLen).replace(/[<>{}]/g, "");
+}
 
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
   if (req.method === "OPTIONS") return corsResponse(req);
 
   try {
+    // Auth check — mandatory
+    const auth = await verifyAuth(req);
+    if (!auth.authenticated) return unauthorizedResponse(cors);
+
     // Rate limit: 5 req/min (expensive AI calls)
     const ip = getClientIp(req);
     const rl = await checkRateLimit(ip, "interpret-regulation", 5, 60_000);
@@ -82,11 +93,11 @@ Antworte auf Deutsch. Sei konkret und praxisnah.`;
 
     const userPrompt = `Analysiere folgende Regulierungsänderung für einen Schweizer Finanzintermediär:
 
-Regulierung: ${alert.title}
-Zusammenfassung: ${alert.summary ?? "Nicht verfügbar"}
-Rechtsgrundlage: ${alert.legal_basis ?? "Nicht angegeben"}
-Jurisdiktion: ${alert.jurisdiction ?? "CH"}
-Kategorie: ${alert.category ?? "Allgemein"}
+Regulierung: ${sanitize(alert.title, 200)}
+Zusammenfassung: ${sanitize(alert.summary, 2000) || "Nicht verfügbar"}
+Rechtsgrundlage: ${sanitize(alert.legal_basis, 200) || "Nicht angegeben"}
+Jurisdiktion: ${sanitize(alert.jurisdiction, 10) || "CH"}
+Kategorie: ${sanitize(alert.category, 50) || "Allgemein"}
 ${orgContext}
 
 Erstelle eine strukturierte Analyse im folgenden JSON-Format:

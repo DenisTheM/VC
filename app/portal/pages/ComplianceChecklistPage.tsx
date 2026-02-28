@@ -7,16 +7,9 @@ import { type ClientOrg } from "../lib/api";
 
 interface ChecklistItem {
   id: string;
+  text: string;
   category: string;
-  title: string;
-  description: string | null;
-  sort_order: number;
-}
-
-interface ChecklistProgress {
-  checklist_item_id: string;
-  completed: boolean;
-  completed_at: string | null;
+  required: boolean;
 }
 
 const CATEGORIES = ["Dokumente", "Prozesse", "Schulung", "Fristen", "Audit", "Organisation"];
@@ -45,10 +38,12 @@ interface ComplianceChecklistPageProps {
 
 export function ComplianceChecklistPage({ org }: ComplianceChecklistPageProps) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
-  const [progress, setProgress] = useState<Map<string, ChecklistProgress>>(new Map());
+  const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [packageName, setPackageName] = useState<string | null>(null);
+  const [packageId, setPackageId] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!org) return;
@@ -58,81 +53,109 @@ export function ComplianceChecklistPage({ org }: ComplianceChecklistPageProps) {
   const loadChecklist = async () => {
     if (!org) return;
     setLoading(true);
+    setError(null);
     try {
       // Find SRO compliance package for this org's SRO
-      const { data: pkg } = await supabase
+      const { data: pkg, error: pkgErr } = await supabase
         .from("sro_compliance_packages")
-        .select("id, name")
+        .select("id, name, checklist")
         .eq("sro", org.sro ?? "")
         .maybeSingle();
 
+      if (pkgErr) throw pkgErr;
+
       if (pkg) {
         setPackageName(pkg.name);
-        // Load checklist items for this package
-        const { data: checklistItems } = await supabase
-          .from("sro_checklist_items")
-          .select("id, category, title, description, sort_order")
-          .eq("package_id", pkg.id)
-          .order("sort_order");
+        setPackageId(pkg.id);
 
-        setItems((checklistItems ?? []) as ChecklistItem[]);
+        // Parse checklist items from JSONB
+        const checklistItems = (pkg.checklist ?? []) as ChecklistItem[];
+        setItems(checklistItems);
 
-        // Load progress
-        const { data: progressData } = await supabase
+        // Load progress (JSONB object: {item_id: true/false})
+        const { data: progressData, error: progressErr } = await supabase
           .from("organization_checklist_progress")
-          .select("checklist_item_id, completed, completed_at")
-          .eq("organization_id", org.id);
+          .select("checklist_status")
+          .eq("organization_id", org.id)
+          .eq("package_id", pkg.id)
+          .maybeSingle();
 
-        const map = new Map<string, ChecklistProgress>();
-        (progressData ?? []).forEach((p: ChecklistProgress) => {
-          map.set(p.checklist_item_id, p);
-        });
-        setProgress(map);
+        if (progressErr) throw progressErr;
+
+        const completed = new Set<string>();
+        if (progressData?.checklist_status) {
+          const status = progressData.checklist_status as Record<string, boolean>;
+          for (const [itemId, done] of Object.entries(status)) {
+            if (done) completed.add(itemId);
+          }
+        }
+        setCompletedItems(completed);
       }
     } catch (err) {
       console.error("Checklist load error:", err);
+      setError("Checkliste konnte nicht geladen werden.");
     } finally {
       setLoading(false);
     }
   };
 
   const toggleItem = async (itemId: string) => {
-    if (!org || toggling) return;
+    if (!org || !packageId || toggling) return;
     setToggling(itemId);
-    const current = progress.get(itemId);
-    const newCompleted = !current?.completed;
+    const newCompleted = !completedItems.has(itemId);
+
+    // Optimistic update
+    setCompletedItems((prev) => {
+      const next = new Set(prev);
+      if (newCompleted) {
+        next.add(itemId);
+      } else {
+        next.delete(itemId);
+      }
+      return next;
+    });
 
     try {
+      // Build the full checklist_status object
+      const newStatus: Record<string, boolean> = {};
+      for (const item of items) {
+        if (item.id === itemId) {
+          newStatus[item.id] = newCompleted;
+        } else {
+          newStatus[item.id] = completedItems.has(item.id);
+        }
+      }
+
       const { error } = await supabase
         .from("organization_checklist_progress")
         .upsert(
           {
             organization_id: org.id,
-            checklist_item_id: itemId,
-            completed: newCompleted,
-            completed_at: newCompleted ? new Date().toISOString() : null,
+            package_id: packageId,
+            checklist_status: newStatus,
+            last_updated: new Date().toISOString(),
           },
-          { onConflict: "organization_id,checklist_item_id" },
+          { onConflict: "organization_id,package_id" },
         );
       if (error) throw error;
-
-      setProgress((prev) => {
-        const next = new Map(prev);
-        next.set(itemId, {
-          checklist_item_id: itemId,
-          completed: newCompleted,
-          completed_at: newCompleted ? new Date().toISOString() : null,
-        });
-        return next;
-      });
     } catch (err) {
       console.error("Toggle failed:", err);
+      // Revert optimistic update
+      setCompletedItems((prev) => {
+        const next = new Set(prev);
+        if (newCompleted) {
+          next.delete(itemId);
+        } else {
+          next.add(itemId);
+        }
+        return next;
+      });
     } finally {
       setToggling(null);
     }
   };
 
-  const completedCount = [...progress.values()].filter((p) => p.completed).length;
+  const completedCount = completedItems.size;
   const totalCount = items.length;
   const completionPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
@@ -153,6 +176,12 @@ export function ComplianceChecklistPage({ org }: ComplianceChecklistPageProps) {
       <p style={{ fontSize: 15, color: T.ink3, fontFamily: T.sans, margin: "0 0 8px" }}>
         {packageName ? `Paket: ${packageName} (${org?.sro ?? "Keine SRO"})` : "Kein SRO-Paket zugewiesen."}
       </p>
+
+      {error && (
+        <div style={{ padding: "12px 16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #dc262622", color: "#dc2626", fontSize: 13, fontFamily: T.sans, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
 
       {/* Progress bar */}
       <div style={{ marginBottom: 32, background: "#fff", borderRadius: T.rLg, padding: "20px 24px", border: `1px solid ${T.border}`, boxShadow: T.shSm }}>
@@ -188,7 +217,7 @@ export function ComplianceChecklistPage({ org }: ComplianceChecklistPageProps) {
           if (categoryItems.length === 0) return null;
           const catColors = CATEGORY_COLORS[category] ?? CATEGORY_COLORS.Dokumente;
           const catIcon = CATEGORY_ICONS[category] ?? icons.doc;
-          const catCompleted = categoryItems.filter((item) => progress.get(item.id)?.completed).length;
+          const catCompleted = categoryItems.filter((item) => completedItems.has(item.id)).length;
 
           return (
             <div key={category} style={{ marginBottom: 24 }}>
@@ -202,7 +231,7 @@ export function ComplianceChecklistPage({ org }: ComplianceChecklistPageProps) {
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {categoryItems.map((item) => {
-                  const isCompleted = progress.get(item.id)?.completed ?? false;
+                  const isCompleted = completedItems.has(item.id);
                   const isToggling = toggling === item.id;
                   return (
                     <div
@@ -230,11 +259,11 @@ export function ComplianceChecklistPage({ org }: ComplianceChecklistPageProps) {
                           fontSize: 13, fontWeight: 600, color: isCompleted ? T.ink3 : T.ink,
                           fontFamily: T.sans, textDecoration: isCompleted ? "line-through" : "none",
                         }}>
-                          {item.title}
+                          {item.text}
                         </div>
-                        {item.description && (
-                          <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, marginTop: 2, lineHeight: 1.4 }}>
-                            {item.description}
+                        {item.required && !isCompleted && (
+                          <div style={{ fontSize: 11, color: T.red, fontFamily: T.sans, marginTop: 2 }}>
+                            Pflichtfeld
                           </div>
                         )}
                       </div>

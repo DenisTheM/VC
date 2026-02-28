@@ -8,6 +8,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getCorsHeaders, corsResponse } from "../_shared/cors.ts";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "../_shared/rate-limit.ts";
+import { verifyAuth, unauthorizedResponse } from "../_shared/auth.ts";
 
 // LETA API Status — set to true when LETA goes live
 const LETA_LIVE = false;
@@ -25,6 +26,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsResponse(req);
 
   try {
+    // Auth check — mandatory
+    const auth = await verifyAuth(req);
+    if (!auth.authenticated) return unauthorizedResponse(cors);
+
     const ip = getClientIp(req);
     const rl = await checkRateLimit(ip, "leta-check", 20, 60_000);
     if (!rl.allowed) return rateLimitResponse(cors, rl.retryAfter);

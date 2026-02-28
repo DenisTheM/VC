@@ -7,16 +7,24 @@ import { type ClientOrg } from "../lib/api";
 
 type LetaStatus = "not_checked" | "matched" | "discrepancy" | "pending_report" | "reported";
 
-interface UboDeclaration {
-  id: string;
+interface UboPerson {
   name: string;
-  birth_date: string | null;
+  birthDate: string | null;
   nationality: string | null;
   share_percent: number | null;
   control_type: string | null;
+}
+
+interface UboDeclarationRow {
+  id: string;
+  customer_id: string | null;
+  organization_id: string;
+  ubo_data: UboPerson[];
   leta_status: LetaStatus;
-  discrepancy_detected_at: string | null;
+  discrepancy_details: string | null;
+  report_deadline: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 const LETA_STATUS_CONFIG: Record<LetaStatus, { label: string; bg: string; color: string }> = {
@@ -40,12 +48,13 @@ interface UboDeclarationPageProps {
 }
 
 export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
-  const [declarations, setDeclarations] = useState<UboDeclaration[]>([]);
+  const [declarations, setDeclarations] = useState<UboDeclarationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
+  const [editingDeclId, setEditingDeclId] = useState<string | null>(null);
+  const [editingUboIndex, setEditingUboIndex] = useState<number>(-1);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Form state
   const [formName, setFormName] = useState("");
@@ -62,17 +71,19 @@ export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
   const loadDeclarations = async () => {
     if (!org) return;
     setLoading(true);
+    setError(null);
     try {
-      const { data, error } = await supabase
+      const { data, error: fetchErr } = await supabase
         .from("ubo_declarations")
         .select("*")
         .eq("organization_id", org.id)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      setDeclarations((data ?? []) as UboDeclaration[]);
+      if (fetchErr) throw fetchErr;
+      setDeclarations((data ?? []) as UboDeclarationRow[]);
     } catch (err) {
       console.error("UBO load error:", err);
+      setError("UBO-Daten konnten nicht geladen werden.");
     } finally {
       setLoading(false);
     }
@@ -84,71 +95,120 @@ export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
     setFormNationality("");
     setFormSharePercent("");
     setFormControlType("");
-    setEditId(null);
+    setEditingDeclId(null);
+    setEditingUboIndex(-1);
     setShowForm(false);
   };
 
-  const openEdit = (ubo: UboDeclaration) => {
+  const openEditUbo = (decl: UboDeclarationRow, uboIndex: number) => {
+    const ubo = decl.ubo_data[uboIndex];
+    if (!ubo) return;
     setFormName(ubo.name);
-    setFormBirthDate(ubo.birth_date ?? "");
+    setFormBirthDate(ubo.birthDate ?? "");
     setFormNationality(ubo.nationality ?? "");
     setFormSharePercent(ubo.share_percent?.toString() ?? "");
     setFormControlType(ubo.control_type ?? "");
-    setEditId(ubo.id);
+    setEditingDeclId(decl.id);
+    setEditingUboIndex(uboIndex);
     setShowForm(true);
   };
 
   const handleSave = async () => {
     if (!org || !formName.trim()) return;
     setSaving(true);
-    try {
-      const row = {
-        organization_id: org.id,
-        name: formName.trim(),
-        birth_date: formBirthDate || null,
-        nationality: formNationality || null,
-        share_percent: formSharePercent ? parseFloat(formSharePercent) : null,
-        control_type: formControlType || null,
-      };
+    setError(null);
 
-      if (editId) {
-        const { error } = await supabase.from("ubo_declarations").update(row).eq("id", editId);
-        if (error) throw error;
+    const newUbo: UboPerson = {
+      name: formName.trim(),
+      birthDate: formBirthDate || null,
+      nationality: formNationality || null,
+      share_percent: formSharePercent ? parseFloat(formSharePercent) : null,
+      control_type: formControlType || null,
+    };
+
+    try {
+      if (editingDeclId && editingUboIndex >= 0) {
+        // Update existing UBO person in existing declaration
+        const decl = declarations.find((d) => d.id === editingDeclId);
+        if (!decl) throw new Error("Declaration not found");
+        const updatedUboData = [...decl.ubo_data];
+        updatedUboData[editingUboIndex] = newUbo;
+
+        const { error: updateErr } = await supabase
+          .from("ubo_declarations")
+          .update({ ubo_data: updatedUboData, updated_at: new Date().toISOString() })
+          .eq("id", editingDeclId);
+        if (updateErr) throw updateErr;
+      } else if (declarations.length > 0) {
+        // Add UBO person to the first existing declaration
+        const decl = declarations[0];
+        const updatedUboData = [...decl.ubo_data, newUbo];
+
+        const { error: updateErr } = await supabase
+          .from("ubo_declarations")
+          .update({ ubo_data: updatedUboData, updated_at: new Date().toISOString() })
+          .eq("id", decl.id);
+        if (updateErr) throw updateErr;
       } else {
-        const { error } = await supabase.from("ubo_declarations").insert({ ...row, leta_status: "not_checked" });
-        if (error) throw error;
+        // Create new declaration with first UBO person
+        const { error: insertErr } = await supabase.from("ubo_declarations").insert({
+          organization_id: org.id,
+          ubo_data: [newUbo],
+          leta_status: "not_checked",
+        });
+        if (insertErr) throw insertErr;
       }
       resetForm();
       await loadDeclarations();
     } catch (err) {
       console.error("UBO save failed:", err);
+      setError("Speichern fehlgeschlagen.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteUbo = async (declId: string, uboIndex: number) => {
     if (!confirm("Möchten Sie diesen UBO-Eintrag wirklich löschen?")) return;
-    setDeleting(id);
     try {
-      const { error } = await supabase.from("ubo_declarations").delete().eq("id", id);
-      if (error) throw error;
-      setDeclarations((prev) => prev.filter((d) => d.id !== id));
+      const decl = declarations.find((d) => d.id === declId);
+      if (!decl) return;
+      const updatedUboData = decl.ubo_data.filter((_, i) => i !== uboIndex);
+
+      if (updatedUboData.length === 0) {
+        // Delete entire declaration if no UBOs left
+        const { error: delErr } = await supabase.from("ubo_declarations").delete().eq("id", declId);
+        if (delErr) throw delErr;
+      } else {
+        const { error: updateErr } = await supabase
+          .from("ubo_declarations")
+          .update({ ubo_data: updatedUboData, updated_at: new Date().toISOString() })
+          .eq("id", declId);
+        if (updateErr) throw updateErr;
+      }
+      await loadDeclarations();
     } catch (err) {
       console.error("UBO delete failed:", err);
-    } finally {
-      setDeleting(null);
+      setError("Löschen fehlgeschlagen.");
     }
   };
 
-  const getDiscrepancyDaysLeft = (detectedAt: string | null): number | null => {
-    if (!detectedAt) return null;
-    const deadline = new Date(detectedAt);
-    deadline.setDate(deadline.getDate() + 30);
-    return Math.ceil((deadline.getTime() - Date.now()) / 86400000);
+  const getDeadlineDaysLeft = (deadline: string | null): number | null => {
+    if (!deadline) return null;
+    const dl = new Date(deadline);
+    return Math.ceil((dl.getTime() - Date.now()) / 86400000);
   };
 
-  const totalShares = declarations.reduce((sum, d) => sum + (d.share_percent ?? 0), 0);
+  // Flatten all UBO persons across all declarations for display
+  const allUbos: { decl: UboDeclarationRow; ubo: UboPerson; index: number }[] = [];
+  declarations.forEach((decl) => {
+    (decl.ubo_data ?? []).forEach((ubo, i) => {
+      allUbos.push({ decl, ubo, index: i });
+    });
+  });
+
+  const totalShares = allUbos.reduce((sum, { ubo }) => sum + (ubo.share_percent ?? 0), 0);
+  const discrepancyCount = declarations.filter((d) => d.leta_status === "discrepancy").length;
 
   if (loading) {
     return (
@@ -168,11 +228,17 @@ export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
         Wirtschaftlich Berechtigte deklarieren und LETA-Register-Status überwachen.
       </p>
 
+      {error && (
+        <div style={{ padding: "12px 16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #dc262622", color: "#dc2626", fontSize: 13, fontFamily: T.sans, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
+
       {/* Summary card */}
       <div style={{ display: "flex", gap: 16, marginBottom: 28 }}>
         <div style={{ flex: 1, background: "#fff", borderRadius: T.rLg, padding: "18px 22px", border: `1px solid ${T.border}`, boxShadow: T.shSm }}>
           <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase" }}>UBO deklariert</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: T.ink, fontFamily: T.sans }}>{declarations.length}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: T.ink, fontFamily: T.sans }}>{allUbos.length}</div>
         </div>
         <div style={{ flex: 1, background: "#fff", borderRadius: T.rLg, padding: "18px 22px", border: `1px solid ${T.border}`, boxShadow: T.shSm }}>
           <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase" }}>Gesamtanteil</div>
@@ -180,8 +246,8 @@ export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
         </div>
         <div style={{ flex: 1, background: "#fff", borderRadius: T.rLg, padding: "18px 22px", border: `1px solid ${T.border}`, boxShadow: T.shSm }}>
           <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase" }}>Abweichungen</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: declarations.some((d) => d.leta_status === "discrepancy") ? T.red : T.accent, fontFamily: T.sans }}>
-            {declarations.filter((d) => d.leta_status === "discrepancy").length}
+          <div style={{ fontSize: 28, fontWeight: 700, color: discrepancyCount > 0 ? T.red : T.accent, fontFamily: T.sans }}>
+            {discrepancyCount}
           </div>
         </div>
       </div>
@@ -206,7 +272,7 @@ export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
       {showForm && (
         <div style={{ background: "#fff", borderRadius: T.rLg, border: `1px solid ${T.border}`, boxShadow: T.shMd, padding: "24px", marginBottom: 24 }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: T.ink, fontFamily: T.sans, margin: "0 0 16px" }}>
-            {editId ? "UBO bearbeiten" : "Neuen UBO erfassen"}
+            {editingDeclId ? "UBO bearbeiten" : "Neuen UBO erfassen"}
           </h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div>
@@ -241,7 +307,7 @@ export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
           <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
             <button onClick={handleSave} disabled={saving || !formName.trim()}
               style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: formName.trim() ? T.accent : T.s2, color: formName.trim() ? "#fff" : T.ink4, fontSize: 13, fontWeight: 700, cursor: formName.trim() && !saving ? "pointer" : "default", fontFamily: T.sans, opacity: saving ? 0.6 : 1 }}>
-              {saving ? "Wird gespeichert..." : editId ? "Aktualisieren" : "Speichern"}
+              {saving ? "Wird gespeichert..." : editingDeclId ? "Aktualisieren" : "Speichern"}
             </button>
             <button onClick={resetForm}
               style={{ padding: "9px 20px", borderRadius: 8, border: `1px solid ${T.border}`, background: "#fff", color: T.ink3, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: T.sans }}>
@@ -252,72 +318,88 @@ export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
       )}
 
       {/* UBO list */}
-      {declarations.length === 0 ? (
+      {allUbos.length === 0 ? (
         <div style={{ padding: 40, textAlign: "center", color: T.ink3, fontFamily: T.sans, background: "#fff", borderRadius: T.rLg, border: `1px solid ${T.border}` }}>
           <Icon d={icons.users} size={32} color={T.ink4} />
           <div style={{ fontSize: 14, fontWeight: 500, marginTop: 12 }}>Noch keine UBO deklariert.</div>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {declarations.map((ubo) => {
-            const status = LETA_STATUS_CONFIG[ubo.leta_status] ?? LETA_STATUS_CONFIG.not_checked;
-            const daysLeft = getDiscrepancyDaysLeft(ubo.discrepancy_detected_at);
-            const isDeleting = deleting === ubo.id;
+        declarations.map((decl) => {
+          const status = LETA_STATUS_CONFIG[decl.leta_status] ?? LETA_STATUS_CONFIG.not_checked;
+          const daysLeft = getDeadlineDaysLeft(decl.report_deadline);
 
-            return (
-              <div key={ubo.id} style={{
-                background: "#fff", borderRadius: T.r, border: `1px solid ${T.border}`,
-                boxShadow: T.shSm, padding: "16px 20px", opacity: isDeleting ? 0.5 : 1, transition: "all 0.15s",
-              }}>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: T.s2, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Icon d={icons.users} size={20} color={T.ink3} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: T.ink, fontFamily: T.sans }}>{ubo.name}</span>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: status.color, background: status.bg, padding: "2px 8px", borderRadius: 6, fontFamily: T.sans }}>
-                        {status.label}
-                      </span>
-                    </div>
-                    <div style={{ display: "flex", gap: 16, fontSize: 12, color: T.ink3, fontFamily: T.sans }}>
-                      {ubo.nationality && <span>Nationalität: {ubo.nationality}</span>}
-                      {ubo.share_percent != null && <span>Anteil: {ubo.share_percent}%</span>}
-                      {ubo.control_type && <span>{ubo.control_type}</span>}
-                    </div>
-
-                    {/* Discrepancy warning with countdown */}
-                    {ubo.leta_status === "discrepancy" && daysLeft !== null && (
-                      <div style={{
-                        marginTop: 8, padding: "8px 12px", borderRadius: 8,
-                        background: daysLeft <= 7 ? "#fef2f2" : "#fffbeb",
-                        border: `1px solid ${daysLeft <= 7 ? "#dc262622" : "#d9770622"}`,
-                        fontSize: 12, fontFamily: T.sans, color: daysLeft <= 7 ? "#dc2626" : "#d97706",
-                        fontWeight: 600,
-                      }}>
-                        {daysLeft <= 0
-                          ? "Meldefrist abgelaufen — sofortige Meldung erforderlich!"
-                          : `Meldefrist: ${daysLeft} Tage verbleibend (30-Tage-Frist)`}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Action buttons */}
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                    <button onClick={() => openEdit(ubo)}
-                      style={{ padding: "6px 10px", borderRadius: 6, border: `1px solid ${T.border}`, background: "#fff", color: T.ink3, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: T.sans }}>
-                      Bearbeiten
-                    </button>
-                    <button onClick={() => handleDelete(ubo.id)}
-                      style={{ padding: "6px 10px", borderRadius: 6, border: `1px solid ${T.red}22`, background: T.redS, color: T.red, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: T.sans }}>
-                      Löschen
-                    </button>
-                  </div>
-                </div>
+          return (
+            <div key={decl.id} style={{ marginBottom: 16 }}>
+              {/* Declaration header with LETA status */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: status.color, background: status.bg, padding: "2px 8px", borderRadius: 6, fontFamily: T.sans, textTransform: "uppercase" }}>
+                  {status.label}
+                </span>
+                {decl.leta_status === "discrepancy" && daysLeft !== null && (
+                  <span style={{
+                    fontSize: 11, fontWeight: 600, fontFamily: T.sans,
+                    color: daysLeft <= 7 ? "#dc2626" : "#d97706",
+                  }}>
+                    {daysLeft <= 0
+                      ? "Meldefrist abgelaufen!"
+                      : `${daysLeft} Tage bis Meldefrist`}
+                  </span>
+                )}
               </div>
-            );
-          })}
-        </div>
+
+              {/* UBO persons in this declaration */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {(decl.ubo_data ?? []).map((ubo, i) => (
+                  <div key={i} style={{
+                    background: "#fff", borderRadius: T.r, border: `1px solid ${T.border}`,
+                    boxShadow: T.shSm, padding: "16px 20px",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: T.s2, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Icon d={icons.users} size={20} color={T.ink3} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: T.ink, fontFamily: T.sans, marginBottom: 4 }}>
+                          {ubo.name}
+                        </div>
+                        <div style={{ display: "flex", gap: 16, fontSize: 12, color: T.ink3, fontFamily: T.sans }}>
+                          {ubo.nationality && <span>Nationalität: {ubo.nationality}</span>}
+                          {ubo.share_percent != null && <span>Anteil: {ubo.share_percent}%</span>}
+                          {ubo.control_type && <span>{ubo.control_type}</span>}
+                          {ubo.birthDate && <span>Geb.: {ubo.birthDate}</span>}
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        <button onClick={() => openEditUbo(decl, i)}
+                          style={{ padding: "6px 10px", borderRadius: 6, border: `1px solid ${T.border}`, background: "#fff", color: T.ink3, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: T.sans }}>
+                          Bearbeiten
+                        </button>
+                        <button onClick={() => handleDeleteUbo(decl.id, i)}
+                          style={{ padding: "6px 10px", borderRadius: 6, border: `1px solid ${T.red}22`, background: T.redS, color: T.red, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: T.sans }}>
+                          Löschen
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Discrepancy warning */}
+              {decl.leta_status === "discrepancy" && decl.discrepancy_details && (
+                <div style={{
+                  marginTop: 8, padding: "8px 12px", borderRadius: 8,
+                  background: (daysLeft ?? 30) <= 7 ? "#fef2f2" : "#fffbeb",
+                  border: `1px solid ${(daysLeft ?? 30) <= 7 ? "#dc262622" : "#d9770622"}`,
+                  fontSize: 12, fontFamily: T.sans, color: (daysLeft ?? 30) <= 7 ? "#dc2626" : "#d97706",
+                }}>
+                  {decl.discrepancy_details}
+                </div>
+              )}
+            </div>
+          );
+        })
       )}
     </div>
   );

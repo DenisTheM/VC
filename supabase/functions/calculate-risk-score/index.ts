@@ -7,6 +7,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { getCorsHeaders, corsResponse } from "../_shared/cors.ts";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "../_shared/rate-limit.ts";
+import { verifyAuth, unauthorizedResponse } from "../_shared/auth.ts";
 
 // Inline risk scoring (mirrors shared/lib/riskScoring.ts for Deno)
 const DEFAULT_WEIGHTS = { country: 25, industry: 15, pep: 20, products: 15, volume: 10, source_of_funds: 15 };
@@ -59,6 +60,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsResponse(req);
 
   try {
+    // Auth check
+    const auth = await verifyAuth(req);
+    if (!auth.authenticated) return unauthorizedResponse(cors);
+
     const ip = getClientIp(req);
     const rl = await checkRateLimit(ip, "calculate-risk-score", 10, 60_000);
     if (!rl.allowed) return rateLimitResponse(cors, rl.retryAfter);
@@ -108,14 +113,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get auth user
-    const authHeader = req.headers.get("authorization");
-    let userId: string | null = null;
-    if (authHeader) {
-      const token = authHeader.replace("Bearer ", "");
-      const { data: { user } } = await supabase.auth.getUser(token);
-      userId = user?.id ?? null;
-    }
+    const userId = auth.userId;
 
     // Calculate scores for all customers
     let calculated = 0;
