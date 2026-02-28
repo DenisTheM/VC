@@ -107,13 +107,15 @@ Deno.serve(async (req) => {
       const email = authUser?.user?.email;
 
       // Create in-app notification
-      await supabase.from("notifications").insert({
-        user_id: p.id,
-        type: "admin_message",
-        title: subject,
-        body: body.length > 200 ? body.substring(0, 200) + "..." : body,
-        link: "/portal/messages",
-      }).catch(() => { /* ignore */ });
+      try {
+        await supabase.from("notifications").insert({
+          user_id: p.id,
+          type: "admin_message",
+          title: subject,
+          body: body.length > 200 ? body.substring(0, 200) + "..." : body,
+          link: "/portal/messages",
+        });
+      } catch { /* ignore notification insert errors */ }
 
       if (!email || !RESEND_API_KEY) continue;
 

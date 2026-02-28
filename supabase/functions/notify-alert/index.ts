@@ -41,13 +41,29 @@ interface AlertData {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" } });
+  }
+
   try {
+    // Authenticate caller
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return jsonResponse({ error: "Missing authorization header" }, 401);
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: caller }, error: authErr } = await supabase.auth.getUser(token);
+    if (authErr || !caller) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+
     const { alert_id } = await req.json();
     if (!alert_id) {
       return jsonResponse({ error: "alert_id is required" }, 400);
     }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Load the alert
     const { data: alert, error: alertErr } = await supabase
@@ -76,7 +92,7 @@ serve(async (req) => {
 
     // For each affected organization, find its members and send emails
     for (const client of affectedClients as unknown as AffectedClient[]) {
-      const orgName = client.organizations?.name ?? "Ihr Unternehmen";
+      const orgName = escapeHtml(client.organizations?.name ?? "Ihr Unternehmen");
 
       // Get all members of this organization
       const { data: members } = await supabase
@@ -110,7 +126,7 @@ serve(async (req) => {
               alert as AlertData,
               client,
               orgName,
-              profile.full_name || "Sehr geehrte Damen und Herren",
+              escapeHtml(profile.full_name || "Sehr geehrte Damen und Herren"),
             ),
           });
           orgSentCount++;
@@ -172,7 +188,7 @@ serve(async (req) => {
       }
     }
 
-    return jsonResponse({ sent: sentCount, errors: errors.length, errorDetails: errors });
+    return jsonResponse({ sent: sentCount, errors: errors.length });
   } catch (err) {
     console.error("notify-alert error:", err);
     return jsonResponse({ error: String(err) }, 500);
@@ -313,6 +329,14 @@ function buildAlertEmail(
   </div>
 </body>
 </html>`;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function jsonResponse(data: Record<string, unknown>, status = 200) {

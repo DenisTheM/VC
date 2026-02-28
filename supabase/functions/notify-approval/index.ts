@@ -31,13 +31,24 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Authenticate caller
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return jsonResponse({ error: "Missing authorization header" }, 401);
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: caller }, error: authErr } = await supabase.auth.getUser(token);
+    if (authErr || !caller) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+
     const { document_id, organization_id } = await req.json();
 
     if (!document_id || !organization_id) {
       return jsonResponse({ error: "document_id und organization_id sind erforderlich." }, 400);
     }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Load organization with contact_email
     const { data: org, error: orgErr } = await supabase
@@ -69,13 +80,13 @@ Deno.serve(async (req) => {
     }
 
     // Send approval request email
-    const recipientName = org.contact_name || org.contact_email.split("@")[0];
+    const recipientName = escapeHtml(org.contact_name || org.contact_email.split("@")[0]);
     const portalLink = `${PORTAL_URL}/app/portal#approvals`;
 
     await sendEmail({
       to: org.contact_email,
       subject: `Dokument zur Freigabe bereit — ${doc.name} (${org.name})`,
-      html: buildApprovalEmail(recipientName, org.name, doc.name, portalLink),
+      html: buildApprovalEmail(recipientName, escapeHtml(org.name), escapeHtml(doc.name), portalLink),
     });
 
     return jsonResponse({
@@ -192,6 +203,14 @@ function buildApprovalEmail(
   </div>
 </body>
 </html>`;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function jsonResponse(data: Record<string, unknown>, status = 200) {

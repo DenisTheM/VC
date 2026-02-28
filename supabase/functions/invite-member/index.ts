@@ -40,6 +40,30 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // ── Authenticate caller ──────────────────────────────────────────
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return jsonResponse({ error: "Missing authorization header" }, 401);
+    }
+
+    const authSupabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: caller }, error: authErr } = await authSupabase.auth.getUser(token);
+    if (authErr || !caller) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+
+    // Check admin role
+    const { data: callerProfile } = await authSupabase
+      .from("profiles")
+      .select("role")
+      .eq("id", caller.id)
+      .single();
+
+    if (!callerProfile || callerProfile.role !== "admin") {
+      return jsonResponse({ error: "Admin access required" }, 403);
+    }
+
     const { email, full_name, org_id, role } = await req.json();
 
     // ── Validate input ───────────────────────────────────────────────
