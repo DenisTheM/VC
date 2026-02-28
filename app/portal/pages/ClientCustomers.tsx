@@ -4,6 +4,7 @@ import { Icon, icons } from "@shared/components/Icon";
 import { Field } from "@shared/components/Field";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import { useAuthContext } from "@shared/components/AuthContext";
+import { supabase } from "@shared/lib/supabase";
 import { searchZefix, type ZefixResult } from "@shared/lib/zefix";
 import { exportCustomerDocumentAsPdf, exportAuditTrailAsPdf } from "@shared/lib/pdfExport";
 import { useAutosave, readAutosave } from "@shared/hooks/useAutosave";
@@ -549,7 +550,7 @@ function CustomerDetail({ org, role, customerId, onBack, onOpenDoc }: {
   const [auditCustomer, setAuditCustomer] = useState<CustomerAuditEntry[]>([]);
   const [auditDocs, setAuditDocs] = useState<CustomerDocAuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"docs" | "profile" | "history">("docs");
+  const [tab, setTab] = useState<"docs" | "profile" | "screening" | "history">("docs");
   const [showTemplateSelect, setShowTemplateSelect] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<Record<string, string>>({});
@@ -686,7 +687,7 @@ function CustomerDetail({ org, role, customerId, onBack, onOpenDoc }: {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${T.border}`, marginBottom: 24 }}>
-        {(["docs", "profile", "history"] as const).map((t) => (
+        {(["docs", "profile", "screening", "history"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -696,7 +697,7 @@ function CustomerDetail({ org, role, customerId, onBack, onOpenDoc }: {
               borderBottom: tab === t ? `2px solid ${T.accent}` : "2px solid transparent", marginBottom: -1,
             }}
           >
-            {t === "docs" ? "Dokumente" : t === "profile" ? "Stammdaten" : "Verlauf"}
+            {t === "docs" ? "Dokumente" : t === "profile" ? "Stammdaten" : t === "screening" ? "Screening" : "Verlauf"}
           </button>
         ))}
       </div>
@@ -924,6 +925,11 @@ function CustomerDetail({ org, role, customerId, onBack, onOpenDoc }: {
         </>
       )}
 
+      {/* Tab: Screening */}
+      {tab === "screening" && (
+        <ScreeningTab org={org} customer={customer} role={role} />
+      )}
+
       {/* Tab: Verlauf */}
       {tab === "history" && (
         <>
@@ -986,6 +992,174 @@ function CustomerDetail({ org, role, customerId, onBack, onOpenDoc }: {
           onClose={() => setShowDeleteModal(false)}
           onDeleted={onBack}
         />
+      )}
+    </>
+  );
+}
+
+// =================================================================
+//  Screening Tab — Sanctions/PEP screening for a customer
+// =================================================================
+
+function ScreeningTab({ org, customer, role }: { org: ClientOrg; customer: Customer; role?: string }) {
+  const [screenings, setScreenings] = useState<{
+    id: string; status: string; query_name: string; screening_type: string;
+    matches: { name: string; score: number; datasets: string[] }[];
+    screened_at: string; notes: string | null; reviewed_at: string | null;
+  }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [screening, setScreening] = useState(false);
+  const [screeningError, setScreeningError] = useState<string | null>(null);
+  const [lastResult, setLastResult] = useState<{ status: string; match_count: number } | null>(null);
+
+  const STATUS_INFO: Record<string, { label: string; bg: string; color: string }> = {
+    clear: { label: "Keine Treffer", bg: "#f0fdf4", color: "#16a34a" },
+    potential_match: { label: "Möglicher Treffer", bg: "#fff7ed", color: "#ea580c" },
+    confirmed_match: { label: "Bestätigter Treffer", bg: "#fef2f2", color: "#dc2626" },
+    false_positive: { label: "Fehlalarm", bg: "#f9fafb", color: "#6b7280" },
+  };
+
+  useEffect(() => {
+    loadScreenings();
+  }, [customer.id]);
+
+  async function loadScreenings() {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("screening_results")
+        .select("id, status, query_name, screening_type, matches, screened_at, notes, reviewed_at")
+        .eq("customer_id", customer.id)
+        .order("screened_at", { ascending: false });
+      if (!error) setScreenings(data ?? []);
+    } catch (err) {
+      console.error("Load screenings:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleScreen() {
+    setScreening(true);
+    setScreeningError(null);
+    setLastResult(null);
+
+    const name = customer.customer_type === "natural_person"
+      ? [customer.first_name, customer.last_name].filter(Boolean).join(" ")
+      : customer.company_name || "Unbekannt";
+
+    try {
+      const { data, error } = await supabase.functions.invoke("sanctions-screening", {
+        body: {
+          name,
+          organization_id: org.id,
+          customer_id: customer.id,
+          date_of_birth: customer.date_of_birth ?? undefined,
+          nationality: customer.nationality ?? undefined,
+          screening_type: "sanctions",
+        },
+      });
+      if (error) throw error;
+      setLastResult(data as { status: string; match_count: number });
+      loadScreenings();
+    } catch (err) {
+      console.error("Screening failed:", err);
+      setScreeningError("Screening fehlgeschlagen. Bitte versuchen Sie es erneut.");
+    } finally {
+      setScreening(false);
+    }
+  }
+
+  if (loading) return <div style={{ padding: 20, color: T.ink3, fontSize: 13 }}>Screening-Daten werden geladen...</div>;
+
+  return (
+    <>
+      {/* Screening action */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: T.ink, margin: 0 }}>Sanctions & PEP Screening</h3>
+        {canEdit(role) && (
+          <button
+            onClick={handleScreen}
+            disabled={screening}
+            style={{
+              padding: "8px 20px", borderRadius: 10, border: "none",
+              background: T.accent, color: "#fff", fontSize: 12, fontWeight: 700,
+              cursor: screening ? "default" : "pointer", fontFamily: T.sans,
+              opacity: screening ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6,
+            }}
+          >
+            <Icon d={icons.shield} size={13} color="#fff" />
+            {screening ? "Läuft..." : "Jetzt screenen"}
+          </button>
+        )}
+      </div>
+
+      {screeningError && (
+        <div style={{ padding: "10px 14px", borderRadius: 8, background: "#fef2f2", border: "1px solid #dc262622", color: "#dc2626", fontSize: 12, fontFamily: T.sans, marginBottom: 16 }}>
+          {screeningError}
+        </div>
+      )}
+
+      {lastResult && (
+        <div style={{
+          padding: "12px 16px", borderRadius: 8, marginBottom: 16,
+          background: lastResult.status === "clear" ? "#f0fdf4" : "#fff7ed",
+          border: `1px solid ${lastResult.status === "clear" ? "#16a34a22" : "#ea580c22"}`,
+          fontSize: 13, fontFamily: T.sans,
+          color: lastResult.status === "clear" ? "#16a34a" : "#ea580c", fontWeight: 600,
+        }}>
+          {lastResult.status === "clear"
+            ? "Keine Treffer — Kunde ist unauffällig."
+            : `${lastResult.match_count} mögliche Treffer gefunden. Bitte prüfen.`}
+        </div>
+      )}
+
+      {/* History */}
+      {screenings.length === 0 ? (
+        <div style={{ padding: 32, textAlign: "center", color: T.ink3, fontSize: 13, background: T.s1, borderRadius: 10 }}>
+          Noch keine Screenings durchgeführt.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {screenings.map((s) => {
+            const info = STATUS_INFO[s.status] ?? STATUS_INFO.clear;
+            return (
+              <div key={s.id} style={{ background: "#fff", borderRadius: T.r, border: `1px solid ${T.border}`, padding: "14px 18px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>{s.query_name}</div>
+                  <Badge label={info.label} bg={info.bg} color={info.color} />
+                </div>
+                <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans }}>
+                  {new Date(s.screened_at).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  {s.matches.length > 0 && ` · ${s.matches.length} Treffer`}
+                  {s.reviewed_at && ` · Überprüft`}
+                </div>
+                {s.matches.length > 0 && (
+                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                    {s.matches.slice(0, 3).map((m, idx) => (
+                      <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", borderRadius: 6, background: T.s1, fontSize: 12 }}>
+                        <span style={{ color: T.ink2, fontFamily: T.sans }}>{m.name}</span>
+                        <span style={{ color: m.score >= 0.9 ? "#dc2626" : m.score >= 0.8 ? "#ea580c" : "#d97706", fontWeight: 700, fontFamily: T.sans }}>
+                          {Math.round(m.score * 100)}%
+                        </span>
+                      </div>
+                    ))}
+                    {s.matches.length > 3 && (
+                      <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, paddingLeft: 10 }}>
+                        + {s.matches.length - 3} weitere Treffer
+                      </div>
+                    )}
+                  </div>
+                )}
+                {s.notes && (
+                  <div style={{ fontSize: 12, color: T.ink3, fontFamily: T.sans, marginTop: 6, fontStyle: "italic" }}>
+                    {s.notes}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </>
   );

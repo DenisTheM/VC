@@ -3,8 +3,24 @@ import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import { supabase } from "@shared/lib/supabase";
-import { screeningStatusInfo, datasetName, type ScreeningResult } from "@shared/lib/sanctionsScreening";
+import { screeningStatusInfo, datasetName, type ScreeningResult, type ScreeningMatch } from "@shared/lib/sanctionsScreening";
 import { type Organization } from "../lib/api";
+
+interface SimpleCustomer {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  company_name: string | null;
+  customer_type: string;
+  date_of_birth: string | null;
+  nationality: string | null;
+}
+
+function customerDisplayName(c: SimpleCustomer): string {
+  return c.customer_type === "natural_person"
+    ? [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unbekannt"
+    : c.company_name || "Unbekannt";
+}
 
 export function ScreeningPage({ organizations }: { organizations: Organization[] }) {
   const [selectedOrg, setSelectedOrg] = useState<string>("");
@@ -13,8 +29,22 @@ export function ScreeningPage({ organizations }: { organizations: Organization[]
   const [selectedResult, setSelectedResult] = useState<ScreeningResult | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
 
+  // New screening state
+  const [customers, setCustomers] = useState<SimpleCustomer[]>([]);
+  const [screeningCustomerId, setScreeningCustomerId] = useState<string>("");
+  const [manualName, setManualName] = useState("");
+  const [manualDob, setManualDob] = useState("");
+  const [manualNationality, setManualNationality] = useState("");
+  const [screeningMode, setScreeningMode] = useState<"customer" | "manual">("customer");
+  const [screening, setScreening] = useState(false);
+  const [screeningResult, setScreeningResult] = useState<{ status: string; match_count: number; matches: ScreeningMatch[] } | null>(null);
+  const [screeningError, setScreeningError] = useState<string | null>(null);
+
   useEffect(() => {
-    if (selectedOrg) loadResults(selectedOrg);
+    if (selectedOrg) {
+      loadResults(selectedOrg);
+      loadCustomers(selectedOrg);
+    }
   }, [selectedOrg]);
 
   async function loadResults(orgId: string) {
@@ -27,6 +57,69 @@ export function ScreeningPage({ organizations }: { organizations: Organization[]
 
     if (!error && data) setResults(data as ScreeningResult[]);
     setLoading(false);
+  }
+
+  async function loadCustomers(orgId: string) {
+    const { data } = await supabase
+      .from("client_customers")
+      .select("id, first_name, last_name, company_name, customer_type, date_of_birth, nationality")
+      .eq("organization_id", orgId)
+      .eq("status", "active")
+      .order("last_name");
+
+    setCustomers((data ?? []) as SimpleCustomer[]);
+  }
+
+  async function handleStartScreening() {
+    if (!selectedOrg) return;
+    setScreening(true);
+    setScreeningError(null);
+    setScreeningResult(null);
+
+    let name = "";
+    let customerId: string | undefined;
+    let dob: string | undefined;
+    let nationality: string | undefined;
+
+    if (screeningMode === "customer" && screeningCustomerId) {
+      const cust = customers.find((c) => c.id === screeningCustomerId);
+      if (!cust) { setScreeningError("Kunde nicht gefunden."); setScreening(false); return; }
+      name = customerDisplayName(cust);
+      customerId = cust.id;
+      dob = cust.date_of_birth ?? undefined;
+      nationality = cust.nationality ?? undefined;
+    } else if (screeningMode === "manual" && manualName.trim()) {
+      name = manualName.trim();
+      dob = manualDob || undefined;
+      nationality = manualNationality || undefined;
+    } else {
+      setScreeningError("Bitte Name oder Kunde angeben.");
+      setScreening(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke("sanctions-screening", {
+        body: {
+          name,
+          organization_id: selectedOrg,
+          customer_id: customerId,
+          date_of_birth: dob,
+          nationality,
+          screening_type: "sanctions",
+        },
+      });
+
+      if (error) throw error;
+      setScreeningResult(data as { status: string; match_count: number; matches: ScreeningMatch[] });
+      // Reload results list
+      loadResults(selectedOrg);
+    } catch (err) {
+      console.error("Screening failed:", err);
+      setScreeningError("Screening fehlgeschlagen. Bitte versuchen Sie es erneut.");
+    } finally {
+      setScreening(false);
+    }
   }
 
   async function handleReview(resultId: string, newStatus: "confirmed_match" | "false_positive") {
@@ -65,7 +158,7 @@ export function ScreeningPage({ organizations }: { organizations: Organization[]
       <div style={{ display: "flex", gap: 12, marginBottom: 24, alignItems: "center" }}>
         <select
           value={selectedOrg}
-          onChange={(e) => setSelectedOrg(e.target.value)}
+          onChange={(e) => { setSelectedOrg(e.target.value); setScreeningResult(null); }}
           style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, minWidth: 220 }}
         >
           <option value="">Organisation wählen...</option>
@@ -79,6 +172,116 @@ export function ScreeningPage({ organizations }: { organizations: Organization[]
           </span>
         )}
       </div>
+
+      {/* New Screening Panel */}
+      {selectedOrg && (
+        <div style={{ background: "#fff", borderRadius: T.rLg, border: `1px solid ${T.border}`, padding: 24, marginBottom: 24, boxShadow: T.shSm }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: T.ink, fontFamily: T.sans, margin: "0 0 16px", display: "flex", alignItems: "center", gap: 8 }}>
+            <Icon d={icons.search} size={18} color={T.accent} />
+            Neues Screening
+          </h2>
+
+          {/* Mode toggle */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            {(["customer", "manual"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setScreeningMode(mode)}
+                style={{
+                  padding: "6px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, fontFamily: T.sans,
+                  border: `1px solid ${screeningMode === mode ? T.accent : T.border}`,
+                  background: screeningMode === mode ? T.accentS : "#fff",
+                  color: screeningMode === mode ? T.accent : T.ink3,
+                  cursor: "pointer",
+                }}
+              >
+                {mode === "customer" ? "Kunde auswählen" : "Manuelle Eingabe"}
+              </button>
+            ))}
+          </div>
+
+          {screeningMode === "customer" ? (
+            <div>
+              <select
+                value={screeningCustomerId}
+                onChange={(e) => setScreeningCustomerId(e.target.value)}
+                style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, boxSizing: "border-box" }}
+              >
+                <option value="">Kunde wählen...</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>{customerDisplayName(c)}{c.date_of_birth ? ` (${c.date_of_birth})` : ""}</option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ flex: 2 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: T.ink3, fontFamily: T.sans, display: "block", marginBottom: 4 }}>Name *</label>
+                <input
+                  type="text" value={manualName} onChange={(e) => setManualName(e.target.value)}
+                  placeholder="Vor- und Nachname oder Firma..."
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, boxSizing: "border-box" }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: T.ink3, fontFamily: T.sans, display: "block", marginBottom: 4 }}>Geburtsdatum</label>
+                <input
+                  type="date" value={manualDob} onChange={(e) => setManualDob(e.target.value)}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, boxSizing: "border-box" }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: T.ink3, fontFamily: T.sans, display: "block", marginBottom: 4 }}>Nationalität</label>
+                <input
+                  type="text" value={manualNationality} onChange={(e) => setManualNationality(e.target.value)}
+                  placeholder="z.B. CH"
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, boxSizing: "border-box" }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center" }}>
+            <button
+              onClick={handleStartScreening}
+              disabled={screening}
+              style={{
+                padding: "10px 24px", borderRadius: 10, border: "none",
+                background: T.accent, color: "#fff", fontSize: 13, fontWeight: 700,
+                cursor: screening ? "default" : "pointer", fontFamily: T.sans,
+                opacity: screening ? 0.6 : 1, display: "inline-flex", alignItems: "center", gap: 6,
+              }}
+            >
+              <Icon d={icons.shield} size={14} color="#fff" />
+              {screening ? "Screening läuft..." : "Screening starten"}
+            </button>
+
+            {screeningError && (
+              <span style={{ fontSize: 12, color: "#dc2626", fontFamily: T.sans }}>{screeningError}</span>
+            )}
+          </div>
+
+          {/* Inline screening result */}
+          {screeningResult && (
+            <div style={{
+              marginTop: 16, padding: "14px 18px", borderRadius: T.r,
+              background: screeningResult.status === "clear" ? "#f0fdf4" : "#fff7ed",
+              border: `1px solid ${screeningResult.status === "clear" ? "#16a34a22" : "#ea580c22"}`,
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: screeningResult.status === "clear" ? "#16a34a" : "#ea580c", fontFamily: T.sans, marginBottom: 4 }}>
+                {screeningResult.status === "clear"
+                  ? "Keine Treffer gefunden"
+                  : `${screeningResult.match_count} mögliche Treffer gefunden`}
+              </div>
+              {screeningResult.matches.length > 0 && (
+                <div style={{ fontSize: 12, color: T.ink3, fontFamily: T.sans }}>
+                  Die Treffer sind unten in der Überprüfungsliste sichtbar.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {loading && <div style={{ padding: 32, color: T.ink3, fontFamily: T.sans }}>Laden...</div>}
 
@@ -97,14 +300,9 @@ export function ScreeningPage({ organizations }: { organizations: Organization[]
                   key={r.id}
                   onClick={() => setSelectedResult(r)}
                   style={{
-                    background: "#fff",
-                    borderRadius: T.r,
-                    border: `1px solid #fed7aa`,
-                    padding: "16px 20px",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 16,
+                    background: "#fff", borderRadius: T.r, border: `1px solid #fed7aa`,
+                    padding: "16px 20px", cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 16,
                     transition: "box-shadow 0.15s",
                   }}
                   onMouseOver={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = T.shMd)}
@@ -138,7 +336,7 @@ export function ScreeningPage({ organizations }: { organizations: Organization[]
             </button>
           </div>
 
-          {selectedResult.matches.map((match, idx) => (
+          {(selectedResult.matches as ScreeningMatch[]).map((match, idx) => (
             <div key={idx} style={{ background: T.s1, borderRadius: T.r, padding: "14px 18px", marginBottom: 10, border: `1px solid ${T.border}` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>{match.name}</div>
@@ -165,7 +363,7 @@ export function ScreeningPage({ organizations }: { organizations: Organization[]
               onChange={(e) => setReviewNotes(e.target.value)}
               placeholder="Begründung für Entscheidung..."
               rows={3}
-              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, resize: "vertical" }}
+              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, resize: "vertical", boxSizing: "border-box" }}
             />
           </div>
 
@@ -211,6 +409,15 @@ export function ScreeningPage({ organizations }: { organizations: Organization[]
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && selectedOrg && results.length === 0 && !screeningResult && (
+        <div style={{ padding: 40, textAlign: "center", color: T.ink3, fontFamily: T.sans, background: "#fff", borderRadius: T.rLg, border: `1px solid ${T.border}` }}>
+          <Icon d={icons.shield} size={32} color={T.ink4} />
+          <div style={{ fontSize: 14, fontWeight: 500, marginTop: 12 }}>Noch keine Screenings durchgeführt.</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Verwenden Sie das Formular oben, um ein Screening zu starten.</div>
         </div>
       )}
     </div>

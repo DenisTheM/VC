@@ -715,12 +715,20 @@ export async function updateElearningProgress(
 
 // ─── Sanctions Screening ───────────────────────────────────────────
 
-export async function triggerScreening(customerId: string): Promise<void> {
-  const { error } = await supabase.functions.invoke("sanctions-screening", {
-    body: { customer_id: customerId },
+export async function triggerScreening(params: {
+  customer_id: string;
+  organization_id: string;
+  name: string;
+  date_of_birth?: string | null;
+  nationality?: string | null;
+  screening_type?: "sanctions" | "pep" | "adverse_media";
+}): Promise<{ status: string; match_count: number; matches: unknown[] }> {
+  const { data, error } = await supabase.functions.invoke("sanctions-screening", {
+    body: params,
   });
 
   if (error) throw error;
+  return data;
 }
 
 export async function loadCustomerScreenings(orgId: string, customerId?: string) {
