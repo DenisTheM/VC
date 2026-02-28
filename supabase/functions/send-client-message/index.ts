@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
           type: "admin_message",
           title: subject,
           body: body.length > 200 ? body.substring(0, 200) + "..." : body,
-          link: "/portal/messages",
+          link: "/app/portal#dashboard",
         });
       } catch { /* ignore notification insert errors */ }
 

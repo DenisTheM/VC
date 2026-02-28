@@ -323,6 +323,37 @@ export async function submitForReview(docId: string): Promise<void> {
     .eq("id", docId);
 
   if (error) throw error;
+
+  // Notify approvers about the new review submission
+  try {
+    const { data: doc } = await supabase
+      .from("customer_documents")
+      .select("organization_id, name")
+      .eq("id", docId)
+      .single();
+
+    if (doc) {
+      const { data: approvers } = await supabase
+        .from("organization_members")
+        .select("user_id")
+        .eq("organization_id", doc.organization_id)
+        .eq("role", "approver");
+
+      if (approvers && approvers.length > 0) {
+        await supabase.from("notifications").insert(
+          approvers.map((a: { user_id: string }) => ({
+            user_id: a.user_id,
+            type: "doc_review_submitted",
+            title: `Dokument zur Prüfung: ${doc.name}`,
+            body: "Ein Kundendokument wurde zur Prüfung eingereicht.",
+            link: "/app/portal#customers",
+          })),
+        );
+      }
+    }
+  } catch {
+    // Non-critical — document status already updated
+  }
 }
 
 export async function approveCustomerDocument(docId: string): Promise<void> {

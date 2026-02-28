@@ -283,6 +283,16 @@ export async function publishAlert(
     elena_comment: string;
   }[],
 ): Promise<{ sent: number; errors: number } | undefined> {
+  // Validate required fields before publishing
+  const missing: string[] = [];
+  if (!updates.severity) missing.push("Schweregrad");
+  if (!updates.category) missing.push("Kategorie");
+  if (!updates.summary?.trim()) missing.push("Zusammenfassung");
+  if (affectedClients.length === 0) missing.push("Betroffene Kunden");
+  if (missing.length > 0) {
+    throw new Error(`Pflichtfelder fehlen: ${missing.join(", ")}`);
+  }
+
   // Update alert to 'new' status with final values
   const { error: alertErr } = await supabase
     .from("regulatory_alerts")

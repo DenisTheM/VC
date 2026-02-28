@@ -172,7 +172,7 @@ Das Dokument soll sofort verwendbar sein und den aktuellen regulatorischen Stand
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-opus-4-20250514",
+          model: "claude-opus-4-6",
           max_tokens: 12000,
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],

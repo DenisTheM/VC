@@ -19,7 +19,7 @@ export function DashboardPage({ onNav, onGenerateDoc, profile, profOk, stats: db
 
   const stats = [
     { label: "Dokumente", value: dbStats.documentCount, icon: icons.doc, color: T.primary, nav: "documents" },
-    { label: "Jurisdiktionen", value: 2, icon: icons.shield, color: T.accent, nav: "generate" },
+    { label: "Jurisdiktionen", value: Object.values(JURIS).filter((j) => !j.soon).length, icon: icons.shield, color: T.accent, nav: "generate" },
     { label: "Reg. Alerts", value: dbStats.alertCount, icon: icons.alert, color: T.amber, nav: "alerts" },
   ];
 

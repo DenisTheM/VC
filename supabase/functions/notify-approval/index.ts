@@ -89,6 +89,29 @@ Deno.serve(async (req) => {
       html: buildApprovalEmail(recipientName, escapeHtml(org.name), escapeHtml(doc.name), portalLink),
     });
 
+    // Create in-app notifications for all org members
+    try {
+      const { data: members } = await supabase
+        .from("organization_members")
+        .select("user_id")
+        .eq("organization_id", organization_id);
+
+      if (members && members.length > 0) {
+        const notifications = members.map((m: { user_id: string }) => ({
+          user_id: m.user_id,
+          type: "doc_approval_needed",
+          title: `Dokument zur Freigabe: ${doc.name}`,
+          body: `Ein Compliance-Dokument für ${org.name} ist bereit zur Prüfung und Freigabe.`,
+          link: "/app/portal#approvals",
+        }));
+
+        await supabase.from("notifications").insert(notifications);
+      }
+    } catch (notifErr) {
+      console.error("In-app notification insert failed:", notifErr);
+      // Non-critical — email was already sent
+    }
+
     return jsonResponse({
       success: true,
       message: `Benachrichtigung an ${org.contact_email} versendet.`,

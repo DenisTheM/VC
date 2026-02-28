@@ -115,6 +115,20 @@ export async function updateClientActionStatus(
     .eq("id", actionId);
 
   if (error) throw error;
+
+  // Log status change as comment for audit trail
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("action_comments").insert({
+        action_id: actionId,
+        user_id: user.id,
+        text: `Status geändert auf „${newStatus}"`,
+      });
+    }
+  } catch {
+    // Non-critical — status update already saved
+  }
 }
 
 // ─── Action Comments ─────────────────────────────────────────────────

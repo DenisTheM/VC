@@ -562,12 +562,21 @@ function DocDetailView({
         </div>
       </div>
 
-      {/* Status change */}
+      {/* Status change — only show valid transitions */}
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: T.ink3, fontFamily: T.sans }}>Status ändern:</span>
         {(["draft", "review", "current", "outdated"] as DbDocument["status"][]).map((s) => {
           const cfg = STATUS_COLORS[s];
           const isActive = doc.status === s;
+          // Valid status transitions
+          const validTransitions: Record<string, string[]> = {
+            draft: ["review"],
+            review: ["current", "draft"],
+            current: ["outdated", "review"],
+            outdated: ["draft"],
+          };
+          const isValid = isActive || (validTransitions[doc.status] ?? []).includes(s);
+          if (!isValid) return null;
           return (
             <button
               key={s}
@@ -632,8 +641,15 @@ function DocDetailView({
                   if (editing) {
                     // Switching back to preview — discard unsaved changes
                     setEditContent(doc.content ?? "");
+                    setEditing(false);
+                    return;
                   }
-                  setEditing(!editing);
+                  // Entering edit mode on non-draft doc — confirm first
+                  const statusLabel = STATUS_COLORS[doc.status]?.label ?? doc.status;
+                  if (!confirm(`Dieses Dokument hat den Status «${statusLabel}». Änderungen werden gespeichert, aber der Status bleibt unverändert. Fortfahren?`)) {
+                    return;
+                  }
+                  setEditing(true);
                 }}
                 style={{
                   display: "inline-flex",

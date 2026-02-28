@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Virtue Compliance — Entwicklungsagenten Anleitung</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Source+Serif+4:wght@400;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  @page {
+    size: A4;
+    margin: 20mm 20mm 25mm 20mm;
+  }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    color: #111827;
+    line-height: 1.7;
+    font-size: 13px;
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 20mm;
+    background: #fff;
+  }
+
+  /* ── Cover ── */
+  .cover {
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    min-height: 250mm;
+    padding: 40px 0;
+  }
+  .cover-brand {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f3d2e;
+    text-align: center;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .cover-line {
+    width: 100px;
+    height: 2px;
+    background: #0f3d2e;
+    margin: 16px auto 0;
+  }
+  .cover-title {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: #111827;
+    text-align: center;
+    margin-top: 80px;
+    line-height: 1.3;
+  }
+  .cover-subtitle {
+    font-size: 15px;
+    color: #6b7280;
+    text-align: center;
+    margin-top: 12px;
+  }
+  .cover-meta {
+    margin-top: auto;
+    font-size: 11px;
+    color: #9ca3af;
+  }
+  .cover-meta p { margin: 3px 0; }
+  .cover-bottom-line {
+    width: 100px;
+    height: 2px;
+    background: #0f3d2e;
+    margin: 20px auto;
+  }
+  .cover-confidential {
+    text-align: center;
+    font-size: 10px;
+    color: #9ca3af;
+  }
+
+  /* ── Headings ── */
+  h1 {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e3a5f;
+    border-left: 3px solid #16654e;
+    background: #f0fdf4;
+    padding: 10px 14px;
+    margin: 32px 0 16px;
+    border-radius: 0 6px 6px 0;
+    page-break-after: avoid;
+  }
+  h2 {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: #1e3a5f;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 6px;
+    margin: 24px 0 12px;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: #16654e;
+    margin: 18px 0 8px;
+    page-break-after: avoid;
+  }
+
+  /* ── Text ── */
+  p { margin: 0 0 10px; }
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+
+  /* ── Lists ── */
+  ul, ol { padding-left: 22px; margin: 6px 0 12px; }
+  li { margin-bottom: 4px; }
+
+  /* ── Code ── */
+  code {
+    font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+    font-size: 12px;
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #0f3d2e;
+  }
+  pre {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 10px 0 14px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    color: #111827;
+  }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 12px 0;
+    font-size: 12px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+  }
+  th {
+    text-align: left;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #fff;
+    padding: 9px 12px;
+    background: #0f3d2e;
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f1f3;
+    color: #374151;
+  }
+  tr:nth-child(even) td { background: #f9fafb; }
+
+  /* ── Callout Boxes ── */
+  .callout {
+    border-radius: 0 6px 6px 0;
+    padding: 12px 16px;
+    margin: 12px 0;
+    page-break-inside: avoid;
+  }
+  .callout p { margin: 0; }
+  .callout-info {
+    border-left: 4px solid #16654e;
+    background: #f0fdf4;
+  }
+  .callout-warn {
+    border-left: 4px solid #f59e0b;
+    background: #fffbeb;
+  }
+  .callout-tip {
+    border-left: 4px solid #3b82f6;
+    background: #eff6ff;
+  }
+
+  /* ── Separator ── */
+  hr {
+    border: none;
+    border-top: 1px solid #e5e7eb;
+    margin: 20px 0;
+  }
+
+  /* ── TOC ── */
+  .toc {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0 24px;
+  }
+  .toc-title {
+    font-weight: 700;
+    color: #1e3a5f;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+  .toc ol { padding-left: 20px; margin: 0; }
+  .toc li { margin-bottom: 3px; font-size: 12.5px; }
+  .toc a { color: #16654e; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* ── Command Card ── */
+  .cmd-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 16px 0;
+    page-break-inside: avoid;
+  }
+  .cmd-header {
+    background: #0f3d2e;
+    color: #fff;
+    padding: 10px 16px;
+    font-family: 'SF Mono', Consolas, monospace;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .cmd-body { padding: 14px 16px; }
+  .cmd-body p { font-size: 13px; }
+
+  /* ── Print ── */
+  @media print {
+    body { padding: 0; }
+    .no-print { display: none; }
+    h1, h2, h3 { page-break-after: avoid; }
+    .cmd-card, .callout, table { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════ TITELSEITE ════════════════════ -->
+<div class="cover">
+  <div class="cover-brand">Virtue Compliance</div>
+  <div class="cover-line"></div>
+  <div class="cover-title">Entwicklungsagenten<br>Anleitung</div>
+  <div class="cover-subtitle">Custom Slash Commands fuer Claude Code</div>
+
+  <div class="cover-meta">
+    <p>Version: 1.0</p>
+    <p>Datum: 28. Februar 2026</p>
+    <p>Erstellt fuer: Virtue Compliance GmbH, Uznach</p>
+  </div>
+  <div class="cover-bottom-line"></div>
+  <div class="cover-confidential">Internes Dokument</div>
+</div>
+
+<!-- ════════════════════ INHALTSVERZEICHNIS ════════════════════ -->
+
+<div class="toc">
+  <div class="toc-title">Inhaltsverzeichnis</div>
+  <ol>
+    <li><a href="#uebersicht">Uebersicht</a></li>
+    <li><a href="#voraussetzungen">Voraussetzungen</a></li>
+    <li><a href="#test">/test — Test-Runner Agent</a></li>
+    <li><a href="#deploy">/deploy — Deploy Agent</a></li>
+    <li><a href="#audit">/audit — Security Audit Agent</a></li>
+    <li><a href="#quality">/quality — Code Quality Agent</a></li>
+    <li><a href="#uebersicht-tabelle">Schnellreferenz</a></li>
+    <li><a href="#troubleshooting">Troubleshooting</a></li>
+  </ol>
+</div>
+
+<!-- ════════════════════ 1. UEBERSICHT ════════════════════ -->
+
+<h1 id="uebersicht">1. Uebersicht</h1>
+
+<p>Die Entwicklungsagenten sind <strong>Custom Slash Commands</strong> fuer Claude Code, die haeufige Entwicklungsaufgaben automatisieren. Sie sind unter <code>.claude/commands/</code> im Projektverzeichnis definiert und koennen direkt in einer Claude Code Session aufgerufen werden.</p>
+
+<table>
+  <tr>
+    <th>Command</th>
+    <th>Zweck</th>
+    <th>Dauer</th>
+  </tr>
+  <tr>
+    <td><code>/test</code></td>
+    <td>Build pruefen + Integration Tests ausfuehren</td>
+    <td>1-3 Min.</td>
+  </tr>
+  <tr>
+    <td><code>/deploy</code></td>
+    <td>Frontend + Edge Functions deployen</td>
+    <td>1-2 Min.</td>
+  </tr>
+  <tr>
+    <td><code>/audit</code></td>
+    <td>Security-Audit der gesamten Codebase</td>
+    <td>2-5 Min.</td>
+  </tr>
+  <tr>
+    <td><code>/quality</code></td>
+    <td>Code-Qualitaet und Best Practices pruefen</td>
+    <td>2-4 Min.</td>
+  </tr>
+</table>
+
+<div class="callout callout-info">
+  <p><strong>Wichtig:</strong> Alle Commands werden innerhalb der Claude Code CLI ausgefuehrt. Sie sind keine eigenstaendigen Skripte, sondern Anweisungen die Claude Code interpretiert und als strukturierte Aufgaben abarbeitet.</p>
+</div>
+
+<!-- ════════════════════ 2. VORAUSSETZUNGEN ════════════════════ -->
+
+<h1 id="voraussetzungen">2. Voraussetzungen</h1>
+
+<h3>Installierte Tools</h3>
+<ul>
+  <li><strong>Claude Code CLI</strong> — <code>claude</code> muss installiert und konfiguriert sein</li>
+  <li><strong>Node.js</strong> — fuer <code>npm run build</code> und Test-Ausfuehrung</li>
+  <li><strong>Supabase CLI</strong> — fuer Edge Function Deployments (<code>npx supabase</code>)</li>
+  <li><strong>Vercel CLI</strong> — fuer Frontend Deployments (<code>npx vercel</code>)</li>
+</ul>
+
+<h3>Konfigurationsdateien</h3>
+<table>
+  <tr>
+    <th>Datei</th>
+    <th>Benoetigt fuer</th>
+    <th>Inhalt</th>
+  </tr>
+  <tr>
+    <td><code>.env.test</code></td>
+    <td><code>/test</code> (Integration Tests)</td>
+    <td>TEST_EMAIL, TEST_PASSWORD</td>
+  </tr>
+  <tr>
+    <td><code>~/.supabase/access-token</code></td>
+    <td><code>/deploy</code> (Edge Functions)</td>
+    <td>Supabase Access Token</td>
+  </tr>
+  <tr>
+    <td><code>~/.vercel/</code></td>
+    <td><code>/deploy</code> (Frontend)</td>
+    <td>Vercel Login Session</td>
+  </tr>
+</table>
+
+<div class="callout callout-warn">
+  <p><strong>Achtung:</strong> Die <code>.env.test</code> Datei enthaelt echte Zugangsdaten und darf <strong>niemals</strong> committed werden. Sie ist in <code>.gitignore</code> eingetragen.</p>
+</div>
+
+<!-- ════════════════════ 3. /test ════════════════════ -->
+
+<h1 id="test">3. /test — Test-Runner Agent</h1>
+
+<div class="cmd-card">
+  <div class="cmd-header">/test</div>
+  <div class="cmd-body">
+    <p>Fuehrt einen vollstaendigen Build-Check und die Integration Tests aus. Analysiert die Ergebnisse und meldet Probleme.</p>
+  </div>
+</div>
+
+<h2>Was passiert</h2>
+<ol>
+  <li><strong>Build-Pruefung:</strong> <code>npm run build</code> wird ausgefuehrt. Bei TypeScript-Fehlern werden diese aufgelistet und Fixes vorgeschlagen.</li>
+  <li><strong>Integration Tests:</strong> <code>node test-full.mjs</code> startet die Test-Suite mit 18 Modulen und 52+ Tests gegen die live Supabase-Instanz.</li>
+  <li><strong>Analyse:</strong> Claude wertet die Ausgabe aus — PASS/FAIL/WARN Zaehlung, kritische Fehler hervorheben.</li>
+  <li><strong>Zusammenfassung:</strong> Kurzbericht mit Status und empfohlenen naechsten Schritten.</li>
+</ol>
+
+<h2>Aufruf</h2>
+<pre><code>/test</code></pre>
+<p>Keine Parameter. Der Agent entscheidet automatisch, ob Integration Tests moeglich sind (abhaengig von <code>.env.test</code>).</p>
+
+<h2>Getestete Bereiche</h2>
+<table>
+  <tr><th>Modul</th><th>Tests</th></tr>
+  <tr><td>Authentifizierung</td><td>Login, Profil, JWT-Ablauf</td></tr>
+  <tr><td>Organisationen</td><td>Laden, Datenqualitaet (Land, SRO, Kontakt)</td></tr>
+  <tr><td>Company Profiles</td><td>Vollstaendigkeit, Pflichtfelder</td></tr>
+  <tr><td>Dokumente</td><td>CRUD, Content-Qualitaet, Versionshistorie</td></tr>
+  <tr><td>Dokumentgenerierung</td><td>Claude API, Custom Chapters, Formatierung</td></tr>
+  <tr><td>Status-Workflow</td><td>draft &rarr; review &rarr; current &rarr; outdated</td></tr>
+  <tr><td>Regulatory Alerts</td><td>Laden, betroffene Clients, Aktionen</td></tr>
+  <tr><td>Notifications</td><td>System-Benachrichtigungen</td></tr>
+  <tr><td>Messaging</td><td>Admin-Nachrichten senden</td></tr>
+  <tr><td>Kunden (KYC)</td><td>Endkunden, Reviews, Risiko-Levels</td></tr>
+  <tr><td>Zefix</td><td>Handelsregister-Integration</td></tr>
+  <tr><td>Security (RLS)</td><td>Row Level Security, Zugriffsrechte</td></tr>
+  <tr><td>Edge Function Errors</td><td>Fehlende Parameter, ungueltige Requests</td></tr>
+  <tr><td>Datenintegritaet</td><td>Verwaiste Datensaetze, Konsistenz</td></tr>
+</table>
+
+<h2>Beispiel-Ausgabe</h2>
+<pre><code>Build: OK (1.12s, keine Fehler)
+
+Integration Tests:
+  PASS: 48  |  FAIL: 2  |  WARN: 4
+
+Kritische Probleme:
+  1. Document Generation timeout (>120s) — Claude API ueberlastet
+  2. Notification System inaktiv — keine Benachrichtigungen generiert
+
+Empfehlung: Generation retry-logic pruefen, Notification-Trigger testen</code></pre>
+
+<!-- ════════════════════ 4. /deploy ════════════════════ -->
+
+<h1 id="deploy">4. /deploy — Deploy Agent</h1>
+
+<div class="cmd-card">
+  <div class="cmd-header">/deploy [ziel]</div>
+  <div class="cmd-body">
+    <p>Baut das Frontend und deployed es auf Vercel und/oder die Edge Functions auf Supabase. Erkennt automatisch welche Functions sich geaendert haben.</p>
+  </div>
+</div>
+
+<h2>Parameter</h2>
+<table>
+  <tr><th>Aufruf</th><th>Verhalten</th></tr>
+  <tr><td><code>/deploy</code></td><td>Alles deployen (Frontend + geaenderte Edge Functions)</td></tr>
+  <tr><td><code>/deploy frontend</code></td><td>Nur Frontend auf Vercel</td></tr>
+  <tr><td><code>/deploy functions</code></td><td>Nur geaenderte Edge Functions</td></tr>
+  <tr><td><code>/deploy generate-document</code></td><td>Nur eine bestimmte Edge Function</td></tr>
+</table>
+
+<h2>Was passiert</h2>
+<ol>
+  <li><strong>Pre-Flight Check:</strong> Uncommitted Changes? Build erfolgreich?</li>
+  <li><strong>Frontend:</strong> <code>npm run build</code> &rarr; <code>npx vercel --prod</code></li>
+  <li><strong>Edge Functions:</strong> Git-Diff pruefen &rarr; nur geaenderte Functions deployen via <code>npx supabase functions deploy &lt;name&gt; --no-verify-jwt</code></li>
+  <li><strong>Post-Deploy:</strong> Zusammenfassung mit URLs und Status</li>
+</ol>
+
+<h2>Verfuegbare Edge Functions</h2>
+<table>
+  <tr><th>Function</th><th>Beschreibung</th></tr>
+  <tr><td><code>generate-document</code></td><td>Compliance-Dokument via Claude API generieren</td></tr>
+  <tr><td><code>send-client-message</code></td><td>Admin-Nachricht an Organisation senden</td></tr>
+  <tr><td><code>zefix-lookup</code></td><td>Schweizer Handelsregister abfragen</td></tr>
+  <tr><td><code>invite-member</code></td><td>Neues Organisations-Mitglied einladen</td></tr>
+  <tr><td><code>notify-approval</code></td><td>Freigabe-Benachrichtigung senden</td></tr>
+  <tr><td><code>notify-alert</code></td><td>Alert-Benachrichtigung an betroffene Clients</td></tr>
+  <tr><td><code>notify-help-request</code></td><td>Hilfe-Anfrage Benachrichtigung</td></tr>
+  <tr><td><code>check-action-reminders</code></td><td>Erinnerungen fuer offene Massnahmen</td></tr>
+  <tr><td><code>check-customer-reviews</code></td><td>Faellige Kunden-Reviews pruefen</td></tr>
+</table>
+
+<div class="callout callout-tip">
+  <p><strong>Tipp:</strong> Nach groesseren Aenderungen empfiehlt sich der Ablauf: <code>/test</code> &rarr; Commit &rarr; <code>/deploy</code>. So stellst du sicher, dass nur getesteter Code deployed wird.</p>
+</div>
+
+<!-- ════════════════════ 5. /audit ════════════════════ -->
+
+<h1 id="audit">5. /audit — Security Audit Agent</h1>
+
+<div class="cmd-card">
+  <div class="cmd-header">/audit</div>
+  <div class="cmd-body">
+    <p>Fuehrt einen umfassenden Security-Audit der gesamten Codebase durch. Prueft CORS, Authentifizierung, Input-Validierung, Secrets und Security Headers.</p>
+  </div>
+</div>
+
+<h2>Pruefbereiche</h2>
+
+<h3>CORS-Konfiguration</h3>
+<p>Sucht in allen Edge Functions nach <code>Access-Control-Allow-Origin</code>. Wildcard (<code>*</code>) wird als Risiko gemeldet — sollte auf eigene Domains beschraenkt werden.</p>
+
+<h3>Authentifizierung &amp; Autorisierung</h3>
+<ul>
+  <li>Auth-Header Pruefung in allen Edge Functions</li>
+  <li>Rollen-Pruefung (admin/client) vorhanden?</li>
+  <li>Passwort-Policy in <code>supabase/config.toml</code></li>
+</ul>
+
+<h3>Input-Validierung &amp; Injection</h3>
+<ul>
+  <li><code>dangerouslySetInnerHTML</code> mit DOMPurify?</li>
+  <li>SQL Injection Risiken (String-Interpolation in Queries)</li>
+  <li>HTML-Escaping in Email-Templates</li>
+</ul>
+
+<h3>Secrets &amp; Konfiguration</h3>
+<ul>
+  <li>Keine <code>.env</code>-Dateien im Git</li>
+  <li>Keine hardcodierten API Keys</li>
+  <li><code>.gitignore</code> vollstaendig</li>
+</ul>
+
+<h3>Content Security Policy</h3>
+<ul>
+  <li>Security Headers in <code>vercel.json</code></li>
+  <li>CSP, X-Frame-Options, HSTS</li>
+</ul>
+
+<h2>Ergebnis-Kategorien</h2>
+<table>
+  <tr><th>Severity</th><th>Bedeutung</th><th>Aktion</th></tr>
+  <tr><td style="color:#dc2626;font-weight:700">KRITISCH</td><td>Sicherheitsluecke</td><td>Sofort beheben</td></tr>
+  <tr><td style="color:#f59e0b;font-weight:700">HOCH</td><td>Konfigurationsproblem</td><td>Innerhalb 1 Woche</td></tr>
+  <tr><td style="color:#3b82f6;font-weight:700">MITTEL</td><td>Best-Practice Verbesserung</td><td>Einplanen</td></tr>
+  <tr><td style="color:#9ca3af;font-weight:700">INFO</td><td>Hinweis</td><td>Optional</td></tr>
+</table>
+
+<!-- ════════════════════ 6. /quality ════════════════════ -->
+
+<h1 id="quality">6. /quality — Code Quality Agent</h1>
+
+<div class="cmd-card">
+  <div class="cmd-header">/quality [bereich]</div>
+  <div class="cmd-body">
+    <p>Prueft die Codequalitaet: TypeScript-Typen, Performance-Probleme, toter Code und Abhaengigkeiten.</p>
+  </div>
+</div>
+
+<h2>Parameter</h2>
+<table>
+  <tr><th>Aufruf</th><th>Verhalten</th></tr>
+  <tr><td><code>/quality</code></td><td>Vollstaendiger Quality-Check</td></tr>
+  <tr><td><code>/quality types</code></td><td>Nur TypeScript-Typen (<code>any</code>, <code>@ts-ignore</code>)</td></tr>
+  <tr><td><code>/quality performance</code></td><td>Nur Performance (N+1 Queries, Bundle Size)</td></tr>
+  <tr><td><code>/quality dead-code</code></td><td>Nur unbenutzter/toter Code</td></tr>
+</table>
+
+<h2>Pruefbereiche</h2>
+
+<h3>TypeScript-Qualitaet</h3>
+<ul>
+  <li>Build-Fehler via <code>npm run build</code></li>
+  <li><code>any</code> Types aufspueren und typisierte Alternativen vorschlagen</li>
+  <li><code>@ts-ignore</code> / <code>@ts-expect-error</code> Kommentare pruefen</li>
+</ul>
+
+<h3>Performance</h3>
+<ul>
+  <li><strong>N+1 Queries:</strong> Schleifen mit DB-Queries in Edge Functions</li>
+  <li><strong>React Re-Renders:</strong> Fehlende <code>useMemo</code>/<code>useCallback</code></li>
+  <li><strong>Bundle Size:</strong> Grosse Imports die ersetzt werden koennten</li>
+</ul>
+
+<h3>Toter Code</h3>
+<ul>
+  <li>Exportierte Functions/Components ohne Import</li>
+  <li>Auskommentierte Code-Bloecke</li>
+  <li>Legacy Edge Functions (Nochda/Stillalive) die nicht mehr referenziert werden</li>
+</ul>
+
+<h3>Abhaengigkeiten</h3>
+<ul>
+  <li><code>npm audit</code> fuer bekannte Schwachstellen</li>
+  <li>Veraltete Packages mit Major-Version-Rueckstand</li>
+</ul>
+
+<!-- ════════════════════ 7. SCHNELLREFERENZ ════════════════════ -->
+
+<h1 id="uebersicht-tabelle">7. Schnellreferenz</h1>
+
+<table>
+  <tr>
+    <th>Aufgabe</th>
+    <th>Command</th>
+    <th>Wann nutzen</th>
+  </tr>
+  <tr>
+    <td>Nach Code-Aenderungen pruefen</td>
+    <td><code>/test</code></td>
+    <td>Vor jedem Commit</td>
+  </tr>
+  <tr>
+    <td>Aenderungen live schalten</td>
+    <td><code>/deploy</code></td>
+    <td>Nach erfolgreichem Test + Commit</td>
+  </tr>
+  <tr>
+    <td>Nur Frontend deployen</td>
+    <td><code>/deploy frontend</code></td>
+    <td>Bei reinen UI-Aenderungen</td>
+  </tr>
+  <tr>
+    <td>Eine Edge Function deployen</td>
+    <td><code>/deploy &lt;name&gt;</code></td>
+    <td>Bei Aenderung an einer Function</td>
+  </tr>
+  <tr>
+    <td>Sicherheit pruefen</td>
+    <td><code>/audit</code></td>
+    <td>Woechentlich / vor Release</td>
+  </tr>
+  <tr>
+    <td>Code aufraumen</td>
+    <td><code>/quality</code></td>
+    <td>Regelmaessig / bei Refactoring</td>
+  </tr>
+  <tr>
+    <td>Nur Types pruefen</td>
+    <td><code>/quality types</code></td>
+    <td>Nach groesseren Aenderungen</td>
+  </tr>
+</table>
+
+<h2>Empfohlener Workflow</h2>
+<pre><code># 1. Aenderungen machen
+#    ... Code schreiben ...
+
+# 2. Testen
+/test
+
+# 3. Commit
+/commit
+
+# 4. Deployen
+/deploy
+
+# 5. Regelmaessig (z.B. woechentlich)
+/audit
+/quality</code></pre>
+
+<!-- ════════════════════ 8. TROUBLESHOOTING ════════════════════ -->
+
+<h1 id="troubleshooting">8. Troubleshooting</h1>
+
+<h3>"/test" — Integration Tests werden uebersprungen</h3>
+<p>Die Datei <code>.env.test</code> fehlt oder enthaelt keine gueltigen Credentials. Erstelle sie im Projektroot:</p>
+<pre><code>TEST_EMAIL=dein@email.com
+TEST_PASSWORD=deinPasswort</code></pre>
+
+<h3>"/deploy" — Vercel-Fehler "not linked"</h3>
+<p>Einmalig <code>npx vercel link</code> ausfuehren und das Projekt verknuepfen.</p>
+
+<h3>"/deploy" — Supabase "not logged in"</h3>
+<p>Einmalig <code>npx supabase login</code> ausfuehren.</p>
+
+<h3>"/audit" oder "/quality" — Dauert sehr lange</h3>
+<p>Diese Commands durchsuchen die gesamte Codebase. Bei grossen Projekten kann das 3-5 Minuten dauern. Das ist normal.</p>
+
+<h3>Commands werden nicht erkannt</h3>
+<p>Stelle sicher, dass du dich im richtigen Projektverzeichnis befindest:</p>
+<pre><code>cd ~/Projekte/virtue-compliance
+claude</code></pre>
+<p>Die <code>.claude/commands/</code> Dateien muessen im Projektroot liegen.</p>
+
+<hr>
+
+<p style="text-align:center; color:#9ca3af; font-size:11px; margin-top:30px;">
+  Virtue Compliance GmbH — Uznach, Schweiz<br>
+  Erstellt am 28. Februar 2026
+</p>
+
+</body>
+</html>
