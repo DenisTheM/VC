@@ -8,6 +8,7 @@ import { usePageNav } from "@shared/hooks/usePageNav";
 import { useBreakpoint } from "@shared/hooks/useBreakpoint";
 import { signOut } from "@shared/lib/auth";
 import { LanguageSwitcher } from "@shared/components/LanguageSwitcher";
+import { t } from "@shared/lib/i18n";
 import { PROFILE_FIELDS } from "./data/profileFields";
 import { loadOrganizations, loadCompanyProfile, saveCompanyProfile, loadDashboardStats, type Organization, type ZefixResult } from "./lib/api";
 
@@ -186,20 +187,20 @@ function DocGenInner() {
   }, []);
 
   const sidebarItems = [
-    { id: "dashboard", icon: icons.home, label: "Dashboard" },
-    { id: "organizations", icon: icons.folder, label: "Kunden" },
-    { id: "generate", icon: icons.plus, label: "Neues Dokument" },
-    { id: "documents", icon: icons.doc, label: "Dokumente" },
-    { id: "alerts", icon: icons.alert, label: "Reg. Alerts", badge: dashStats.draftAlertCount || undefined },
-    { id: "readiness", icon: icons.shield, label: "Audit Readiness" },
-    { id: "risk_scoring", icon: icons.chart, label: "Risk Scoring" },
-    { id: "screening", icon: icons.search, label: "Sanctions Screening" },
-    { id: "kyc_cases", icon: icons.clipboard, label: "KYC Cases" },
-    { id: "sar", icon: icons.flag, label: "SAR-Übersicht" },
-    { id: "sro_packages", icon: icons.list, label: "SRO-Pakete" },
-    { id: "pkyc", icon: icons.eye, label: "pKYC Monitor" },
-    { id: "leta", icon: icons.building, label: "LETA / UBO" },
-    { id: "training", icon: icons.academic, label: "Schulungen" },
+    { id: "dashboard", icon: icons.home, label: t("docgen.nav.dashboard") },
+    { id: "organizations", icon: icons.folder, label: t("docgen.nav.organizations") },
+    { id: "generate", icon: icons.plus, label: t("docgen.nav.generate") },
+    { id: "documents", icon: icons.doc, label: t("docgen.nav.documents") },
+    { id: "alerts", icon: icons.alert, label: t("docgen.nav.alerts"), badge: dashStats.draftAlertCount || undefined },
+    { id: "readiness", icon: icons.shield, label: t("docgen.nav.readiness") },
+    { id: "risk_scoring", icon: icons.chart, label: t("docgen.nav.risk_scoring") },
+    { id: "screening", icon: icons.search, label: t("docgen.nav.screening") },
+    { id: "kyc_cases", icon: icons.clipboard, label: t("docgen.nav.kyc_cases") },
+    { id: "sar", icon: icons.flag, label: t("docgen.nav.sar") },
+    { id: "sro_packages", icon: icons.list, label: t("docgen.nav.sro_packages") },
+    { id: "pkyc", icon: icons.eye, label: t("docgen.nav.pkyc") },
+    { id: "leta", icon: icons.building, label: t("docgen.nav.leta") },
+    { id: "training", icon: icons.academic, label: t("docgen.nav.training") },
   ];
 
   const footer = (

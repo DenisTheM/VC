@@ -22,6 +22,8 @@ import {
   addClientAction,
   loadNotificationLog,
   resendAlertNotification,
+  triggerInterpretation,
+  loadInterpretation,
   type DbAlert,
   type DbActionItem,
   type Organization,
@@ -1062,6 +1064,14 @@ function AlertDetailView({
   const [notifLogOpen, setNotifLogOpen] = useState(false);
   const [resending, setResending] = useState(false);
 
+  // AI Interpretation state
+  const [interpretation, setInterpretation] = useState<{
+    summary: string; impact_areas: string[]; action_items: string[]; affected_articles: string[]; deadline?: string;
+  } | null>((alert as any).ai_interpretation ?? null);
+  const [interpretedAt, setInterpretedAt] = useState<string | null>((alert as any).interpreted_at ?? null);
+  const [interpreting, setInterpreting] = useState(false);
+  const [interpretError, setInterpretError] = useState<string | null>(null);
+
   useEffect(() => {
     loadClientActionsForAlert(alert.id)
       .then(setClientActionGroups)
@@ -1069,6 +1079,17 @@ function AlertDetailView({
     loadNotificationLog(alert.id)
       .then(setNotifLog)
       .catch((err) => console.error("Failed to load notification log:", err));
+    // Load AI interpretation if not already loaded
+    if (!interpretation) {
+      loadInterpretation(alert.id)
+        .then((data) => {
+          if (data?.ai_interpretation) {
+            setInterpretation(data.ai_interpretation);
+            setInterpretedAt(data.interpreted_at);
+          }
+        })
+        .catch(() => {});
+    }
   }, [alert.id]);
 
   const handleResend = async () => {
@@ -1081,6 +1102,27 @@ function AlertDetailView({
       console.error("Resend failed:", err);
     } finally {
       setResending(false);
+    }
+  };
+
+  const handleTriggerInterpretation = async () => {
+    setInterpreting(true);
+    setInterpretError(null);
+    try {
+      // Use first affected client's org, or a generic org ID
+      const orgId = alert.affected_clients[0]?.organization_id ?? "";
+      await triggerInterpretation(alert.id, orgId);
+      // Reload interpretation
+      const data = await loadInterpretation(alert.id);
+      if (data?.ai_interpretation) {
+        setInterpretation(data.ai_interpretation);
+        setInterpretedAt(data.interpreted_at);
+      }
+    } catch (err) {
+      console.error("Interpretation failed:", err);
+      setInterpretError("KI-Analyse fehlgeschlagen. Bitte erneut versuchen.");
+    } finally {
+      setInterpreting(false);
     }
   };
 
@@ -1337,6 +1379,123 @@ function AlertDetailView({
               </p>
             </div>
           )}
+
+          {/* AI Regulatory Interpretation */}
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: T.rLg,
+              padding: "22px 24px",
+              border: `1px solid ${interpretation ? T.accent + "33" : T.border}`,
+              boxShadow: T.shSm,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: interpretation ? 14 : 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Icon d={icons.sparkle} size={16} color={T.accent} />
+                <span style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
+                  KI-Analyse
+                </span>
+                {interpretedAt && (
+                  <span style={{ fontSize: 10.5, color: T.ink4, fontFamily: T.sans }}>
+                    {new Date(interpretedAt).toLocaleString("de-CH", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={handleTriggerInterpretation}
+                disabled={interpreting}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: "5px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${T.accent}`,
+                  background: interpreting ? T.s2 : T.accentS,
+                  color: T.accent,
+                  cursor: interpreting ? "default" : "pointer",
+                  fontFamily: T.sans,
+                  opacity: interpreting ? 0.6 : 1,
+                }}
+              >
+                {interpreting ? "Analysiert..." : interpretation ? "Erneut analysieren" : "Jetzt analysieren"}
+              </button>
+            </div>
+            {interpretError && (
+              <div style={{ fontSize: 12, color: "#dc2626", fontFamily: T.sans, padding: "8px 12px", background: "#fef2f2", borderRadius: T.r, marginBottom: 8 }}>
+                {interpretError}
+              </div>
+            )}
+            {interpretation ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Summary */}
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: T.ink3, fontFamily: T.sans, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                    Zusammenfassung
+                  </div>
+                  <p style={{ fontSize: 13, color: T.ink2, fontFamily: T.sans, lineHeight: 1.6, margin: 0 }}>
+                    {interpretation.summary}
+                  </p>
+                </div>
+                {/* Impact areas */}
+                {interpretation.impact_areas?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: T.ink3, fontFamily: T.sans, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                      Betroffene Bereiche
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {interpretation.impact_areas.map((area, i) => (
+                        <span key={i} style={{ fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 8, background: T.accentS, color: T.accent, fontFamily: T.sans }}>
+                          {area}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Action items */}
+                {interpretation.action_items?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: T.ink3, fontFamily: T.sans, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                      Handlungsbedarf
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {interpretation.action_items.map((item, i) => (
+                        <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12.5, color: T.ink2, fontFamily: T.sans, lineHeight: 1.5 }}>
+                          <span style={{ color: T.accent, fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Affected articles */}
+                {interpretation.affected_articles?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: T.ink3, fontFamily: T.sans, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                      Betroffene Gesetzesartikel
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {interpretation.affected_articles.map((art, i) => (
+                        <span key={i} style={{ fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 8, background: T.s2, color: T.ink2, fontFamily: T.sans }}>
+                          {art}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Deadline */}
+                {interpretation.deadline && (
+                  <div style={{ fontSize: 12, color: T.ink3, fontFamily: T.sans, padding: "8px 12px", background: T.s1, borderRadius: T.r }}>
+                    Umsetzungsfrist: <strong style={{ color: T.ink }}>{interpretation.deadline}</strong>
+                  </div>
+                )}
+              </div>
+            ) : !interpreting ? (
+              <p style={{ fontSize: 12.5, color: T.ink4, fontFamily: T.sans, margin: 0 }}>
+                Lassen Sie diese Regulierungsänderung von der KI analysieren, um eine Einschätzung der Auswirkungen und konkreten Handlungsbedarf zu erhalten.
+              </p>
+            ) : null}
+          </div>
 
           {/* Action items — interactive */}
           <div

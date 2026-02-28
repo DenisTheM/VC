@@ -5,10 +5,10 @@ import { T } from "@shared/styles/tokens";
 /* ------------------------------------------------------------------ */
 
 export const CUSTOMER_DOC_STATUS = {
-  draft: { label: "Entwurf", bg: "#eff6ff", color: "#3b82f6" },
-  in_review: { label: "Zur Prüfung", bg: "#fffbeb", color: "#d97706" },
+  draft: { label: "Entwurf", bg: T.blueS, color: T.blue },
+  in_review: { label: "Zur Prüfung", bg: T.amberS, color: T.amberD },
   approved: { label: "Freigegeben", bg: T.accentS, color: T.accent },
-  rejected: { label: "Abgelehnt", bg: "#fef2f2", color: "#dc2626" },
+  rejected: { label: "Abgelehnt", bg: T.redS, color: T.redD },
   outdated: { label: "Veraltet", bg: T.s2, color: T.ink3 },
 } as const;
 
@@ -20,9 +20,9 @@ export type CustomerDocStatus = keyof typeof CUSTOMER_DOC_STATUS;
 
 export const RISK_LEVEL = {
   low: { label: "Niedrig", bg: T.accentS, color: T.accent },
-  standard: { label: "Standard", bg: "#eff6ff", color: "#3b82f6" },
-  elevated: { label: "Erhöht", bg: "#fffbeb", color: "#d97706" },
-  high: { label: "Hoch", bg: "#fef2f2", color: "#dc2626" },
+  standard: { label: "Standard", bg: T.blueS, color: T.blue },
+  elevated: { label: "Erhöht", bg: T.amberS, color: T.amberD },
+  high: { label: "Hoch", bg: T.redS, color: T.redD },
 } as const;
 
 export type RiskLevel = keyof typeof RISK_LEVEL;
@@ -34,7 +34,7 @@ export type RiskLevel = keyof typeof RISK_LEVEL;
 export const CUSTOMER_STATUS = {
   active: { label: "Aktiv", bg: T.accentS, color: T.accent },
   inactive: { label: "Inaktiv", bg: T.s2, color: T.ink3 },
-  archived: { label: "Archiviert", bg: "#fef2f2", color: "#dc2626" },
+  archived: { label: "Archiviert", bg: T.redS, color: T.redD },
 } as const;
 
 export type CustomerStatus = keyof typeof CUSTOMER_STATUS;
@@ -55,8 +55,8 @@ export type CustomerType = keyof typeof CUSTOMER_TYPE;
 /* ------------------------------------------------------------------ */
 
 export const HELP_STATUS = {
-  open: { label: "Offen", bg: "#fffbeb", color: "#d97706" },
-  in_progress: { label: "In Bearbeitung", bg: "#eff6ff", color: "#3b82f6" },
+  open: { label: "Offen", bg: T.amberS, color: T.amberD },
+  in_progress: { label: "In Bearbeitung", bg: T.blueS, color: T.blue },
   resolved: { label: "Gelöst", bg: T.accentS, color: T.accent },
 } as const;
 
@@ -87,13 +87,13 @@ export const AUDIT_ACTION_COLORS: Record<string, { bg: string; color: string }> 
   created: { bg: T.accentS, color: T.accent },
   approved: { bg: T.accentS, color: T.accent },
   contact_added: { bg: T.accentS, color: T.accent },
-  updated: { bg: "#eff6ff", color: "#3b82f6" },
-  contact_updated: { bg: "#eff6ff", color: "#3b82f6" },
-  submitted: { bg: "#fffbeb", color: "#d97706" },
-  status_changed: { bg: "#fffbeb", color: "#d97706" },
-  rejected: { bg: "#fef2f2", color: "#dc2626" },
-  archived: { bg: "#fef2f2", color: "#dc2626" },
-  deleted: { bg: "#fef2f2", color: "#dc2626" },
-  contact_removed: { bg: "#fef2f2", color: "#dc2626" },
+  updated: { bg: T.blueS, color: T.blue },
+  contact_updated: { bg: T.blueS, color: T.blue },
+  submitted: { bg: T.amberS, color: T.amberD },
+  status_changed: { bg: T.amberS, color: T.amberD },
+  rejected: { bg: T.redS, color: T.redD },
+  archived: { bg: T.redS, color: T.redD },
+  deleted: { bg: T.redS, color: T.redD },
+  contact_removed: { bg: T.redS, color: T.redD },
   outdated: { bg: T.s2, color: T.ink3 },
 } as const;

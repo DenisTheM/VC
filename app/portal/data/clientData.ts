@@ -5,29 +5,29 @@ import { T } from "@shared/styles/tokens";
 /* ------------------------------------------------------------------ */
 
 export const SEV = {
-  critical: { label: "Kritisch", bg: "#fef2f2", color: "#dc2626", border: "#ef4444" },
-  high: { label: "Hoch", bg: "#fffbeb", color: "#d97706", border: "#f59e0b" },
+  critical: { label: "Kritisch", bg: T.redS, color: T.redD, border: T.red },
+  high: { label: "Hoch", bg: T.amberS, color: T.amberD, border: T.amber },
   medium: { label: "Mittel", bg: T.accentS, color: T.accent, border: T.accent },
   info: { label: "Info", bg: T.s2, color: T.ink3, border: T.ink4 },
 } as const;
 
 export const IMPACT = {
-  high: { label: "Hoch", bg: "#fef2f2", color: "#dc2626" },
-  medium: { label: "Mittel", bg: "#fffbeb", color: "#d97706" },
+  high: { label: "Hoch", bg: T.redS, color: T.redD },
+  medium: { label: "Mittel", bg: T.amberS, color: T.amberD },
   low: { label: "Niedrig", bg: T.accentS, color: T.accent },
   none: { label: "Keine", bg: T.s2, color: T.ink3 },
 } as const;
 
 export const DOC_STATUS = {
   current: { label: "Aktuell", bg: T.accentS, color: T.accent },
-  review: { label: "Review nötig", bg: "#fffbeb", color: "#d97706" },
-  draft: { label: "Entwurf", bg: "#eff6ff", color: "#3b82f6" },
-  outdated: { label: "Veraltet", bg: "#fef2f2", color: "#dc2626" },
+  review: { label: "Review nötig", bg: T.amberS, color: T.amberD },
+  draft: { label: "Entwurf", bg: T.blueS, color: T.blue },
+  outdated: { label: "Veraltet", bg: T.redS, color: T.redD },
 } as const;
 
 export const FORMAT_COLORS = {
-  DOCX: { bg: "#eff6ff", color: "#3b82f6" },
-  PDF: { bg: "#fef2f2", color: "#dc2626" },
+  DOCX: { bg: T.blueS, color: T.blue },
+  PDF: { bg: T.redS, color: T.redD },
   PPTX: { bg: "#fff7ed", color: "#ea580c" },
   XLSX: { bg: T.accentS, color: T.accent },
 } as const;
@@ -39,17 +39,17 @@ export const FORMAT_COLORS = {
 export const ACTION_STATUS = {
   offen: {
     label: "Offen",
-    bg: "#fffbeb",
-    color: "#d97706",
+    bg: T.amberS,
+    color: T.amberD,
     border: T.amber,
     icon: null as string | null,
     strikethrough: false,
   },
   in_arbeit: {
     label: "In Arbeit",
-    bg: "#eff6ff",
-    color: "#3b82f6",
-    border: "#3b82f6",
+    bg: T.blueS,
+    color: T.blue,
+    border: T.blue,
     icon: "clock" as string | null,
     strikethrough: false,
   },

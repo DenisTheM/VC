@@ -115,6 +115,14 @@ export interface PortalAlert {
   elenaComment: string;
   actions: { id: string; text: string; due: string; status: string }[];
   relatedDocs: { name: string; type: string; date: string }[];
+  aiInterpretation?: {
+    summary: string;
+    impact_areas: string[];
+    action_items: string[];
+    affected_articles: string[];
+    deadline?: string;
+  } | null;
+  interpretedAt?: string | null;
 }
 
 export async function loadClientAlerts(organizationId: string): Promise<PortalAlert[]> {
@@ -127,7 +135,8 @@ export async function loadClientAlerts(organizationId: string): Promise<PortalAl
       elena_comment,
       regulatory_alerts!inner(
         id, title, source, date, severity, status,
-        category, summary, legal_basis, deadline
+        category, summary, legal_basis, deadline,
+        ai_interpretation, interpreted_at
       ),
       client_alert_actions(id, text, due, status),
       alert_related_documents(name, type, date)
@@ -167,6 +176,8 @@ export async function loadClientAlerts(organizationId: string): Promise<PortalAl
         type: d.type ?? "PDF",
         date: d.date ?? "",
       })),
+      aiInterpretation: alert?.ai_interpretation ?? null,
+      interpretedAt: alert?.interpreted_at ?? null,
     };
   });
 }

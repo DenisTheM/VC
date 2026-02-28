@@ -9,6 +9,7 @@ import { loadCustomerStats, type CustomerStats } from "../lib/customerApi";
 import { PROFILE_FIELDS } from "@shared/data/profileFields";
 import { calcProfileCompletion, completionColor } from "@shared/lib/profileCompletion";
 import { TrustBadge } from "@shared/components/TrustBadge";
+import { t } from "@shared/lib/i18n";
 
 interface ClientDashboardProps {
   onNav: (id: string) => void;
@@ -52,7 +53,7 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
   if (loading) {
     return (
       <div style={{ padding: "40px 48px", textAlign: "center", color: T.ink3, fontFamily: T.sans }}>
-        Dashboard wird geladen...
+        {t("common.loading")}
       </div>
     );
   }
@@ -73,10 +74,10 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
           letterSpacing: "-0.5px",
         }}
       >
-        Guten Tag, {firstName}
+        {t("dashboard.greeting", { name: firstName })}
       </h1>
       <p style={{ fontSize: 15, color: T.ink3, fontFamily: T.sans, margin: "0 0 32px" }}>
-        Willkommen im Compliance-Portal von {orgShort}. Hier finden Sie aktuelle regulatorische Updates und Ihre Dokumente.
+        {t("dashboard.welcome", { org: orgShort })}
       </p>
       <div style={{ marginBottom: 24 }}>
         <TrustBadge />
@@ -157,13 +158,13 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
             >
               <Icon d={icons.alert} size={16} color={T.accent} />
             </div>
-            <span style={{ fontSize: 12.5, color: T.ink3, fontFamily: T.sans, fontWeight: 500 }}>Neue Updates</span>
+            <span style={{ fontSize: 12.5, color: T.ink3, fontFamily: T.sans, fontWeight: 500 }}>{t("dashboard.new_updates")}</span>
           </div>
           <div style={{ fontSize: 32, fontWeight: 700, color: T.ink, fontFamily: T.sans, letterSpacing: "-1px" }}>
             {stats.newAlerts}
           </div>
           <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
-            regulatorische Meldungen
+            {t("dashboard.regulatory_alerts")}
           </div>
         </div>
 
@@ -196,7 +197,7 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
             >
               <Icon d={icons.clock} size={16} color="#d97706" />
             </div>
-            <span style={{ fontSize: 12.5, color: T.ink3, fontFamily: T.sans, fontWeight: 500 }}>Offene Massnahmen</span>
+            <span style={{ fontSize: 12.5, color: T.ink3, fontFamily: T.sans, fontWeight: 500 }}>{t("dashboard.open_actions")}</span>
           </div>
           <div style={{ fontSize: 32, fontWeight: 700, color: T.ink, fontFamily: T.sans, letterSpacing: "-1px" }}>
             {openActions}
@@ -235,7 +236,7 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
             >
               <Icon d={icons.shield} size={16} color={T.accent} />
             </div>
-            <span style={{ fontSize: 12.5, color: T.ink3, fontFamily: T.sans, fontWeight: 500 }}>Compliance Status</span>
+            <span style={{ fontSize: 12.5, color: T.ink3, fontFamily: T.sans, fontWeight: 500 }}>{t("dashboard.compliance_status")}</span>
           </div>
           {profilePct != null ? (
             <>
@@ -243,7 +244,7 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
                 {profilePct}%
               </div>
               <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
-                Profil-Vollständigkeit
+                {t("dashboard.profile_completeness")}
               </div>
               <div style={{ marginTop: 6, height: 4, borderRadius: 2, background: T.s2 }}>
                 <div style={{ height: 4, borderRadius: 2, background: completionColor(profilePct).color, width: `${profilePct}%`, transition: "width 0.3s" }} />
@@ -347,7 +348,7 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
         <div style={{ marginBottom: 36 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <h2 style={{ fontSize: 17, fontWeight: 700, color: T.ink, fontFamily: T.sans, margin: 0 }}>
-              Aktuelle Meldungen
+              {t("dashboard.latest_alerts")}
             </h2>
             <button
               onClick={() => onNav("alerts")}
@@ -364,7 +365,7 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
                 gap: 4,
               }}
             >
-              Alle anzeigen <Icon d={icons.arrow} size={14} color={T.accent} />
+              {t("dashboard.show_all")} <Icon d={icons.arrow} size={14} color={T.accent} />
             </button>
           </div>
 

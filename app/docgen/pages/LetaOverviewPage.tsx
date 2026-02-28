@@ -7,22 +7,40 @@ import { type Organization } from "../lib/api";
 
 type LetaStatus = "not_checked" | "matched" | "discrepancy" | "pending_report" | "reported";
 
-interface UboEntry {
+interface UboPerson {
+  name: string;
+  birthDate?: string | null;
+  nationality?: string | null;
+  share_percent?: number | null;
+  control_type?: string | null;
+}
+
+interface UboDeclarationRow {
   id: string;
   organization_id: string;
-  name: string;
-  share_percent: number | null;
+  customer_id: string;
+  ubo_data: UboPerson[];
   leta_status: LetaStatus;
-  discrepancy_detected_at: string | null;
-  org_name?: string;
+  report_deadline: string | null;
+  created_at: string;
+}
+
+// Flattened display entry
+interface FlatUboEntry {
+  declId: string;
+  organizationId: string;
+  orgName: string;
+  person: UboPerson;
+  letaStatus: LetaStatus;
+  reportDeadline: string | null;
 }
 
 const LETA_STATUS_CONFIG: Record<LetaStatus, { label: string; bg: string; color: string }> = {
   not_checked: { label: "Nicht geprüft", bg: T.s2, color: T.ink3 },
   matched: { label: "Übereinstimmung", bg: T.accentS, color: T.accent },
-  discrepancy: { label: "Abweichung", bg: "#fef2f2", color: "#dc2626" },
-  pending_report: { label: "Meldung ausstehend", bg: "#fffbeb", color: "#d97706" },
-  reported: { label: "Gemeldet", bg: "#eff6ff", color: "#3b82f6" },
+  discrepancy: { label: "Abweichung", bg: T.redS, color: T.redD },
+  pending_report: { label: "Meldung ausstehend", bg: T.amberS, color: T.amberD },
+  reported: { label: "Gemeldet", bg: T.blueS, color: T.blue },
 };
 
 interface LetaOverviewPageProps {
@@ -30,31 +48,26 @@ interface LetaOverviewPageProps {
 }
 
 export function LetaOverviewPage({ organizations }: LetaOverviewPageProps) {
-  const [entries, setEntries] = useState<UboEntry[]>([]);
+  const [declarations, setDeclarations] = useState<UboDeclarationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [orgFilter, setOrgFilter] = useState<string | null>(null);
 
   const orgMap = new Map(organizations.map((o) => [o.id, o.name]));
 
   useEffect(() => {
-    loadEntries();
+    loadData();
   }, []);
 
-  const loadEntries = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from("ubo_declarations")
-        .select("id, organization_id, name, share_percent, leta_status, discrepancy_detected_at")
+        .select("id, organization_id, customer_id, ubo_data, leta_status, report_deadline, created_at")
         .order("organization_id");
 
       if (error) throw error;
-      setEntries(
-        (data ?? []).map((e: UboEntry) => ({
-          ...e,
-          org_name: orgMap.get(e.organization_id) ?? "Unbekannt",
-        })),
-      );
+      setDeclarations((data ?? []) as UboDeclarationRow[]);
     } catch (err) {
       console.error("LETA load error:", err);
     } finally {
@@ -62,29 +75,44 @@ export function LetaOverviewPage({ organizations }: LetaOverviewPageProps) {
     }
   };
 
-  const filtered = orgFilter ? entries.filter((e) => e.organization_id === orgFilter) : entries;
+  // Flatten all UBO persons across all declarations for display
+  const allEntries: FlatUboEntry[] = [];
+  declarations.forEach((decl) => {
+    const orgName = orgMap.get(decl.organization_id) ?? "Unbekannt";
+    (decl.ubo_data ?? []).forEach((person) => {
+      allEntries.push({
+        declId: decl.id,
+        organizationId: decl.organization_id,
+        orgName,
+        person,
+        letaStatus: decl.leta_status,
+        reportDeadline: decl.report_deadline,
+      });
+    });
+  });
 
-  // Group by org for summary
-  const orgSummary = new Map<string, { name: string; total: number; discrepancies: number; deadline: string | null }>();
-  entries.forEach((e) => {
-    const current = orgSummary.get(e.organization_id) ?? { name: e.org_name!, total: 0, discrepancies: 0, deadline: null };
-    current.total++;
-    if (e.leta_status === "discrepancy" || e.leta_status === "pending_report") {
+  const filtered = orgFilter ? allEntries.filter((e) => e.organizationId === orgFilter) : allEntries;
+
+  // Org-level summary
+  const orgSummary = new Map<string, { name: string; totalPersons: number; declarations: number; discrepancies: number; deadline: string | null }>();
+  declarations.forEach((decl) => {
+    const orgName = orgMap.get(decl.organization_id) ?? "Unbekannt";
+    const current = orgSummary.get(decl.organization_id) ?? { name: orgName, totalPersons: 0, declarations: 0, discrepancies: 0, deadline: null };
+    current.declarations++;
+    current.totalPersons += (decl.ubo_data ?? []).length;
+    if (decl.leta_status === "discrepancy" || decl.leta_status === "pending_report") {
       current.discrepancies++;
-      if (e.discrepancy_detected_at) {
-        const dl = new Date(e.discrepancy_detected_at);
-        dl.setDate(dl.getDate() + 30);
-        const dlStr = dl.toISOString();
-        if (!current.deadline || dlStr < current.deadline) {
-          current.deadline = dlStr;
+      if (decl.report_deadline) {
+        if (!current.deadline || decl.report_deadline < current.deadline) {
+          current.deadline = decl.report_deadline;
         }
       }
     }
-    orgSummary.set(e.organization_id, current);
+    orgSummary.set(decl.organization_id, current);
   });
 
-  const totalDiscrepancies = entries.filter((e) => e.leta_status === "discrepancy").length;
-  const totalPending = entries.filter((e) => e.leta_status === "pending_report").length;
+  const totalDiscrepancies = declarations.filter((d) => d.leta_status === "discrepancy").length;
+  const totalPending = declarations.filter((d) => d.leta_status === "pending_report").length;
 
   if (loading) {
     return (
@@ -107,16 +135,16 @@ export function LetaOverviewPage({ organizations }: LetaOverviewPageProps) {
       {/* Summary cards */}
       <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
         <div style={{ flex: 1, background: "#fff", borderRadius: T.rLg, padding: "18px 22px", border: `1px solid ${T.border}`, boxShadow: T.shSm }}>
-          <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase" }}>UBO gesamt</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: T.ink, fontFamily: T.sans }}>{entries.length}</div>
+          <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase" }}>UBO Personen</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: T.ink, fontFamily: T.sans }}>{allEntries.length}</div>
         </div>
         <div style={{ flex: 1, background: "#fff", borderRadius: T.rLg, padding: "18px 22px", border: `1px solid ${T.border}`, boxShadow: T.shSm }}>
           <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase" }}>Abweichungen</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: totalDiscrepancies > 0 ? T.red : T.accent, fontFamily: T.sans }}>{totalDiscrepancies}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: totalDiscrepancies > 0 ? T.redD : T.accent, fontFamily: T.sans }}>{totalDiscrepancies}</div>
         </div>
         <div style={{ flex: 1, background: "#fff", borderRadius: T.rLg, padding: "18px 22px", border: `1px solid ${T.border}`, boxShadow: T.shSm }}>
           <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase" }}>Meldung ausstehend</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: totalPending > 0 ? "#d97706" : T.ink, fontFamily: T.sans }}>{totalPending}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: totalPending > 0 ? T.amberD : T.ink, fontFamily: T.sans }}>{totalPending}</div>
         </div>
         <div style={{ flex: 1, background: "#fff", borderRadius: T.rLg, padding: "18px 22px", border: `1px solid ${T.border}`, boxShadow: T.shSm }}>
           <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, fontWeight: 600, marginBottom: 4, textTransform: "uppercase" }}>Organisationen</div>
@@ -144,7 +172,7 @@ export function LetaOverviewPage({ organizations }: LetaOverviewPageProps) {
         <div style={{ background: "#fff", borderRadius: T.r, border: `1px solid ${T.border}`, boxShadow: T.shSm, overflow: "hidden", marginBottom: 28 }}>
           {/* Header */}
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: 8, padding: "10px 18px", background: T.s1, borderBottom: `1px solid ${T.border}` }}>
-            {["Organisation", "UBO", "LETA Status", "Abweichungen", "Meldefrist"].map((h) => (
+            {["Organisation", "UBO Personen", "LETA Status", "Abweichungen", "Meldefrist"].map((h) => (
               <span key={h} style={{ fontSize: 11, fontWeight: 700, color: T.ink4, fontFamily: T.sans, textTransform: "uppercase", letterSpacing: "0.3px" }}>{h}</span>
             ))}
           </div>
@@ -152,9 +180,9 @@ export function LetaOverviewPage({ organizations }: LetaOverviewPageProps) {
             const hasDiscrepancy = summary.discrepancies > 0;
             const daysLeft = summary.deadline ? Math.ceil((new Date(summary.deadline).getTime() - Date.now()) / 86400000) : null;
             // Determine dominant LETA status for org
-            const orgEntries = entries.filter((e) => e.organization_id === orgId);
-            const hasMatch = orgEntries.some((e) => e.leta_status === "matched");
-            const hasDisc = orgEntries.some((e) => e.leta_status === "discrepancy");
+            const orgDecls = declarations.filter((d) => d.organization_id === orgId);
+            const hasDisc = orgDecls.some((d) => d.leta_status === "discrepancy");
+            const hasMatch = orgDecls.some((d) => d.leta_status === "matched");
             const dominantStatus: LetaStatus = hasDisc ? "discrepancy" : hasMatch ? "matched" : "not_checked";
             const statusCfg = LETA_STATUS_CONFIG[dominantStatus];
 
@@ -165,16 +193,16 @@ export function LetaOverviewPage({ organizations }: LetaOverviewPageProps) {
                 background: hasDiscrepancy ? "#fef2f205" : "transparent",
               }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>{summary.name}</span>
-                <span style={{ fontSize: 13, color: T.ink2, fontFamily: T.sans }}>{summary.total}</span>
+                <span style={{ fontSize: 13, color: T.ink2, fontFamily: T.sans }}>{summary.totalPersons}</span>
                 <span style={{ fontSize: 10, fontWeight: 600, color: statusCfg.color, background: statusCfg.bg, padding: "2px 8px", borderRadius: 6, fontFamily: T.sans, display: "inline-block", width: "fit-content" }}>
                   {statusCfg.label}
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: hasDiscrepancy ? T.red : T.ink3, fontFamily: T.sans }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: hasDiscrepancy ? T.redD : T.ink3, fontFamily: T.sans }}>
                   {summary.discrepancies}
                 </span>
                 <span style={{
                   fontSize: 12, fontFamily: T.sans, fontWeight: 600,
-                  color: daysLeft !== null && daysLeft <= 7 ? T.red : daysLeft !== null && daysLeft <= 14 ? "#d97706" : T.ink3,
+                  color: daysLeft !== null && daysLeft <= 7 ? T.redD : daysLeft !== null && daysLeft <= 14 ? T.amberD : T.ink3,
                 }}>
                   {daysLeft !== null ? (daysLeft <= 0 ? "Abgelaufen" : `${daysLeft} Tage`) : "—"}
                 </span>
@@ -192,17 +220,19 @@ export function LetaOverviewPage({ organizations }: LetaOverviewPageProps) {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {filtered.map((e) => {
-            const status = LETA_STATUS_CONFIG[e.leta_status] ?? LETA_STATUS_CONFIG.not_checked;
+          {filtered.map((e, idx) => {
+            const status = LETA_STATUS_CONFIG[e.letaStatus] ?? LETA_STATUS_CONFIG.not_checked;
             return (
-              <div key={e.id} style={{
+              <div key={`${e.declId}-${idx}`} style={{
                 display: "flex", alignItems: "center", gap: 12,
                 background: "#fff", borderRadius: T.r, border: `1px solid ${T.border}`,
                 padding: "10px 16px", boxShadow: T.shSm,
               }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: T.ink, fontFamily: T.sans, flex: 1 }}>{e.org_name}</span>
-                <span style={{ fontSize: 12.5, color: T.ink2, fontFamily: T.sans, flex: 1 }}>{e.name}</span>
-                <span style={{ fontSize: 12, color: T.ink3, fontFamily: T.sans, width: 60 }}>{e.share_percent != null ? `${e.share_percent}%` : "—"}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: T.ink, fontFamily: T.sans, flex: 1 }}>{e.orgName}</span>
+                <span style={{ fontSize: 12.5, color: T.ink2, fontFamily: T.sans, flex: 1 }}>{e.person.name}</span>
+                <span style={{ fontSize: 12, color: T.ink3, fontFamily: T.sans, width: 60 }}>
+                  {e.person.share_percent != null ? `${e.person.share_percent}%` : "—"}
+                </span>
                 <span style={{ fontSize: 10, fontWeight: 600, color: status.color, background: status.bg, padding: "2px 8px", borderRadius: 6, fontFamily: T.sans }}>
                   {status.label}
                 </span>

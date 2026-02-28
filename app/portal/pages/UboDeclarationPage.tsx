@@ -47,8 +47,17 @@ interface UboDeclarationPageProps {
   org: ClientOrg | null;
 }
 
+interface SimpleCustomer {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  company_name: string | null;
+  customer_type: string;
+}
+
 export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
   const [declarations, setDeclarations] = useState<UboDeclarationRow[]>([]);
+  const [customers, setCustomers] = useState<SimpleCustomer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingDeclId, setEditingDeclId] = useState<string | null>(null);
@@ -57,6 +66,7 @@ export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Form state
+  const [formCustomerId, setFormCustomerId] = useState("");
   const [formName, setFormName] = useState("");
   const [formBirthDate, setFormBirthDate] = useState("");
   const [formNationality, setFormNationality] = useState("");
@@ -66,7 +76,19 @@ export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
   useEffect(() => {
     if (!org) return;
     loadDeclarations();
+    loadCustomerList();
   }, [org]);
+
+  const loadCustomerList = async () => {
+    if (!org) return;
+    const { data } = await supabase
+      .from("client_customers")
+      .select("id, first_name, last_name, company_name, customer_type")
+      .eq("organization_id", org.id)
+      .eq("status", "active")
+      .order("last_name");
+    setCustomers((data ?? []) as SimpleCustomer[]);
+  };
 
   const loadDeclarations = async () => {
     if (!org) return;
@@ -90,6 +112,7 @@ export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
   };
 
   const resetForm = () => {
+    setFormCustomerId("");
     setFormName("");
     setFormBirthDate("");
     setFormNationality("");
@@ -150,8 +173,14 @@ export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
           .eq("id", decl.id);
         if (updateErr) throw updateErr;
       } else {
-        // Create new declaration with first UBO person
+        // Create new declaration with first UBO person — customer_id is required
+        if (!formCustomerId) {
+          setError("Bitte wählen Sie einen Kunden aus.");
+          setSaving(false);
+          return;
+        }
         const { error: insertErr } = await supabase.from("ubo_declarations").insert({
+          customer_id: formCustomerId,
           organization_id: org.id,
           ubo_data: [newUbo],
           leta_status: "not_checked",
@@ -274,6 +303,23 @@ export function UboDeclarationPage({ org }: UboDeclarationPageProps) {
           <h3 style={{ fontSize: 15, fontWeight: 700, color: T.ink, fontFamily: T.sans, margin: "0 0 16px" }}>
             {editingDeclId ? "UBO bearbeiten" : "Neuen UBO erfassen"}
           </h3>
+          {/* Customer selector (only for new declarations) */}
+          {!editingDeclId && declarations.length === 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: T.ink2, fontFamily: T.sans, marginBottom: 4, display: "block" }}>Kunde <span style={{ color: T.red }}>*</span></label>
+              <select value={formCustomerId} onChange={(e) => setFormCustomerId(e.target.value)}
+                style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, color: T.ink, background: "#fff", boxSizing: "border-box" }}>
+                <option value="">Kunde wählen...</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.customer_type === "natural_person"
+                      ? [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unbekannt"
+                      : c.company_name || "Unbekannt"}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: T.ink2, fontFamily: T.sans, marginBottom: 4, display: "block" }}>Name <span style={{ color: T.red }}>*</span></label>

@@ -169,8 +169,84 @@ export function ElearningPage({ org }: ElearningPageProps) {
     }
   };
 
-  const handleCertificateDownload = () => {
-    alert("Zertifikat-Download wird in einer zukünftigen Version verfügbar sein (jsPDF).");
+  const handleCertificateDownload = async () => {
+    if (!activeModule || !org) return;
+    const progress = progressMap.get(activeModule.id);
+    if (!progress?.completed_at) return;
+
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const w = 297;
+      const h = 210;
+
+      // Background
+      doc.setFillColor(15, 23, 42); // slate-900
+      doc.rect(0, 0, w, h, "F");
+
+      // Decorative border
+      doc.setDrawColor(34, 197, 94); // accent green
+      doc.setLineWidth(1.5);
+      doc.rect(12, 12, w - 24, h - 24);
+
+      // Inner frame
+      doc.setDrawColor(34, 197, 94);
+      doc.setLineWidth(0.3);
+      doc.rect(16, 16, w - 32, h - 32);
+
+      // Title
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(34, 197, 94);
+      doc.text("VIRTUE COMPLIANCE", w / 2, 40, { align: "center" });
+
+      doc.setFontSize(28);
+      doc.setTextColor(255, 255, 255);
+      doc.text("Schulungszertifikat", w / 2, 58, { align: "center" });
+
+      // Subtitle
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.setTextColor(148, 163, 184); // slate-400
+      doc.text("Hiermit wird bestätigt, dass", w / 2, 78, { align: "center" });
+
+      // Participant name
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.setTextColor(255, 255, 255);
+      doc.text(org.name, w / 2, 92, { align: "center" });
+
+      // Module title
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.setTextColor(148, 163, 184);
+      doc.text("das folgende Schulungsmodul erfolgreich abgeschlossen hat:", w / 2, 108, { align: "center" });
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(34, 197, 94);
+      doc.text(activeModule.title, w / 2, 122, { align: "center" });
+
+      // Score & Date
+      const completedDate = new Date(progress.completed_at).toLocaleDateString("de-CH", { day: "numeric", month: "long", year: "numeric" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`Ergebnis: ${progress.score ?? 0}%  |  Datum: ${completedDate}`, w / 2, 138, { align: "center" });
+
+      // Duration
+      doc.setFontSize(10);
+      doc.text(`Dauer: ${activeModule.duration_minutes} Minuten  |  Mindestpunktzahl: ${activeModule.passing_score}%`, w / 2, 148, { align: "center" });
+
+      // Footer
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139); // slate-500
+      doc.text("Virtue Compliance GmbH · Uznach, Schweiz · www.virtue-compliance.ch", w / 2, 185, { align: "center" });
+
+      doc.save(`Zertifikat_${activeModule.slug}_${org.name.replace(/\s+/g, "_")}.pdf`);
+    } catch (err) {
+      console.error("Certificate generation failed:", err);
+    }
   };
 
   const completedModules = [...progressMap.values()].filter((p) => p.completed_at).length;

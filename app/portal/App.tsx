@@ -8,6 +8,7 @@ import { useBreakpoint } from "@shared/hooks/useBreakpoint";
 import { signOut } from "@shared/lib/auth";
 import { NotificationBell } from "@shared/components/NotificationBell";
 import { LanguageSwitcher } from "@shared/components/LanguageSwitcher";
+import { t } from "@shared/lib/i18n";
 import { loadUserOrganization, type ClientOrg } from "./lib/api";
 
 const ClientDashboard = lazy(() => import("./pages/ClientDashboard").then((m) => ({ default: m.ClientDashboard })));
@@ -29,22 +30,24 @@ const ElearningPage = lazy(() => import("./pages/ElearningPage").then((m) => ({ 
 /*  Client Sidebar                                                    */
 /* ------------------------------------------------------------------ */
 
-const BASE_NAV_ITEMS: readonly { id: string; icon: string; label: string; approverOnly?: boolean }[] = [
-  { id: "dashboard", icon: icons.home, label: "Dashboard" },
-  { id: "alerts", icon: icons.alert, label: "Meldungen" },
-  { id: "docs", icon: icons.doc, label: "Dokumente" },
-  { id: "approvals", icon: icons.check, label: "Freigaben", approverOnly: true },
-  { id: "customers", icon: icons.users, label: "Kunden" },
-  { id: "kyc", icon: icons.clipboard, label: "KYC Onboarding" },
-  { id: "mros", icon: icons.flag, label: "Verdachtsmeldung" },
-  { id: "checklist", icon: icons.list, label: "Compliance Checkliste" },
-  { id: "pkyc", icon: icons.eye, label: "pKYC Monitoring" },
-  { id: "ubo", icon: icons.building, label: "UBO / LETA" },
-  { id: "training", icon: icons.academic, label: "Schulungen" },
-  { id: "readiness", icon: icons.shield, label: "Audit Readiness" },
-  { id: "messages", icon: icons.mail, label: "Nachrichten" },
-  { id: "help", icon: icons.phone, label: "Hilfe" },
-];
+function getNavItems(): readonly { id: string; icon: string; label: string; approverOnly?: boolean }[] {
+  return [
+    { id: "dashboard", icon: icons.home, label: t("portal.nav.dashboard") },
+    { id: "alerts", icon: icons.alert, label: t("portal.nav.alerts") },
+    { id: "docs", icon: icons.doc, label: t("portal.nav.docs") },
+    { id: "approvals", icon: icons.check, label: t("portal.nav.approvals"), approverOnly: true },
+    { id: "customers", icon: icons.users, label: t("portal.nav.customers") },
+    { id: "kyc", icon: icons.clipboard, label: t("portal.nav.kyc") },
+    { id: "mros", icon: icons.flag, label: t("portal.nav.mros") },
+    { id: "checklist", icon: icons.list, label: t("portal.nav.checklist") },
+    { id: "pkyc", icon: icons.eye, label: t("portal.nav.pkyc") },
+    { id: "ubo", icon: icons.building, label: t("portal.nav.ubo") },
+    { id: "training", icon: icons.academic, label: t("portal.nav.training") },
+    { id: "readiness", icon: icons.shield, label: t("portal.nav.readiness") },
+    { id: "messages", icon: icons.mail, label: t("portal.nav.messages") },
+    { id: "help", icon: icons.phone, label: t("portal.nav.help") },
+  ];
+}
 
 function ClientSidebar({
   active,
@@ -133,7 +136,7 @@ function ClientSidebar({
           </span>
           <NotificationBell onNavigate={onNotificationNav} />
         </div>
-        {BASE_NAV_ITEMS.filter((it) => !it.approverOnly || org?.userRole === "approver").map((it) => {
+        {getNavItems().filter((it) => !it.approverOnly || org?.userRole === "approver").map((it) => {
           const isActive = active === it.id;
           return (
             <button

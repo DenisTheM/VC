@@ -716,6 +716,91 @@ function AlertDetail({
             </div>
           )}
 
+          {/* AI Regulatory Interpretation (read-only for portal) */}
+          {alert.aiInterpretation && (
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: T.r,
+                padding: "20px 22px",
+                marginBottom: 20,
+                border: `1px solid ${T.accent}33`,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                <Icon d={icons.sparkle} size={16} color={T.accent} />
+                <span style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
+                  KI-Analyse
+                </span>
+                {alert.interpretedAt && (
+                  <span style={{ fontSize: 10.5, color: T.ink4, fontFamily: T.sans }}>
+                    {new Date(alert.interpretedAt).toLocaleString("de-CH", { day: "numeric", month: "short", year: "numeric" })}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {alert.aiInterpretation.summary && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.ink4, fontFamily: T.sans, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                      Zusammenfassung
+                    </div>
+                    <p style={{ fontSize: 13, color: T.ink2, fontFamily: T.sans, lineHeight: 1.6, margin: 0 }}>
+                      {alert.aiInterpretation.summary}
+                    </p>
+                  </div>
+                )}
+                {alert.aiInterpretation.impact_areas?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.ink4, fontFamily: T.sans, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                      Betroffene Bereiche
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {alert.aiInterpretation.impact_areas.map((area: string, i: number) => (
+                        <span key={i} style={{ fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 8, background: T.accentS, color: T.accent, fontFamily: T.sans }}>
+                          {area}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {alert.aiInterpretation.action_items?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.ink4, fontFamily: T.sans, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                      Handlungsbedarf
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {alert.aiInterpretation.action_items.map((item: string, i: number) => (
+                        <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12.5, color: T.ink2, fontFamily: T.sans, lineHeight: 1.5 }}>
+                          <span style={{ color: T.accent, fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {alert.aiInterpretation.affected_articles?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.ink4, fontFamily: T.sans, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                      Betroffene Gesetzesartikel
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {alert.aiInterpretation.affected_articles.map((art: string, i: number) => (
+                        <span key={i} style={{ fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 8, background: T.s2, color: T.ink2, fontFamily: T.sans }}>
+                          {art}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {alert.aiInterpretation.deadline && (
+                  <div style={{ fontSize: 12, color: T.ink3, fontFamily: T.sans, padding: "8px 12px", background: T.s1, borderRadius: 8 }}>
+                    Umsetzungsfrist: <strong style={{ color: T.ink }}>{alert.aiInterpretation.deadline}</strong>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Action items — interactive */}
           {localActions.length > 0 && (
             <div style={{ marginBottom: 24 }}>

@@ -34,6 +34,22 @@ export const en: Record<string, string> = {
   "common.error": "Error",
   "common.success": "Success",
 
+  // Navigation — DocGen
+  "docgen.nav.dashboard": "Dashboard",
+  "docgen.nav.organizations": "Customers",
+  "docgen.nav.generate": "New Document",
+  "docgen.nav.documents": "Documents",
+  "docgen.nav.alerts": "Reg. Alerts",
+  "docgen.nav.readiness": "Audit Readiness",
+  "docgen.nav.risk_scoring": "Risk Scoring",
+  "docgen.nav.screening": "Sanctions Screening",
+  "docgen.nav.kyc_cases": "KYC Cases",
+  "docgen.nav.sar": "SAR Overview",
+  "docgen.nav.sro_packages": "SRO Packages",
+  "docgen.nav.pkyc": "pKYC Monitor",
+  "docgen.nav.leta": "LETA / UBO",
+  "docgen.nav.training": "Training",
+
   // Navigation — Portal
   "portal.nav.dashboard": "Dashboard",
   "portal.nav.alerts": "Alerts",
