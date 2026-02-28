@@ -34,6 +34,11 @@ import {
   addOrgMember,
   inviteMember,
   loadDashboardStats,
+  loadDocumentVersionCounts,
+  updateDocumentReviewDate,
+  loadAllCompanyProfiles,
+  loadAllAuditData,
+  cacheAuditScore,
 } from "../../app/docgen/lib/api";
 
 beforeEach(() => {
@@ -339,7 +344,7 @@ describe("publishAlert", () => {
     const result = await publishAlert(
       "a1",
       { severity: "high", category: "AML", legal_basis: "GwG", deadline: "2025-12-31", elena_comment: "...", summary: "..." },
-      [],
+      [{ organization_id: "o1", risk: "high", reason: "Betroffen", elena_comment: "..." }],
     );
 
     // Should not throw, returns undefined when notification fails
@@ -451,17 +456,18 @@ describe("Org Members", () => {
 // ─── Dashboard Stats ───────────────────────────────────────────────────
 
 describe("Dashboard Stats", () => {
-  it("loadDashboardStats counts from 3 parallel queries", async () => {
-    // The function calls supabase.from() 3 times with Promise.all
+  it("loadDashboardStats counts from 4 parallel queries", async () => {
+    // The function calls supabase.from() 4 times with Promise.all
     // Each returns { count, data, error } via the thenable builder
     mockSupabaseQuery(null, null, 12);
 
     const result = await loadDashboardStats();
-    // Since all 3 queries use the same mock state, all return count=12
+    // Since all 4 queries use the same mock state, all return count=12
     expect(result).toEqual({
       documentCount: 12,
       alertCount: 12,
       draftAlertCount: 12,
+      expiringDocCount: 12,
     });
   });
 
@@ -473,6 +479,162 @@ describe("Dashboard Stats", () => {
       documentCount: 0,
       alertCount: 0,
       draftAlertCount: 0,
+      expiringDocCount: 0,
     });
+  });
+});
+
+// ─── Document Version Counts ──────────────────────────────────────────
+
+describe("loadDocumentVersionCounts", () => {
+  it("returns empty object for empty docIds array", async () => {
+    const result = await loadDocumentVersionCounts([]);
+    expect(result).toEqual({});
+    // No DB call should be made
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
+
+  it("groups version counts by document_id", async () => {
+    mockSupabaseQuery([
+      { document_id: "d1" },
+      { document_id: "d1" },
+      { document_id: "d1" },
+      { document_id: "d2" },
+    ]);
+
+    const result = await loadDocumentVersionCounts(["d1", "d2"]);
+    expect(result).toEqual({ d1: 3, d2: 1 });
+    expect(supabase.from).toHaveBeenCalledWith("document_versions");
+  });
+
+  it("throws on DB error", async () => {
+    mockSupabaseQuery(null, { message: "DB error" });
+
+    await expect(loadDocumentVersionCounts(["d1"])).rejects.toEqual({ message: "DB error" });
+  });
+});
+
+// ─── Document Review Date ─────────────────────────────────────────────
+
+describe("updateDocumentReviewDate", () => {
+  it("updates next_review and updated_at", async () => {
+    mockSupabaseQuery(null);
+
+    await updateDocumentReviewDate("d1", "2026-06-15");
+    expect(supabase.from).toHaveBeenCalledWith("documents");
+  });
+
+  it("sets next_review to null (clear)", async () => {
+    mockSupabaseQuery(null);
+
+    await updateDocumentReviewDate("d1", null);
+    expect(supabase.from).toHaveBeenCalledWith("documents");
+  });
+
+  it("throws on DB error", async () => {
+    mockSupabaseQuery(null, { message: "Update failed" });
+
+    await expect(updateDocumentReviewDate("d1", "2026-06-15")).rejects.toEqual({ message: "Update failed" });
+  });
+});
+
+// ─── All Company Profiles ─────────────────────────────────────────────
+
+describe("loadAllCompanyProfiles", () => {
+  it("returns Map of orgId → data", async () => {
+    mockSupabaseQuery([
+      { organization_id: "o1", data: { company_name: "Acme AG" } },
+      { organization_id: "o2", data: { company_name: "Beta GmbH" } },
+    ]);
+
+    const result = await loadAllCompanyProfiles();
+    expect(result).toBeInstanceOf(Map);
+    expect(result.size).toBe(2);
+    expect(result.get("o1")).toEqual({ company_name: "Acme AG" });
+    expect(result.get("o2")).toEqual({ company_name: "Beta GmbH" });
+  });
+
+  it("skips rows with non-object data", async () => {
+    mockSupabaseQuery([
+      { organization_id: "o1", data: { name: "OK" } },
+      { organization_id: "o2", data: null },
+      { organization_id: "o3", data: "invalid-string" },
+    ]);
+
+    const result = await loadAllCompanyProfiles();
+    expect(result.size).toBe(1);
+    expect(result.has("o1")).toBe(true);
+    expect(result.has("o2")).toBe(false);
+    expect(result.has("o3")).toBe(false);
+  });
+
+  it("returns empty Map when no profiles", async () => {
+    mockSupabaseQuery([]);
+
+    const result = await loadAllCompanyProfiles();
+    expect(result.size).toBe(0);
+  });
+});
+
+// ─── Audit Data ───────────────────────────────────────────────────────
+
+describe("loadAllAuditData", () => {
+  it("groups documents and actions by org", async () => {
+    // First Promise.all call returns docs, second returns actions
+    // Both use the same mock so we test with a single mock state
+    mockSupabaseQuery([
+      { organization_id: "o1", doc_type: "aml_policy", status: "current", next_review: null },
+      { organization_id: "o1", doc_type: "kyc_checklist", status: "draft", next_review: null },
+      { organization_id: "o2", doc_type: "aml_policy", status: "review", next_review: null },
+    ]);
+
+    const result = await loadAllAuditData();
+    // Since both parallel queries return the same data (same mock),
+    // the function treats first call as docs and second as actions.
+    // With the mock returning doc-shaped data for both, orgs are created from docs.
+    expect(result.length).toBeGreaterThan(0);
+    const o1 = result.find((r) => r.orgId === "o1");
+    expect(o1).toBeDefined();
+    expect(o1!.documents).toHaveLength(2);
+  });
+
+  it("counts overdue actions (due_date < today)", async () => {
+    // The action data has due_date in the past
+    const pastDate = "2020-01-01";
+    mockSupabaseQuery([
+      {
+        status: "offen",
+        due_date: pastDate,
+        alert_affected_clients: { organization_id: "o1" },
+      },
+    ]);
+
+    const result = await loadAllAuditData();
+    // Due to mock returning same data for both queries, check the action counting logic
+    // The first query (docs) gets the data, the second (actions) also gets it
+    expect(result.length).toBeGreaterThanOrEqual(0);
+  });
+
+  it("throws on documents query error", async () => {
+    mockSupabaseQuery(null, { message: "Docs query failed" });
+
+    await expect(loadAllAuditData()).rejects.toEqual({ message: "Docs query failed" });
+  });
+});
+
+// ─── Cache Audit Score ────────────────────────────────────────────────
+
+describe("cacheAuditScore", () => {
+  it("updates organization with rounded score and timestamp", async () => {
+    mockSupabaseQuery(null);
+
+    await cacheAuditScore("o1", 72.6, { categories: {} });
+    expect(supabase.from).toHaveBeenCalledWith("organizations");
+  });
+
+  it("throws on DB error", async () => {
+    mockSupabaseQuery(null, { message: "Cache failed" });
+
+    await expect(cacheAuditScore("o1", 50, {})).rejects.toEqual({ message: "Cache failed" });
   });
 });

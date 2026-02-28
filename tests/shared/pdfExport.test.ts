@@ -180,11 +180,12 @@ describe("List items", () => {
     );
   });
 
-  it("renders numbered list", () => {
+  it("renders numbered list with preserved number", () => {
     exportDocumentAsPdf({ ...baseOpts, content: "1. Erster Punkt" });
 
+    // Numbered lists render with the actual number as bullet, not a bullet point
     expect(mockText).toHaveBeenCalledWith(
-      "\u2022",
+      "1.",
       expect.any(Number),
       expect.any(Number),
     );
@@ -194,25 +195,25 @@ describe("List items", () => {
 // ─── Paragraphs ────────────────────────────────────────────────────────
 
 describe("Paragraphs", () => {
-  it("renders regular text as paragraph", () => {
+  it("renders regular text as paragraph (word-by-word via renderRichLine)", () => {
     exportDocumentAsPdf({ ...baseOpts, content: "Dies ist ein Absatz." });
 
     expect(mockSetFontSize).toHaveBeenCalledWith(10);
-    expect(mockText).toHaveBeenCalledWith(
-      expect.stringContaining("Dies ist ein Absatz."),
-      expect.any(Number),
-      expect.any(Number),
-    );
+    // renderRichLine renders each word individually
+    expect(mockText).toHaveBeenCalledWith("Dies", expect.any(Number), expect.any(Number));
+    expect(mockText).toHaveBeenCalledWith("Absatz.", expect.any(Number), expect.any(Number));
   });
 
-  it("strips bold markdown markers", () => {
+  it("strips bold markdown markers and renders segments", () => {
     exportDocumentAsPdf({ ...baseOpts, content: "Text mit **fettem** Wort" });
 
-    expect(mockText).toHaveBeenCalledWith(
-      expect.stringContaining("Text mit fettem Wort"),
-      expect.any(Number),
-      expect.any(Number),
-    );
+    // renderRichLine splits into segments: normal "Text mit ", bold "fettem", normal " Wort"
+    // Each segment's words are rendered individually
+    expect(mockText).toHaveBeenCalledWith("Text", expect.any(Number), expect.any(Number));
+    expect(mockText).toHaveBeenCalledWith("fettem", expect.any(Number), expect.any(Number));
+    expect(mockText).toHaveBeenCalledWith("Wort", expect.any(Number), expect.any(Number));
+    // Bold segment triggers font change
+    expect(mockSetFont).toHaveBeenCalledWith("helvetica", "bold");
   });
 });
 
@@ -233,8 +234,9 @@ describe("General", () => {
       expect.any(Number),
       expect.any(Number),
     );
+    // Cover page is page 1, content starts on page 2
     expect(mockText).toHaveBeenCalledWith(
-      "Seite 1",
+      "Seite 2",
       expect.any(Number),
       expect.any(Number),
       expect.any(Object),
