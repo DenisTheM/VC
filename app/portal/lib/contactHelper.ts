@@ -1,28 +1,35 @@
 import type { ClientOrg } from "./api";
 
-// Portal contact always shows Virtue Compliance / Elena as the compliance advisor.
-// org.contact_name from DB is not used — it may contain outdated or incorrect names.
+// Portal contact shows the assigned CO from DB fields, with fallback to Virtue Compliance defaults.
 
-export function coName(_org: ClientOrg | null): string {
+export function coName(org: ClientOrg | null): string {
+  return org?.contact_name || "Virtue Compliance";
+}
+
+export function coFirstName(org: ClientOrg | null): string {
+  if (org?.contact_name) return org.contact_name.split(" ")[0];
   return "Virtue Compliance";
 }
 
-export function coFirstName(_org: ClientOrg | null): string {
-  return "Elena";
-}
-
-export function coInitials(_org: ClientOrg | null): string {
+export function coInitials(org: ClientOrg | null): string {
+  const name = org?.contact_name;
+  if (name) {
+    const parts = name.trim().split(/\s+/);
+    return parts.length >= 2
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : parts[0].slice(0, 2).toUpperCase();
+  }
   return "VC";
 }
 
-export function coEmail(_org: ClientOrg | null): string {
-  return "info@virtue-compliance.ch";
+export function coEmail(org: ClientOrg | null): string {
+  return org?.contact_email || "info@virtue-compliance.ch";
 }
 
-export function coPhone(_org: ClientOrg | null): string {
-  return "";
+export function coPhone(org: ClientOrg | null): string {
+  return org?.contact_phone || "";
 }
 
-export function coRole(_org: ClientOrg | null): string {
-  return "Compliance-Beraterin";
+export function coRole(org: ClientOrg | null): string {
+  return org?.contact_role || "Compliance-Beraterin";
 }

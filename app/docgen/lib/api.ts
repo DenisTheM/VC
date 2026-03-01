@@ -49,6 +49,8 @@ export interface Organization {
   contact_name: string | null;
   contact_role: string | null;
   contact_email: string | null;
+  contact_phone: string | null;
+  contact_salutation: string | null;
   digest_opt_out: boolean;
   created_at: string;
 }
@@ -56,7 +58,7 @@ export interface Organization {
 export async function loadOrganizations(): Promise<Organization[]> {
   const { data, error } = await supabase
     .from("organizations")
-    .select("id, name, short_name, industry, sro, country, contact_name, contact_role, contact_email, digest_opt_out, created_at")
+    .select("id, name, short_name, industry, sro, country, contact_name, contact_role, contact_email, contact_phone, contact_salutation, digest_opt_out, created_at")
     .order("name");
 
   if (error) throw error;
@@ -76,7 +78,7 @@ export async function createOrganization(org: {
   const { data, error } = await supabase
     .from("organizations")
     .insert(org)
-    .select("id, name, short_name, industry, sro, country, contact_name, contact_role, contact_email, digest_opt_out, created_at")
+    .select("id, name, short_name, industry, sro, country, contact_name, contact_role, contact_email, contact_phone, contact_salutation, digest_opt_out, created_at")
     .single();
 
   if (error) throw error;
@@ -85,7 +87,14 @@ export async function createOrganization(org: {
 
 export async function updateOrganization(
   orgId: string,
-  updates: { contact_email?: string | null; digest_opt_out?: boolean },
+  updates: {
+    contact_name?: string | null;
+    contact_email?: string | null;
+    contact_phone?: string | null;
+    contact_role?: string | null;
+    contact_salutation?: string | null;
+    digest_opt_out?: boolean;
+  },
 ): Promise<void> {
   const { error } = await supabase
     .from("organizations")
@@ -650,21 +659,19 @@ export interface OrgMember {
 export async function loadOrgMembers(orgId: string): Promise<OrgMember[]> {
   const { data, error } = await supabase
     .from("organization_members")
-    .select("id, user_id, role, created_at, profiles(full_name)")
+    .select("id, user_id, role, created_at, profiles(full_name, email)")
     .eq("organization_id", orgId)
     .order("created_at");
 
   if (error) throw error;
 
-  // We need to look up emails via auth admin — but from client side we can't.
-  // Instead we'll use the profiles table (full_name) and show user_id as fallback.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data ?? []).map((m: any) => ({
     id: m.id,
     user_id: m.user_id,
     role: m.role as OrgRole,
     full_name: m.profiles?.full_name ?? null,
-    email: null, // email not available via profiles; shown as user_id in UI
+    email: m.profiles?.email ?? null,
     created_at: m.created_at,
   }));
 }

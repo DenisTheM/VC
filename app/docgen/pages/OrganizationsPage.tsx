@@ -31,6 +31,12 @@ const COUNTRIES = [
   { value: "EU", label: "\u{1F1EA}\u{1F1FA} EU (Sonstige)" },
 ];
 
+const ROLE_DESCRIPTIONS: Record<string, string> = {
+  viewer: "Kann Dokumente und Alerts einsehen",
+  editor: "Kann Dokumente bearbeiten und Kundendaten pflegen",
+  approver: "Kann Dokumente freigeben und erhält Freigabe-E-Mails",
+};
+
 interface OrganizationsPageProps {
   organizations: Organization[];
   onSelectOrg: (orgId: string, zefixData?: ZefixResult) => void;
@@ -60,6 +66,12 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
   const [membersOrgId, setMembersOrgId] = useState<string | null>(null);
   const [messageOrgId, setMessageOrgId] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<Map<string, Record<string, unknown>>>(new Map());
+  const [inviteWarning, setInviteWarning] = useState<string | null>(null);
+
+  // Search & filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterCountry, setFilterCountry] = useState("");
+  const [filterSro, setFilterSro] = useState("");
 
   // Zefix search state
   const [zefixQuery, setZefixQuery] = useState("");
@@ -75,6 +87,16 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
   const orgDefaults = { name: "", short_name: "", industry: "", sro: "", country: "CH", contact_name: "", contact_role: "", contact_email: "" };
   const [newOrg, setNewOrg] = useState(() => readAutosave<typeof orgDefaults>("vc:docgen:create-org") ?? orgDefaults);
   const orgAutosave = useAutosave({ key: "vc:docgen:create-org", data: newOrg, enabled: showForm });
+
+  // Auto-scroll to inline panel when opened
+  useEffect(() => {
+    const activeId = membersOrgId || messageOrgId;
+    if (activeId) {
+      setTimeout(() => {
+        document.getElementById(`panel-${activeId}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 50);
+    }
+  }, [membersOrgId, messageOrgId]);
 
   const handleZefixSearch = async () => {
     if (zefixQuery.trim().length < 2) return;
@@ -105,6 +127,7 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
   const handleCreate = async () => {
     if (!newOrg.name.trim()) return;
     setCreating(true);
+    setInviteWarning(null);
     try {
       const created = await createOrganization({
         name: newOrg.name.trim(),
@@ -121,8 +144,8 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
       if (email && email.includes("@")) {
         try {
           await inviteMember(created.id, email, newOrg.contact_name.trim() || email.split("@")[0], "approver");
-        } catch {
-          // Ignore invite errors (e.g. already invited) — org is created
+        } catch (inviteErr) {
+          setInviteWarning(`Kunde erstellt, aber CO-Einladung fehlgeschlagen: ${String(inviteErr)}`);
         }
       }
       onOrgCreated(created, selectedZefix || undefined);
@@ -145,6 +168,7 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
     try {
       await deleteOrganization(org.id);
       if (membersOrgId === org.id) setMembersOrgId(null);
+      if (messageOrgId === org.id) setMessageOrgId(null);
       onOrgDeleted(org.id);
     } catch (err) {
       console.error("Failed to delete organization:", err);
@@ -152,6 +176,72 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
       setDeleting(null);
     }
   };
+
+  // Filtered organizations
+  const filteredOrgs = organizations.filter((org) => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const haystack = [org.name, org.short_name, org.contact_name, org.contact_email].filter(Boolean).join(" ").toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    if (filterCountry && org.country !== filterCountry) return false;
+    if (filterSro && org.sro !== filterSro) return false;
+    return true;
+  });
+
+  // Build grid items: cards in pairs, with inline panel after the pair containing the active org
+  const gridItems: React.ReactNode[] = [];
+  for (let i = 0; i < filteredOrgs.length; i += 2) {
+    const pair = filteredOrgs.slice(i, i + 2);
+    // Render each card in the pair
+    pair.forEach((org) => {
+      gridItems.push(
+        <OrgCard
+          key={org.id}
+          org={org}
+          docCount={docCounts[org.id] || 0}
+          profilePct={calcProfileCompletion(profileData.get(org.id) ?? null, PROFILE_FIELDS)}
+          membersActive={membersOrgId === org.id}
+          messageActive={messageOrgId === org.id}
+          deleting={deleting === org.id}
+          onSelect={() => onSelectOrg(org.id)}
+          onToggleMembers={() => {
+            setMembersOrgId(membersOrgId === org.id ? null : org.id);
+            if (messageOrgId === org.id) setMessageOrgId(null);
+          }}
+          onToggleMessage={() => {
+            setMessageOrgId(messageOrgId === org.id ? null : org.id);
+            if (membersOrgId === org.id) setMembersOrgId(null);
+          }}
+          onDelete={() => handleDelete(org)}
+        />
+      );
+    });
+    // Insert inline panel if one of this pair's orgs is active
+    const activeOrg = pair.find((o) => o.id === membersOrgId || o.id === messageOrgId);
+    if (activeOrg) {
+      gridItems.push(
+        <div key={`panel-${activeOrg.id}`} id={`panel-${activeOrg.id}`} style={{ gridColumn: "1 / -1" }}>
+          {membersOrgId === activeOrg.id && (
+            <OrgMembersPanel
+              org={activeOrg}
+              onClose={() => setMembersOrgId(null)}
+              onOrgUpdated={() => setDocCounts((prev) => ({ ...prev }))} // force re-render
+            />
+          )}
+          {messageOrgId === activeOrg.id && (
+            <SendMessagePanel
+              orgId={activeOrg.id}
+              orgName={activeOrg.name}
+              orgContactName={activeOrg.contact_name}
+              orgContactSalutation={activeOrg.contact_salutation}
+              onClose={() => setMessageOrgId(null)}
+            />
+          )}
+        </div>
+      );
+    }
+  }
 
   return (
     <div>
@@ -190,6 +280,31 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
         <Icon d={icons.plus} size={15} color="#fff" />
         Neuer Kunde
       </button>
+
+      {/* Invite warning banner */}
+      {inviteWarning && (
+        <div
+          style={{
+            marginBottom: 14,
+            padding: "8px 14px",
+            borderRadius: 8,
+            fontSize: 12.5,
+            fontWeight: 500,
+            fontFamily: T.sans,
+            background: "#fffbeb",
+            color: "#d97706",
+            border: "1px solid #d9770622",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <span style={{ flex: 1 }}>{inviteWarning}</span>
+          <button onClick={() => setInviteWarning(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex" }}>
+            <Icon d="M6 18L18 6M6 6l12 12" size={14} color="#d97706" />
+          </button>
+        </div>
+      )}
 
       {/* Inline create form */}
       {showForm && (
@@ -463,6 +578,52 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
         </div>
       )}
 
+      {/* Search & Filter bar */}
+      {organizations.length > 0 && (
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 200, position: "relative" }}>
+            <Icon d={icons.search} size={14} color={T.ink4} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Kunden suchen..."
+              style={{
+                ...inputStyle,
+                paddingLeft: 12,
+                fontSize: 13,
+                padding: "8px 12px",
+              }}
+            />
+          </div>
+          <select
+            value={filterCountry}
+            onChange={(e) => setFilterCountry(e.target.value)}
+            style={{ ...inputStyle, width: "auto", fontSize: 13, padding: "8px 12px", appearance: "auto", minWidth: 120 }}
+          >
+            <option value="">Alle Länder</option>
+            {COUNTRIES.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+          <select
+            value={filterSro}
+            onChange={(e) => setFilterSro(e.target.value)}
+            style={{ ...inputStyle, width: "auto", fontSize: 13, padding: "8px 12px", appearance: "auto", minWidth: 120 }}
+          >
+            <option value="">Alle SROs</option>
+            {SROS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          {(searchQuery || filterCountry || filterSro) && (
+            <span style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, whiteSpace: "nowrap" }}>
+              {filteredOrgs.length} von {organizations.length} Kunden
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Organizations grid */}
       {organizations.length === 0 && !showForm ? (
         <div
@@ -496,255 +657,213 @@ export function OrganizationsPage({ organizations, onSelectOrg, onOrgCreated, on
             Legen Sie Ihren ersten Kunden an, um dessen Firmenprofil zu verwalten.
           </p>
         </div>
+      ) : filteredOrgs.length === 0 ? (
+        <div style={{ padding: "24px 0", fontSize: 13.5, color: T.ink4, fontFamily: T.sans, textAlign: "center" }}>
+          Keine Kunden gefunden.
+        </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          {organizations.map((org) => (
-            <div
-              key={org.id}
-              onClick={() => onSelectOrg(org.id)}
-              style={{
-                background: "#fff",
-                borderRadius: T.rLg,
-                padding: "20px 22px",
-                border: `1px solid ${T.border}`,
-                boxShadow: T.shSm,
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = T.accent;
-                e.currentTarget.style.boxShadow = T.shMd;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = T.border;
-                e.currentTarget.style.boxShadow = T.shSm;
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                <div
-                  style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 8,
-                    background: T.accentS,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <Icon d={icons.building} size={18} color={T.accent} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
-                    {org.name}
-                  </div>
-                  {org.short_name && (
-                    <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans }}>{org.short_name}</div>
-                  )}
-                </div>
-                <Icon d={icons.arrow} size={14} color={T.ink4} />
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {org.country && (
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 500,
-                      padding: "3px 10px",
-                      borderRadius: 10,
-                      background: "#f0f9ff",
-                      color: "#0369a1",
-                      fontFamily: T.sans,
-                    }}
-                  >
-                    {COUNTRIES.find((c) => c.value === org.country)?.label ?? org.country}
-                  </span>
-                )}
-                {org.industry && (
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 500,
-                      padding: "3px 10px",
-                      borderRadius: 10,
-                      background: T.s2,
-                      color: T.ink3,
-                      fontFamily: T.sans,
-                    }}
-                  >
-                    {org.industry}
-                  </span>
-                )}
-                {org.sro && (
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 500,
-                      padding: "3px 10px",
-                      borderRadius: 10,
-                      background: T.accentS,
-                      color: T.accent,
-                      fontFamily: T.sans,
-                    }}
-                  >
-                    {org.sro}
-                  </span>
-                )}
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
-                {org.contact_name && (
-                  <span style={{ fontSize: 12, color: T.ink3, fontFamily: T.sans }}>
-                    {org.contact_name}
-                    {org.contact_role ? ` (${org.contact_role})` : ""}
-                  </span>
-                )}
-                <span style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-                  {(() => {
-                    const pct = calcProfileCompletion(profileData.get(org.id) ?? null, PROFILE_FIELDS);
-                    const c = completionColor(pct);
-                    return (
-                      <span style={{ fontSize: 10, fontWeight: 600, color: c.color, background: c.bg, padding: "1px 6px", borderRadius: 4 }}>
-                        {pct}%
-                      </span>
-                    );
-                  })()}
-                  <span><Icon d={icons.doc} size={12} color={T.ink4} /> {docCounts[org.id] || 0} Dok.</span>
-                </span>
-              </div>
-              {org.contact_email && (
-                <div style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans, marginTop: 4 }}>
-                  CO: {org.contact_email}
-                </div>
-              )}
-              {/* Digest toggle */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-                <label style={{ fontSize: 11, color: T.ink3, fontFamily: T.sans, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={!org.digest_opt_out}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={async (e) => {
-                      const newVal = !e.target.checked;
-                      try {
-                        await updateOrganization(org.id, { digest_opt_out: newVal });
-                        // Update the org in-place (React reconciles via key prop)
-                        (org as unknown as Record<string, unknown>).digest_opt_out = newVal;
-                        setDocCounts((prev) => ({ ...prev })); // force re-render
-                      } catch (err) {
-                        console.error("Failed to update digest setting:", err);
-                      }
-                    }}
-                    style={{ accentColor: T.accent }}
-                  />
-                  Wöchentlicher Digest
-                </label>
-              </div>
-              {/* Actions row */}
-              <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMembersOrgId(membersOrgId === org.id ? null : org.id);
-                  }}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 5,
-                    background: membersOrgId === org.id ? T.accentS : T.s1,
-                    border: `1px solid ${membersOrgId === org.id ? T.accent + "33" : T.border}`,
-                    borderRadius: 6,
-                    padding: "5px 10px",
-                    fontSize: 11.5,
-                    fontWeight: 500,
-                    color: membersOrgId === org.id ? T.accent : T.ink3,
-                    fontFamily: T.sans,
-                    cursor: "pointer",
-                  }}
-                >
-                  <Icon d={icons.users} size={12} color={membersOrgId === org.id ? T.accent : T.ink4} />
-                  Mitglieder
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMessageOrgId(messageOrgId === org.id ? null : org.id);
-                  }}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 5,
-                    background: messageOrgId === org.id ? "#eff6ff" : T.s1,
-                    border: `1px solid ${messageOrgId === org.id ? "#3b82f622" : T.border}`,
-                    borderRadius: 6,
-                    padding: "5px 10px",
-                    fontSize: 11.5,
-                    fontWeight: 500,
-                    color: messageOrgId === org.id ? "#2563eb" : T.ink3,
-                    fontFamily: T.sans,
-                    cursor: "pointer",
-                  }}
-                >
-                  <Icon d={icons.mail} size={12} color={messageOrgId === org.id ? "#2563eb" : T.ink4} />
-                  Nachricht
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(org);
-                  }}
-                  disabled={deleting === org.id}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 5,
-                    background: T.s1,
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 6,
-                    padding: "5px 10px",
-                    fontSize: 11.5,
-                    fontWeight: 500,
-                    color: T.ink4,
-                    fontFamily: T.sans,
-                    cursor: deleting === org.id ? "wait" : "pointer",
-                    opacity: deleting === org.id ? 0.5 : 1,
-                  }}
-                  title="Kunden löschen"
-                >
-                  <Icon d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={12} color={T.ink4} />
-                  {deleting === org.id ? "Löschen..." : "Löschen"}
-                </button>
-              </div>
-            </div>
-          ))}
+          {gridItems}
         </div>
-      )}
-
-      {/* Members panel */}
-      {membersOrgId && (
-        <OrgMembersPanel
-          orgId={membersOrgId}
-          orgName={organizations.find((o) => o.id === membersOrgId)?.name ?? ""}
-          onClose={() => setMembersOrgId(null)}
-        />
-      )}
-
-      {/* Message panel */}
-      {messageOrgId && (
-        <SendMessagePanel
-          orgId={messageOrgId}
-          orgName={organizations.find((o) => o.id === messageOrgId)?.name ?? ""}
-          orgContactName={organizations.find((o) => o.id === messageOrgId)?.contact_name}
-          orgContactSalutation={null}
-          onClose={() => setMessageOrgId(null)}
-        />
       )}
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  OrgMembersPanel — manage members of an organization               */
+/*  OrgCard — individual organization card                            */
+/* ------------------------------------------------------------------ */
+
+function OrgCard({
+  org,
+  docCount,
+  profilePct,
+  membersActive,
+  messageActive,
+  deleting,
+  onSelect,
+  onToggleMembers,
+  onToggleMessage,
+  onDelete,
+}: {
+  org: Organization;
+  docCount: number;
+  profilePct: number;
+  membersActive: boolean;
+  messageActive: boolean;
+  deleting: boolean;
+  onSelect: () => void;
+  onToggleMembers: () => void;
+  onToggleMessage: () => void;
+  onDelete: () => void;
+}) {
+  const c = completionColor(profilePct);
+  return (
+    <div
+      onClick={onSelect}
+      style={{
+        background: "#fff",
+        borderRadius: T.rLg,
+        padding: "20px 22px",
+        border: `1px solid ${T.border}`,
+        boxShadow: T.shSm,
+        cursor: "pointer",
+        transition: "all 0.15s",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = T.accent;
+        e.currentTarget.style.boxShadow = T.shMd;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = T.border;
+        e.currentTarget.style.boxShadow = T.shSm;
+      }}
+    >
+      {/* Header with name + delete icon */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+        <div
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 8,
+            background: T.accentS,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <Icon d={icons.building} size={18} color={T.accent} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
+            {org.name}
+          </div>
+          {org.short_name && (
+            <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans }}>{org.short_name}</div>
+          )}
+        </div>
+        {/* Delete icon (subtle) */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          disabled={deleting}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: deleting ? "wait" : "pointer",
+            padding: 4,
+            display: "flex",
+            opacity: deleting ? 0.4 : 0.35,
+            transition: "opacity 0.15s",
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.8"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.35"; }}
+          title="Kunden löschen"
+        >
+          <Icon d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={14} color="#dc2626" />
+        </button>
+        <Icon d={icons.arrow} size={14} color={T.ink4} />
+      </div>
+
+      {/* Tags */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {org.country && (
+          <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 10, background: "#f0f9ff", color: "#0369a1", fontFamily: T.sans }}>
+            {COUNTRIES.find((cc) => cc.value === org.country)?.label ?? org.country}
+          </span>
+        )}
+        {org.industry && (
+          <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 10, background: T.s2, color: T.ink3, fontFamily: T.sans }}>
+            {org.industry}
+          </span>
+        )}
+        {org.sro && (
+          <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 10px", borderRadius: 10, background: T.accentS, color: T.accent, fontFamily: T.sans }}>
+            {org.sro}
+          </span>
+        )}
+      </div>
+
+      {/* Contact + stats */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
+        {org.contact_name && (
+          <span style={{ fontSize: 12, color: T.ink3, fontFamily: T.sans }}>
+            {org.contact_name}
+            {org.contact_role ? ` (${org.contact_role})` : ""}
+          </span>
+        )}
+        <span style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans, marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 10, fontWeight: 600, color: c.color, background: c.bg, padding: "1px 6px", borderRadius: 4 }}>
+            {profilePct}%
+          </span>
+          <span><Icon d={icons.doc} size={12} color={T.ink4} /> {docCount} Dok.</span>
+        </span>
+      </div>
+      {!org.contact_name && org.contact_email && (
+        <div style={{ fontSize: 11.5, color: T.ink4, fontFamily: T.sans, marginTop: 4 }}>
+          CO: {org.contact_email}
+        </div>
+      )}
+
+      {/* Actions row: Members + Message only */}
+      <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleMembers();
+          }}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            background: membersActive ? T.accentS : T.s1,
+            border: `1px solid ${membersActive ? T.accent + "33" : T.border}`,
+            borderRadius: 6,
+            padding: "5px 10px",
+            fontSize: 11.5,
+            fontWeight: 500,
+            color: membersActive ? T.accent : T.ink3,
+            fontFamily: T.sans,
+            cursor: "pointer",
+          }}
+        >
+          <Icon d={icons.users} size={12} color={membersActive ? T.accent : T.ink4} />
+          Mitglieder
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleMessage();
+          }}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            background: messageActive ? "#eff6ff" : T.s1,
+            border: `1px solid ${messageActive ? "#3b82f622" : T.border}`,
+            borderRadius: 6,
+            padding: "5px 10px",
+            fontSize: 11.5,
+            fontWeight: 500,
+            color: messageActive ? "#2563eb" : T.ink3,
+            fontFamily: T.sans,
+            cursor: "pointer",
+          }}
+        >
+          <Icon d={icons.mail} size={12} color={messageActive ? "#2563eb" : T.ink4} />
+          Nachricht
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  OrgMembersPanel — manage members + CO details of an organization  */
 /* ------------------------------------------------------------------ */
 
 const ROLE_LABELS: Record<OrgRole, { label: string; color: string; bg: string }> = {
@@ -754,20 +873,32 @@ const ROLE_LABELS: Record<OrgRole, { label: string; color: string; bg: string }>
 };
 
 function OrgMembersPanel({
-  orgId,
-  orgName,
+  org,
   onClose,
+  onOrgUpdated,
 }: {
-  orgId: string;
-  orgName: string;
+  org: Organization;
   onClose: () => void;
+  onOrgUpdated: () => void;
 }) {
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
 
+  // CO edit state
+  const [coName, setCoName] = useState(org.contact_name ?? "");
+  const [coRole, setCoRole] = useState(org.contact_role ?? "");
+  const [coEmail, setCoEmail] = useState(org.contact_email ?? "");
+  const [coPhone, setCoPhone] = useState(org.contact_phone ?? "");
+  const [coSalutation, setCoSalutation] = useState(org.contact_salutation ?? "");
+  const [coSaving, setCoSaving] = useState(false);
+  const [coSaved, setCoSaved] = useState(false);
+
+  // Digest toggle
+  const [digestOptOut, setDigestOptOut] = useState(org.digest_opt_out);
+
   // Invite form state
-  const inviteAutosaveKey = `vc:docgen:invite:${orgId}`;
+  const inviteAutosaveKey = `vc:docgen:invite:${org.id}`;
   const inviteSaved = readAutosave<{ email: string; name: string; role: OrgRole }>(inviteAutosaveKey);
   const [inviteEmail, setInviteEmail] = useState(inviteSaved?.email ?? "");
   const [inviteName, setInviteName] = useState(inviteSaved?.name ?? "");
@@ -778,13 +909,13 @@ function OrgMembersPanel({
 
   const load = () => {
     setLoading(true);
-    loadOrgMembers(orgId)
+    loadOrgMembers(org.id)
       .then(setMembers)
       .catch((err) => console.error("Failed to load members:", err))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [orgId]);
+  useEffect(() => { load(); }, [org.id]);
 
   const handleRoleChange = async (memberId: string, newRole: OrgRole) => {
     setUpdating(memberId);
@@ -816,7 +947,7 @@ function OrgMembersPanel({
     setInviting(true);
     setInviteResult(null);
     try {
-      const result = await inviteMember(orgId, inviteEmail.trim(), inviteName.trim(), inviteRole);
+      const result = await inviteMember(org.id, inviteEmail.trim(), inviteName.trim(), inviteRole);
       setInviteResult({ ok: result.success, msg: result.message });
       if (result.success) {
         inviteAutosave.clear();
@@ -832,10 +963,49 @@ function OrgMembersPanel({
     }
   };
 
+  const handleSaveCo = async () => {
+    setCoSaving(true);
+    setCoSaved(false);
+    try {
+      await updateOrganization(org.id, {
+        contact_name: coName.trim() || null,
+        contact_role: coRole.trim() || null,
+        contact_email: coEmail.trim() || null,
+        contact_phone: coPhone.trim() || null,
+        contact_salutation: coSalutation || null,
+      });
+      // Update org in-place for immediate UI feedback
+      org.contact_name = coName.trim() || null;
+      org.contact_role = coRole.trim() || null;
+      org.contact_email = coEmail.trim() || null;
+      org.contact_phone = coPhone.trim() || null;
+      org.contact_salutation = coSalutation || null;
+      setCoSaved(true);
+      onOrgUpdated();
+      setTimeout(() => setCoSaved(false), 2500);
+    } catch (err) {
+      console.error("Failed to save CO:", err);
+    } finally {
+      setCoSaving(false);
+    }
+  };
+
+  const handleDigestToggle = async (checked: boolean) => {
+    const newVal = !checked;
+    setDigestOptOut(newVal);
+    try {
+      await updateOrganization(org.id, { digest_opt_out: newVal });
+      (org as unknown as Record<string, unknown>).digest_opt_out = newVal;
+      onOrgUpdated();
+    } catch (err) {
+      console.error("Failed to update digest setting:", err);
+      setDigestOptOut(!newVal); // revert
+    }
+  };
+
   return (
     <div
       style={{
-        marginTop: 20,
         background: "#fff",
         borderRadius: T.rLg,
         border: `1px solid ${T.border}`,
@@ -855,7 +1025,7 @@ function OrgMembersPanel({
       >
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
-            Mitglieder — {orgName}
+            Mitglieder & CO — {org.name}
           </div>
           <div style={{ fontSize: 12, color: T.ink4, fontFamily: T.sans, marginTop: 2 }}>
             {members.length} {members.length === 1 ? "Mitglied" : "Mitglieder"}
@@ -877,6 +1047,128 @@ function OrgMembersPanel({
 
       {/* Content */}
       <div style={{ padding: "16px 22px" }}>
+        {/* ── CO Edit Section ─────────────────────────────────────── */}
+        <div
+          style={{
+            marginBottom: 18,
+            padding: "16px 18px",
+            background: T.s1,
+            borderRadius: 10,
+            border: `1px solid ${T.borderL}`,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.ink, fontFamily: T.sans, marginBottom: 12 }}>
+            Compliance Officer
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 14px" }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4, fontFamily: T.sans }}>
+                Name
+              </label>
+              <input
+                type="text"
+                value={coName}
+                onChange={(e) => setCoName(e.target.value)}
+                placeholder="Vor- und Nachname"
+                style={{ ...inputStyle, fontSize: 13, padding: "8px 12px" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4, fontFamily: T.sans }}>
+                Rolle
+              </label>
+              <input
+                type="text"
+                value={coRole}
+                onChange={(e) => setCoRole(e.target.value)}
+                placeholder="z.B. Head of Operations"
+                style={{ ...inputStyle, fontSize: 13, padding: "8px 12px" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4, fontFamily: T.sans }}>
+                E-Mail
+              </label>
+              <input
+                type="email"
+                value={coEmail}
+                onChange={(e) => setCoEmail(e.target.value)}
+                placeholder="co@firma.ch"
+                style={{ ...inputStyle, fontSize: 13, padding: "8px 12px" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4, fontFamily: T.sans }}>
+                Telefon
+              </label>
+              <input
+                type="tel"
+                value={coPhone}
+                onChange={(e) => setCoPhone(e.target.value)}
+                placeholder="+41 55 123 45 67"
+                style={{ ...inputStyle, fontSize: 13, padding: "8px 12px" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4, fontFamily: T.sans }}>
+                Anrede
+              </label>
+              <select
+                value={coSalutation}
+                onChange={(e) => setCoSalutation(e.target.value)}
+                style={{ ...inputStyle, fontSize: 13, padding: "8px 12px", appearance: "auto" }}
+              >
+                <option value="">Keine</option>
+                <option value="Herr">Herr</option>
+                <option value="Frau">Frau</option>
+              </select>
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end" }}>
+              <button
+                onClick={handleSaveCo}
+                disabled={coSaving}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "8px 18px",
+                  borderRadius: 7,
+                  border: "none",
+                  background: T.accent,
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: coSaving ? "not-allowed" : "pointer",
+                  fontFamily: T.sans,
+                  opacity: coSaving ? 0.6 : 1,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {coSaving ? "Speichern..." : "Speichern"}
+              </button>
+            </div>
+          </div>
+          {coSaved && (
+            <div style={{ marginTop: 8, padding: "6px 12px", borderRadius: 6, fontSize: 12, fontWeight: 500, fontFamily: T.sans, background: "#f0fdf4", color: "#16654e", border: "1px solid #16654e20" }}>
+              Gespeichert
+            </div>
+          )}
+
+          {/* Digest toggle (moved from card) */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, paddingTop: 10, borderTop: `1px solid ${T.borderL}` }}>
+            <label style={{ fontSize: 12, color: T.ink3, fontFamily: T.sans, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={!digestOptOut}
+                onChange={(e) => handleDigestToggle(e.target.checked)}
+                style={{ accentColor: T.accent }}
+              />
+              Wöchentlicher Digest aktiv
+            </label>
+          </div>
+        </div>
+
+        {/* ── Members list ─────────────────────────────────────────── */}
         {loading ? (
           <div style={{ fontSize: 13, color: T.ink4, fontFamily: T.sans, padding: "12px 0" }}>
             Wird geladen...
@@ -928,33 +1220,44 @@ function OrgMembersPanel({
                     <div style={{ fontSize: 13, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
                       {member.full_name || "Unbekannter Benutzer"}
                     </div>
-                    <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans }}>
-                      {member.user_id.slice(0, 8)}...
-                    </div>
+                    {member.email ? (
+                      <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans }}>
+                        {member.email}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 11, color: T.ink4, fontFamily: T.sans }}>
+                        {member.user_id.slice(0, 8)}...
+                      </div>
+                    )}
                   </div>
 
-                  {/* Role selector */}
-                  <select
-                    value={member.role}
-                    onChange={(e) => handleRoleChange(member.id, e.target.value as OrgRole)}
-                    disabled={updating === member.id}
-                    style={{
-                      padding: "4px 8px",
-                      borderRadius: 6,
-                      border: `1px solid ${T.border}`,
-                      fontSize: 12,
-                      fontFamily: T.sans,
-                      fontWeight: 500,
-                      color: rl.color,
-                      background: "#fff",
-                      cursor: updating === member.id ? "wait" : "pointer",
-                      opacity: updating === member.id ? 0.6 : 1,
-                    }}
-                  >
-                    <option value="viewer">Betrachter</option>
-                    <option value="editor">Bearbeiter</option>
-                    <option value="approver">Freigeber</option>
-                  </select>
+                  {/* Role selector + description */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                    <select
+                      value={member.role}
+                      onChange={(e) => handleRoleChange(member.id, e.target.value as OrgRole)}
+                      disabled={updating === member.id}
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                        border: `1px solid ${T.border}`,
+                        fontSize: 12,
+                        fontFamily: T.sans,
+                        fontWeight: 500,
+                        color: rl.color,
+                        background: "#fff",
+                        cursor: updating === member.id ? "wait" : "pointer",
+                        opacity: updating === member.id ? 0.6 : 1,
+                      }}
+                    >
+                      <option value="viewer">Betrachter</option>
+                      <option value="editor">Bearbeiter</option>
+                      <option value="approver">Freigeber</option>
+                    </select>
+                    <span style={{ fontSize: 10, color: T.ink4, fontFamily: T.sans }}>
+                      {ROLE_DESCRIPTIONS[member.role]}
+                    </span>
+                  </div>
 
                   {/* Remove button */}
                   <button
@@ -1042,6 +1345,9 @@ function OrgMembersPanel({
                 <option value="approver">Freigeber</option>
               </select>
             </div>
+            <div style={{ fontSize: 10, color: T.ink4, fontFamily: T.sans, paddingBottom: 8 }}>
+              {ROLE_DESCRIPTIONS[inviteRole]}
+            </div>
             <button
               onClick={handleInvite}
               disabled={inviting || !inviteEmail.trim() || !inviteName.trim()}
@@ -1060,6 +1366,7 @@ function OrgMembersPanel({
                 fontFamily: T.sans,
                 opacity: inviting || !inviteEmail.trim() || !inviteName.trim() ? 0.6 : 1,
                 whiteSpace: "nowrap",
+                marginLeft: "auto",
               }}
             >
               {inviting ? "Wird eingeladen..." : "Einladen"}
@@ -1135,7 +1442,6 @@ function SendMessagePanel({
   return (
     <div
       style={{
-        marginTop: 20,
         background: "#fff",
         borderRadius: T.rLg,
         border: `1px solid ${T.border}`,
