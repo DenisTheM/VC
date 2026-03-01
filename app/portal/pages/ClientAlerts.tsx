@@ -59,8 +59,12 @@ export function ClientAlerts({ org, initialAlertId, onAlertConsumed, onDocNav }:
     }
   }, [initialAlertId, alerts]);
 
-  const criticalCount = alerts.filter((a) => a.severity === "critical").length;
-  const highCount = alerts.filter((a) => a.severity === "high").length;
+  const severityCounts = {
+    critical: alerts.filter((a) => a.severity === "critical").length,
+    high: alerts.filter((a) => a.severity === "high").length,
+    medium: alerts.filter((a) => a.severity === "medium").length,
+    info: alerts.filter((a) => a.severity === "info").length,
+  };
   const newCount = alerts.filter((a) => a.isNew).length;
 
   if (loading) {
@@ -137,67 +141,58 @@ export function ClientAlerts({ org, initialAlertId, onAlertConsumed, onDocNav }:
       </p>
 
       {/* Summary stats bar — clickable quick-filters */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-        <div
-          onClick={() => setActiveSeverity(activeSeverity === "critical" ? "all" : "critical")}
-          style={{
-            background: "#fef2f2",
-            borderRadius: T.r,
-            padding: "10px 16px",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            cursor: "pointer",
-            border: `1.5px solid ${activeSeverity === "critical" ? "#dc2626" : "transparent"}`,
-            boxShadow: activeSeverity === "critical" ? "0 0 0 2px #dc262622" : "none",
-            transition: "all 0.15s ease",
-          }}
-        >
-          <span style={{ fontSize: 18, fontWeight: 700, color: "#dc2626", fontFamily: T.sans }}>
-            {criticalCount}
-          </span>
-          <span style={{ fontSize: 12, color: "#dc2626", fontFamily: T.sans, fontWeight: 500 }}>Kritisch</span>
-        </div>
-        <div
-          onClick={() => setActiveSeverity(activeSeverity === "high" ? "all" : "high")}
-          style={{
-            background: "#fffbeb",
-            borderRadius: T.r,
-            padding: "10px 16px",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            cursor: "pointer",
-            border: `1.5px solid ${activeSeverity === "high" ? "#d97706" : "transparent"}`,
-            boxShadow: activeSeverity === "high" ? "0 0 0 2px #d9770622" : "none",
-            transition: "all 0.15s ease",
-          }}
-        >
-          <span style={{ fontSize: 18, fontWeight: 700, color: "#d97706", fontFamily: T.sans }}>
-            {highCount}
-          </span>
-          <span style={{ fontSize: 12, color: "#d97706", fontFamily: T.sans, fontWeight: 500 }}>Hoch</span>
-        </div>
-        <div
-          onClick={() => setShowNewOnly(!showNewOnly)}
-          style={{
-            background: T.accentS,
-            borderRadius: T.r,
-            padding: "10px 16px",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            cursor: "pointer",
-            border: `1.5px solid ${showNewOnly ? T.accent : "transparent"}`,
-            boxShadow: showNewOnly ? `0 0 0 2px ${T.accent}22` : "none",
-            transition: "all 0.15s ease",
-          }}
-        >
-          <span style={{ fontSize: 18, fontWeight: 700, color: T.accent, fontFamily: T.sans }}>
-            {newCount}
-          </span>
-          <span style={{ fontSize: 12, color: T.accent, fontFamily: T.sans, fontWeight: 500 }}>Neu</span>
-        </div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        {(["critical", "high", "medium", "info"] as const).map((sev) => {
+          const count = severityCounts[sev];
+          if (count === 0) return null;
+          const s = SEV[sev];
+          const isActive = activeSeverity === sev;
+          return (
+            <div
+              key={sev}
+              onClick={() => setActiveSeverity(isActive ? "all" : sev)}
+              style={{
+                background: s.bg,
+                borderRadius: T.r,
+                padding: "10px 16px",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                cursor: "pointer",
+                border: `1.5px solid ${isActive ? s.border : "transparent"}`,
+                boxShadow: isActive ? `0 0 0 2px ${s.border}22` : "none",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <span style={{ fontSize: 18, fontWeight: 700, color: s.color, fontFamily: T.sans }}>
+                {count}
+              </span>
+              <span style={{ fontSize: 12, color: s.color, fontFamily: T.sans, fontWeight: 500 }}>{s.label}</span>
+            </div>
+          );
+        })}
+        {newCount > 0 && (
+          <div
+            onClick={() => setShowNewOnly(!showNewOnly)}
+            style={{
+              background: T.blueS,
+              borderRadius: T.r,
+              padding: "10px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              cursor: "pointer",
+              border: `1.5px solid ${showNewOnly ? T.blue : "transparent"}`,
+              boxShadow: showNewOnly ? `0 0 0 2px ${T.blue}22` : "none",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <span style={{ fontSize: 18, fontWeight: 700, color: T.blue, fontFamily: T.sans }}>
+              {newCount}
+            </span>
+            <span style={{ fontSize: 12, color: T.blue, fontFamily: T.sans, fontWeight: 500 }}>Neu</span>
+          </div>
+        )}
       </div>
 
       {/* Severity filter pills */}
@@ -706,10 +701,10 @@ function AlertDetail({
                   whiteSpace: "pre-line",
                 }}
               >
-                {org?.contact_salutation && org?.contact_name && (
+                {org?.contact_salutation && (
                   <strong style={{ color: "#fff" }}>
                     {org.contact_salutation === "Frau" ? "Liebe" : "Lieber"}{" "}
-                    {org.contact_name.split(" ")[0]},{" "}
+                    {org.contact_name?.split(" ")[0] || orgShort},{" "}
                   </strong>
                 )}
                 {alert.elenaComment}
