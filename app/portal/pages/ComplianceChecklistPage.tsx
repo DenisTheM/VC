@@ -3,7 +3,7 @@ import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import { supabase } from "@shared/lib/supabase";
-import { type ClientOrg } from "../lib/api";
+import { type ClientOrg, loadClientProfile } from "../lib/api";
 
 interface ChecklistItem {
   id: string;
@@ -45,6 +45,7 @@ export function ComplianceChecklistPage({ org, embedded }: ComplianceChecklistPa
   const [packageId, setPackageId] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [effectiveSro, setEffectiveSro] = useState<string>("");
 
   useEffect(() => {
     if (!org) return;
@@ -56,11 +57,19 @@ export function ComplianceChecklistPage({ org, embedded }: ComplianceChecklistPa
     setLoading(true);
     setError(null);
     try {
+      // Resolve SRO: organizations.sro → fallback to company_profiles.data.sro
+      let sro = org.sro || "";
+      if (!sro) {
+        const profileData = await loadClientProfile(org.id);
+        sro = (profileData?.sro as string) || "";
+      }
+      setEffectiveSro(sro);
+
       // Find SRO compliance package for this org's SRO
       const { data: pkg, error: pkgErr } = await supabase
         .from("sro_compliance_packages")
         .select("id, name, checklist")
-        .eq("sro", org.sro ?? "")
+        .eq("sro", sro)
         .maybeSingle();
 
       if (pkgErr) throw pkgErr;
@@ -179,7 +188,7 @@ export function ComplianceChecklistPage({ org, embedded }: ComplianceChecklistPa
         </>
       )}
       <p style={{ fontSize: 15, color: T.ink3, fontFamily: T.sans, margin: "0 0 8px" }}>
-        {packageName ? `Paket: ${packageName} (${org?.sro ?? "Keine SRO"})` : "Kein SRO-Paket zugewiesen."}
+        {packageName ? `Paket: ${packageName} (${effectiveSro || "Keine SRO"})` : "Kein SRO-Paket zugewiesen."}
       </p>
 
       {error && (

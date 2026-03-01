@@ -31,6 +31,7 @@ export function RiskScoringPage({ organizations }: { organizations: Organization
   const [scores, setScores] = useState<CustomerScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
+  const [calcError, setCalcError] = useState<string | null>(null);
   const [editingProfile, setEditingProfile] = useState<RiskProfile | null>(null);
   const [editWeights, setEditWeights] = useState<Record<string, number>>({});
 
@@ -71,13 +72,16 @@ export function RiskScoringPage({ organizations }: { organizations: Organization
   async function handleCalculate() {
     if (!selectedOrg) return;
     setCalculating(true);
+    setCalcError(null);
     try {
-      await supabase.functions.invoke("calculate-risk-score", {
+      const { data, error } = await supabase.functions.invoke("calculate-risk-score", {
         body: { organization_id: selectedOrg },
       });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       await loadScores(selectedOrg);
     } catch (err) {
-      console.error("Risk calculation failed:", err);
+      setCalcError(`Berechnung fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}`);
     }
     setCalculating(false);
   }
@@ -257,6 +261,12 @@ export function RiskScoringPage({ organizations }: { organizations: Organization
             )}
           </div>
         </div>
+
+        {calcError && (
+          <div style={{ padding: "12px 16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #dc262622", color: "#dc2626", fontSize: 13, fontFamily: T.sans, marginBottom: 12 }}>
+            {calcError}
+          </div>
+        )}
 
         {scores.length === 0 && selectedOrg && (
           <div style={{ padding: 32, textAlign: "center", color: T.ink4, fontFamily: T.sans, fontSize: 14 }}>

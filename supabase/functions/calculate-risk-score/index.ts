@@ -16,12 +16,56 @@ const FATF_HIGH_RISK: Record<string, number> = { IR: 90, KP: 95, MM: 85 };
 const SECO_SANCTIONS: Record<string, number> = { BY: 60, RU: 65, CU: 55, ER: 55, LB: 50, SY: 85, AF: 80, YE: 75, LY: 75, SD: 75, SO: 80, IQ: 70, VE: 65, SS: 70, CD: 65, CF: 65 };
 const LOW_RISK: string[] = ["CH","DE","AT","FR","IT","GB","US","CA","JP","AU","NZ","SE","NO","DK","FI","NL","BE","LU","IE","ES","PT","SG","HK","KR"];
 
+// Industry risk mapping (matches INDUSTRIES from profileFields.ts)
+const HIGH_RISK_INDUSTRIES = ["Kryptowährung / DLT", "Geldübertragung / Zahlungsverkehr", "Rohstoffhandel"];
+const ELEVATED_INDUSTRIES = ["Immobilien", "Edelmetalle / Schmuck", "Glücksspiel", "Investmentgesellschaft"];
+
+// Product risk mapping (matches PRODUCTS from profileFields.ts)
+const HIGH_RISK_PRODUCTS = ["Kryptowährungen", "Bargeld-Transaktionen", "Crowdfunding"];
+const ELEVATED_PRODUCTS = ["Treuhand", "Domizilgesellschaften", "Investment / Fondsmanagement"];
+
 function getCountryRisk(code: string, custom?: Record<string, number>): number {
   const c = code.toUpperCase();
   if (custom && c in custom) return custom[c];
   if (c in FATF_HIGH_RISK) return FATF_HIGH_RISK[c];
   if (c in SECO_SANCTIONS) return SECO_SANCTIONS[c];
   if (LOW_RISK.includes(c)) return 10;
+  return 30;
+}
+
+function getIndustryRisk(industry?: string): number {
+  if (!industry) return 30;
+  if (HIGH_RISK_INDUSTRIES.some(i => industry.includes(i))) return 80;
+  if (ELEVATED_INDUSTRIES.some(i => industry.includes(i))) return 55;
+  return 15;
+}
+
+function getProductRisk(products?: string | string[]): number {
+  if (!products) return 30;
+  const arr = Array.isArray(products) ? products : [products];
+  if (arr.length === 0) return 30;
+  let max = 15;
+  for (const p of arr) {
+    if (HIGH_RISK_PRODUCTS.some(h => p.includes(h))) max = Math.max(max, 80);
+    else if (ELEVATED_PRODUCTS.some(e => p.includes(e))) max = Math.max(max, 55);
+  }
+  return max;
+}
+
+function getVolumeRisk(volume?: number): number {
+  if (!volume || volume <= 0) return 30;
+  if (volume > 5_000_000) return 80;
+  if (volume > 1_000_000) return 55;
+  if (volume > 100_000) return 30;
+  return 10;
+}
+
+function getSourceOfFundsRisk(sof?: string): number {
+  if (!sof) return 30;
+  const s = sof.toLowerCase();
+  if (s.includes("unbekannt") || s.includes("unklar")) return 80;
+  if (s.includes("erbschaft") || s.includes("schenkung") || s.includes("bar")) return 55;
+  if (s.includes("lohn") || s.includes("gehalt") || s.includes("einkommen") || s.includes("geschäftstätigkeit")) return 10;
   return 30;
 }
 
@@ -40,10 +84,10 @@ function calcRisk(customer: any, weights: Record<string, number>, countryMap: Re
 
   const countryScore = data.nationality ? getCountryRisk(String(data.nationality), countryMap) : 30;
   const pepScore = data.pep_status ? 90 : 5;
-  const industryScore = 30; // simplified for batch
-  const productScore = 30;
-  const volScore = 30;
-  const sofScore = 30;
+  const industryScore = getIndustryRisk(data.industry);
+  const productScore = getProductRisk(data.products);
+  const volScore = getVolumeRisk(data.tx_volume ?? data.volume);
+  const sofScore = getSourceOfFundsRisk(data.source_of_funds);
 
   const factors = { country: countryScore, industry: industryScore, pep: pepScore, products: productScore, volume: volScore, source_of_funds: sofScore };
 
@@ -80,14 +124,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Load org's SRO to find the right scoring profile
+    // Load org's SRO with fallback to company_profiles.data.sro
     const { data: org } = await supabase
       .from("organizations")
       .select("sro")
       .eq("id", organization_id)
       .single();
 
-    const sro = org?.sro ?? "VQF";
+    let sro = org?.sro ?? "";
+    if (!sro) {
+      const { data: companyProfile } = await supabase
+        .from("company_profiles")
+        .select("data")
+        .eq("organization_id", organization_id)
+        .maybeSingle();
+      // deno-lint-ignore no-explicit-any
+      sro = (companyProfile?.data as any)?.sro ?? "VQF";
+    }
 
     // Load risk scoring profile
     const { data: profile } = await supabase
