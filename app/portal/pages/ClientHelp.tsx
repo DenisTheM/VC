@@ -3,6 +3,7 @@ import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import type { ClientOrg } from "../lib/api";
+import { coName, coInitials, coEmail, coPhone, coRole } from "../lib/contactHelper";
 import {
   loadHelpRequests, createHelpRequest, loadCustomers,
   type HelpRequest, type Customer,
@@ -103,7 +104,7 @@ export function ClientHelp({ org }: Props) {
         </button>
       </div>
 
-      {/* Elena contact card */}
+      {/* Compliance Officer contact card */}
       <div style={{
         background: "#fff", borderRadius: T.rLg, border: `1px solid ${T.border}`,
         padding: "20px 24px", marginBottom: 28, display: "flex", alignItems: "center", gap: 16,
@@ -113,27 +114,29 @@ export function ClientHelp({ org }: Props) {
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: T.sans, flexShrink: 0,
         }}>
-          EH
+          {coInitials(org)}
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: T.ink }}>Elena Hartmann</div>
-          <div style={{ fontSize: 13, color: T.ink3 }}>Ihre persönliche Compliance-Beraterin</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: T.ink }}>{coName(org)}</div>
+          <div style={{ fontSize: 13, color: T.ink3 }}>{coRole(org)}</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <a href="mailto:es@virtue-compliance.ch" style={{
+          <a href={"mailto:" + coEmail(org)} style={{
             padding: "8px 14px", borderRadius: 8, border: `1px solid ${T.border}`,
             background: "#fff", fontSize: 12, fontWeight: 500, color: T.ink2,
             textDecoration: "none", display: "flex", alignItems: "center", gap: 5,
           }}>
             <Icon d={icons.mail} size={13} color={T.ink3} /> E-Mail
           </a>
-          <a href="tel:+41799433644" style={{
-            padding: "8px 14px", borderRadius: 8, border: `1px solid ${T.border}`,
-            background: "#fff", fontSize: 12, fontWeight: 500, color: T.ink2,
-            textDecoration: "none", display: "flex", alignItems: "center", gap: 5,
-          }}>
-            <Icon d={icons.phone} size={13} color={T.ink3} /> Anrufen
-          </a>
+          {coPhone(org) && (
+            <a href={"tel:" + coPhone(org)} style={{
+              padding: "8px 14px", borderRadius: 8, border: `1px solid ${T.border}`,
+              background: "#fff", fontSize: 12, fontWeight: 500, color: T.ink2,
+              textDecoration: "none", display: "flex", alignItems: "center", gap: 5,
+            }}>
+              <Icon d={icons.phone} size={13} color={T.ink3} /> Anrufen
+            </a>
+          )}
         </div>
       </div>
 

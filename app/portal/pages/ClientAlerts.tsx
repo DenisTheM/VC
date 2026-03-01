@@ -4,6 +4,7 @@ import { Icon, icons } from "@shared/components/Icon";
 import { SectionLabel } from "@shared/components/SectionLabel";
 import { SEV, IMPACT, ACTION_STATUS } from "../data/clientData";
 import { loadClientAlerts, updateClientActionStatus, loadActionComments, addActionComment, deleteActionComment, type ClientOrg, type PortalAlert, type ActionComment } from "../lib/api";
+import { coName, coFirstName, coInitials, coEmail, coRole } from "../lib/contactHelper";
 
 interface ClientAlertsProps {
   org: ClientOrg | null;
@@ -132,7 +133,7 @@ export function ClientAlerts({ org, initialAlertId, onAlertConsumed, onDocNav }:
         Ihre Meldungen
       </h1>
       <p style={{ fontSize: 14, color: T.ink3, fontFamily: T.sans, margin: "0 0 24px" }}>
-        Von Elena Hartmann aufbereitete regulatorische Updates mit Einschätzung der Relevanz für {orgShort}.
+        Von {coName(org)} aufbereitete regulatorische Updates mit Einschätzung der Relevanz für {orgShort}.
       </p>
 
       {/* Summary stats bar — clickable quick-filters */}
@@ -435,11 +436,11 @@ export function ClientAlerts({ org, initialAlertId, onAlertConsumed, onDocNav }:
                         marginTop: 1,
                       }}
                     >
-                      EH
+                      {coInitials(org)}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 11.5, fontWeight: 600, color: T.ink2, fontFamily: T.sans, marginBottom: 2 }}>
-                        Elena Hartmann
+                        {coName(org)}
                       </div>
                       <div
                         style={{
@@ -684,14 +685,14 @@ function AlertDetail({
                     fontFamily: T.sans,
                   }}
                 >
-                  EH
+                  {coInitials(org)}
                 </div>
                 <div>
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: "#fff", fontFamily: T.sans }}>
-                    Elena Hartmann
+                    {coName(org)}
                   </div>
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", fontFamily: T.sans }}>
-                    Ihre Compliance-Beraterin
+                    {coRole(org)}
                   </div>
                 </div>
               </div>
@@ -899,18 +900,18 @@ function AlertDetail({
                 flexShrink: 0,
               }}
             >
-              EH
+              {coInitials(org)}
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
                 Fragen zu dieser Meldung?
               </div>
               <div style={{ fontSize: 12.5, color: T.ink3, fontFamily: T.sans }}>
-                Elena Hartmann steht Ihnen jederzeit zur Verfügung.
+                {coName(org)} steht Ihnen jederzeit zur Verfügung.
               </div>
             </div>
             <button
-              onClick={() => { window.location.href = "mailto:es@virtue-compliance.ch?subject=" + encodeURIComponent("Frage zu: " + alert.title); }}
+              onClick={() => { window.location.href = "mailto:" + coEmail(org) + "?subject=" + encodeURIComponent("Frage zu: " + alert.title); }}
               style={{
                 background: T.accent,
                 color: "#fff",
@@ -927,7 +928,7 @@ function AlertDetail({
               }}
             >
               <Icon d={icons.mail} size={14} color="#fff" />
-              Elena kontaktieren
+              {coFirstName(org)} kontaktieren
             </button>
           </div>
         </div>

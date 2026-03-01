@@ -40,9 +40,10 @@ type StatusFilter = "all" | "current" | "review" | "draft" | "outdated";
 
 interface DocumentsPageProps {
   organizations?: Organization[];
+  onGenerateDoc?: () => void;
 }
 
-export function DocumentsPage({ organizations }: DocumentsPageProps) {
+export function DocumentsPage({ organizations, onGenerateDoc }: DocumentsPageProps) {
   const [documents, setDocuments] = useState<DbDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -131,9 +132,24 @@ export function DocumentsPage({ organizations }: DocumentsPageProps) {
   return (
     <div>
       <SectionLabel text="Dokumentenverwaltung" />
-      <h1 style={{ fontFamily: T.serif, fontSize: 28, fontWeight: 700, color: T.ink, margin: "0 0 2px" }}>
-        Dokumente
-      </h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+        <h1 style={{ fontFamily: T.serif, fontSize: 28, fontWeight: 700, color: T.ink, margin: 0 }}>
+          Dokumente
+        </h1>
+        {onGenerateDoc && (
+          <button
+            onClick={onGenerateDoc}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "10px 18px",
+              background: T.accent, color: "#fff", border: "none", borderRadius: 8,
+              fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: T.sans,
+            }}
+          >
+            <Icon d={icons.plus} size={15} color="#fff" />
+            Neues Dokument
+          </button>
+        )}
+      </div>
       <p style={{ fontSize: 14.5, color: T.ink3, fontFamily: T.sans, margin: "0 0 20px" }}>
         Alle generierten Compliance-Dokumente auf einen Blick.
       </p>

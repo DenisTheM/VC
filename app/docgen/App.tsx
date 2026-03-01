@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { T } from "@shared/styles/tokens";
 import { Icon, icons } from "@shared/components/Icon";
-import { Sidebar } from "@shared/components/Sidebar";
+import { Sidebar, type SidebarSection } from "@shared/components/Sidebar";
 import { AuthGuard } from "@shared/components/AuthGuard";
 import { useAuthContext } from "@shared/components/AuthContext";
 import { usePageNav } from "@shared/hooks/usePageNav";
@@ -186,21 +186,40 @@ function DocGenInner() {
     setPage("generate");
   }, []);
 
-  const sidebarItems = [
-    { id: "dashboard", icon: icons.home, label: t("docgen.nav.dashboard") },
-    { id: "organizations", icon: icons.folder, label: t("docgen.nav.organizations") },
-    { id: "generate", icon: icons.plus, label: t("docgen.nav.generate") },
-    { id: "documents", icon: icons.doc, label: t("docgen.nav.documents") },
-    { id: "alerts", icon: icons.alert, label: t("docgen.nav.alerts"), badge: dashStats.draftAlertCount || undefined },
-    { id: "readiness", icon: icons.shield, label: t("docgen.nav.readiness") },
-    { id: "risk_scoring", icon: icons.chart, label: t("docgen.nav.risk_scoring") },
-    { id: "screening", icon: icons.search, label: t("docgen.nav.screening") },
-    { id: "kyc_cases", icon: icons.clipboard, label: t("docgen.nav.kyc_cases") },
-    { id: "sar", icon: icons.flag, label: t("docgen.nav.sar") },
-    { id: "sro_packages", icon: icons.list, label: t("docgen.nav.sro_packages") },
-    { id: "pkyc", icon: icons.eye, label: t("docgen.nav.pkyc") },
-    { id: "leta", icon: icons.building, label: t("docgen.nav.leta") },
-    { id: "training", icon: icons.academic, label: t("docgen.nav.training") },
+  const sidebarSections: SidebarSection[] = [
+    {
+      title: t("docgen.nav.group.overview"),
+      items: [
+        { id: "dashboard", icon: icons.home, label: t("docgen.nav.dashboard") },
+        { id: "alerts", icon: icons.alert, label: t("docgen.nav.alerts"), badge: dashStats.draftAlertCount || undefined },
+      ],
+    },
+    {
+      title: t("docgen.nav.group.clients_docs"),
+      items: [
+        { id: "organizations", icon: icons.folder, label: t("docgen.nav.organizations") },
+        { id: "documents", icon: icons.doc, label: t("docgen.nav.documents") },
+        { id: "kyc_cases", icon: icons.clipboard, label: t("docgen.nav.kyc_cases") },
+      ],
+    },
+    {
+      title: t("docgen.nav.group.risk_monitoring"),
+      items: [
+        { id: "risk_scoring", icon: icons.chart, label: t("docgen.nav.risk_scoring") },
+        { id: "screening", icon: icons.search, label: t("docgen.nav.screening") },
+        { id: "pkyc", icon: icons.eye, label: t("docgen.nav.pkyc") },
+        { id: "leta", icon: icons.building, label: t("docgen.nav.leta") },
+        { id: "sar", icon: icons.flag, label: t("docgen.nav.sar") },
+      ],
+    },
+    {
+      title: t("docgen.nav.group.compliance_training"),
+      items: [
+        { id: "sro_packages", icon: icons.list, label: t("docgen.nav.sro_packages") },
+        { id: "readiness", icon: icons.shield, label: t("docgen.nav.readiness") },
+        { id: "training", icon: icons.academic, label: t("docgen.nav.training") },
+      ],
+    },
   ];
 
   const footer = (
@@ -327,7 +346,7 @@ function DocGenInner() {
         }}
       >
         <Sidebar
-          items={sidebarItems}
+          sections={sidebarSections}
           active={page}
           onNav={handleNav}
           title="Virtue"
@@ -371,7 +390,7 @@ function DocGenInner() {
               initialDocKey={selectedDocKey}
             />
           )}
-          {page === "documents" && <DocumentsPage />}
+          {page === "documents" && <DocumentsPage onGenerateDoc={() => setPage("generate")} />}
           {page === "alerts" && <AlertsPage profile={profile} organizations={organizations} />}
           {page === "readiness" && <AuditReadinessPage organizations={organizations} />}
           {page === "risk_scoring" && <RiskScoringPage organizations={organizations} />}

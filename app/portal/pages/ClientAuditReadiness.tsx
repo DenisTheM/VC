@@ -9,9 +9,10 @@ import { loadCustomerStats } from "../lib/customerApi";
 
 interface ClientAuditReadinessProps {
   org: ClientOrg | null;
+  embedded?: boolean;
 }
 
-export function ClientAuditReadiness({ org }: ClientAuditReadinessProps) {
+export function ClientAuditReadiness({ org, embedded }: ClientAuditReadinessProps) {
   const [score, setScore] = useState<AuditScoreResult | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -47,7 +48,7 @@ export function ClientAuditReadiness({ org }: ClientAuditReadinessProps) {
 
   if (loading) {
     return (
-      <div style={{ padding: "40px 48px", textAlign: "center", color: T.ink3, fontFamily: T.sans }}>
+      <div style={{ padding: embedded ? "20px 0" : "40px 48px", textAlign: "center", color: T.ink3, fontFamily: T.sans }}>
         Audit-Score wird berechnet...
       </div>
     );
@@ -55,7 +56,7 @@ export function ClientAuditReadiness({ org }: ClientAuditReadinessProps) {
 
   if (!score) {
     return (
-      <div style={{ padding: "40px 48px", textAlign: "center", color: T.ink3, fontFamily: T.sans }}>
+      <div style={{ padding: embedded ? "20px 0" : "40px 48px", textAlign: "center", color: T.ink3, fontFamily: T.sans }}>
         Score konnte nicht berechnet werden.
       </div>
     );
@@ -70,11 +71,15 @@ export function ClientAuditReadiness({ org }: ClientAuditReadinessProps) {
   ];
 
   return (
-    <div style={{ padding: "40px 48px", maxWidth: 960 }}>
-      <SectionLabel text="Audit Readiness" />
-      <h1 style={{ fontSize: 28, fontWeight: 700, color: T.ink, fontFamily: T.sans, margin: "0 0 4px", letterSpacing: "-0.5px" }}>
-        SRO Audit Readiness
-      </h1>
+    <div style={embedded ? { maxWidth: 960 } : { padding: "40px 48px", maxWidth: 960 }}>
+      {!embedded && (
+        <>
+          <SectionLabel text="Audit Readiness" />
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: T.ink, fontFamily: T.sans, margin: "0 0 4px", letterSpacing: "-0.5px" }}>
+            SRO Audit Readiness
+          </h1>
+        </>
+      )}
       <p style={{ fontSize: 15, color: T.ink3, fontFamily: T.sans, margin: "0 0 28px" }}>
         Wie gut ist {org?.short_name || org?.name || "Ihre Organisation"} auf eine SRO-Prüfung vorbereitet?
       </p>

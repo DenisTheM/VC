@@ -10,6 +10,7 @@ import { NotificationBell } from "@shared/components/NotificationBell";
 import { LanguageSwitcher } from "@shared/components/LanguageSwitcher";
 import { t } from "@shared/lib/i18n";
 import { loadUserOrganization, type ClientOrg } from "./lib/api";
+import { coName, coInitials, coEmail, coPhone, coRole } from "./lib/contactHelper";
 
 const ClientDashboard = lazy(() => import("./pages/ClientDashboard").then((m) => ({ default: m.ClientDashboard })));
 const ClientAlerts = lazy(() => import("./pages/ClientAlerts").then((m) => ({ default: m.ClientAlerts })));
@@ -25,27 +26,49 @@ const ComplianceChecklistPage = lazy(() => import("./pages/ComplianceChecklistPa
 const PkycDashboardPage = lazy(() => import("./pages/PkycDashboardPage").then((m) => ({ default: m.PkycDashboardPage })));
 const UboDeclarationPage = lazy(() => import("./pages/UboDeclarationPage").then((m) => ({ default: m.UboDeclarationPage })));
 const ElearningPage = lazy(() => import("./pages/ElearningPage").then((m) => ({ default: m.ElearningPage })));
+const ComplianceHubPage = lazy(() => import("./pages/ComplianceHubPage").then((m) => ({ default: m.ComplianceHubPage })));
 
 /* ------------------------------------------------------------------ */
 /*  Client Sidebar                                                    */
 /* ------------------------------------------------------------------ */
 
-function getNavItems(): readonly { id: string; icon: string; label: string; approverOnly?: boolean }[] {
+interface NavSection {
+  title: string;
+  items: { id: string; icon: string; label: string }[];
+}
+
+function getNavSections(): NavSection[] {
   return [
-    { id: "dashboard", icon: icons.home, label: t("portal.nav.dashboard") },
-    { id: "alerts", icon: icons.alert, label: t("portal.nav.alerts") },
-    { id: "docs", icon: icons.doc, label: t("portal.nav.docs") },
-    { id: "approvals", icon: icons.check, label: t("portal.nav.approvals"), approverOnly: true },
-    { id: "customers", icon: icons.users, label: t("portal.nav.customers") },
-    { id: "kyc", icon: icons.clipboard, label: t("portal.nav.kyc") },
-    { id: "mros", icon: icons.flag, label: t("portal.nav.mros") },
-    { id: "checklist", icon: icons.list, label: t("portal.nav.checklist") },
-    { id: "pkyc", icon: icons.eye, label: t("portal.nav.pkyc") },
-    { id: "ubo", icon: icons.building, label: t("portal.nav.ubo") },
-    { id: "training", icon: icons.academic, label: t("portal.nav.training") },
-    { id: "readiness", icon: icons.shield, label: t("portal.nav.readiness") },
-    { id: "messages", icon: icons.mail, label: t("portal.nav.messages") },
-    { id: "help", icon: icons.phone, label: t("portal.nav.help") },
+    {
+      title: t("portal.nav.group.overview"),
+      items: [
+        { id: "dashboard", icon: icons.home, label: t("portal.nav.dashboard") },
+        { id: "alerts", icon: icons.alert, label: t("portal.nav.alerts") },
+        { id: "messages", icon: icons.mail, label: t("portal.nav.messages") },
+      ],
+    },
+    {
+      title: t("portal.nav.group.customer_review"),
+      items: [
+        { id: "customers", icon: icons.users, label: t("portal.nav.customers") },
+        { id: "pkyc", icon: icons.eye, label: t("portal.nav.pkyc") },
+        { id: "mros", icon: icons.flag, label: t("portal.nav.mros") },
+      ],
+    },
+    {
+      title: t("portal.nav.group.compliance"),
+      items: [
+        { id: "docs", icon: icons.doc, label: t("portal.nav.docs") },
+        { id: "compliance_hub", icon: icons.list, label: t("portal.nav.compliance_hub") },
+      ],
+    },
+    {
+      title: t("portal.nav.group.education"),
+      items: [
+        { id: "training", icon: icons.academic, label: t("portal.nav.training") },
+        { id: "help", icon: icons.phone, label: t("portal.nav.help") },
+      ],
+    },
   ];
 }
 
@@ -119,54 +142,59 @@ function ClientSidebar({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "6px 10px 12px",
+            padding: "6px 10px 8px",
           }}
         >
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              color: "rgba(255,255,255,0.25)",
-              letterSpacing: "1px",
-              textTransform: "uppercase",
-              fontFamily: T.sans,
-            }}
-          >
-            Navigation
-          </span>
           <NotificationBell onNavigate={onNotificationNav} />
         </div>
-        {getNavItems().filter((it) => !it.approverOnly || org?.userRole === "approver").map((it) => {
-          const isActive = active === it.id;
-          return (
-            <button
-              key={it.id}
-              onClick={() => onNav(it.id)}
+        {getNavSections().map((section, idx) => (
+          <div key={section.title} style={{ marginTop: idx > 0 ? 16 : 0 }}>
+            <div
               style={{
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: "none",
-                cursor: "pointer",
-                marginBottom: 2,
+                fontSize: 10,
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.25)",
+                letterSpacing: "1px",
+                textTransform: "uppercase",
+                padding: "6px 10px 8px",
                 fontFamily: T.sans,
-                background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
-                color: isActive ? "#fff" : "rgba(255,255,255,0.5)",
-                fontSize: 13.5,
-                fontWeight: isActive ? 600 : 400,
               }}
             >
-              <Icon d={it.icon} size={18} color={isActive ? T.glow : "rgba(255,255,255,0.35)"} />
-              {it.label}
-            </button>
-          );
-        })}
+              {section.title}
+            </div>
+            {section.items.map((it) => {
+              const isActive = active === it.id;
+              return (
+                <button
+                  key={it.id}
+                  onClick={() => onNav(it.id)}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    border: "none",
+                    cursor: "pointer",
+                    marginBottom: 2,
+                    fontFamily: T.sans,
+                    background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
+                    color: isActive ? "#fff" : "rgba(255,255,255,0.5)",
+                    fontSize: 13.5,
+                    fontWeight: isActive ? 600 : 400,
+                  }}
+                >
+                  <Icon d={it.icon} size={18} color={isActive ? T.glow : "rgba(255,255,255,0.35)"} />
+                  {it.label}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
-      {/* Elena contact card */}
+      {/* Compliance Officer contact card */}
       <div style={{ padding: "0 12px 16px" }}>
         <div
           style={{
@@ -191,20 +219,20 @@ function ClientSidebar({
                 fontFamily: T.sans,
               }}
             >
-              EH
+              {coInitials(org)}
             </div>
             <div>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: "#fff", fontFamily: T.sans }}>
-                Elena Hartmann
+                {coName(org)}
               </div>
               <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.4)", fontFamily: T.sans }}>
-                Ihre Beraterin
+                {coRole(org)}
               </div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             <button
-              onClick={() => { window.location.href = "mailto:es@virtue-compliance.ch"; }}
+              onClick={() => { window.location.href = "mailto:" + coEmail(org); }}
               style={{
                 flex: 1,
                 background: "rgba(255,255,255,0.08)",
@@ -225,28 +253,30 @@ function ClientSidebar({
               <Icon d={icons.mail} size={13} color="rgba(255,255,255,0.45)" />
               E-Mail
             </button>
-            <button
-              onClick={() => { window.location.href = "tel:+41799433644"; }}
-              style={{
-                flex: 1,
-                background: "rgba(255,255,255,0.08)",
-                border: "none",
-                borderRadius: 6,
-                padding: "7px 0",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 5,
-                cursor: "pointer",
-                fontSize: 11,
-                fontWeight: 500,
-                color: "rgba(255,255,255,0.6)",
-                fontFamily: T.sans,
-              }}
-            >
-              <Icon d={icons.phone} size={13} color="rgba(255,255,255,0.45)" />
-              Anrufen
-            </button>
+            {coPhone(org) && (
+              <button
+                onClick={() => { window.location.href = "tel:" + coPhone(org); }}
+                style={{
+                  flex: 1,
+                  background: "rgba(255,255,255,0.08)",
+                  border: "none",
+                  borderRadius: 6,
+                  padding: "7px 0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 5,
+                  cursor: "pointer",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: "rgba(255,255,255,0.6)",
+                  fontFamily: T.sans,
+                }}
+              >
+                <Icon d={icons.phone} size={13} color="rgba(255,255,255,0.45)" />
+                Anrufen
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -452,6 +482,7 @@ function PortalContent() {
           {page === "customers" && <ClientCustomers org={org} onNav={handleNav} />}
           {page === "kyc" && <KycOnboardingPage org={org} />}
           {page === "mros" && <MrosWizardPage org={org} />}
+          {page === "compliance_hub" && <ComplianceHubPage org={org} />}
           {page === "checklist" && <ComplianceChecklistPage org={org} />}
           {page === "pkyc" && <PkycDashboardPage org={org} />}
           {page === "ubo" && <UboDeclarationPage org={org} />}

@@ -1,7 +1,7 @@
 import { T } from "../styles/tokens";
 import { Icon } from "./Icon";
 
-interface SidebarItem {
+export interface SidebarItem {
   id: string;
   icon: string;
   label: string;
@@ -9,8 +9,14 @@ interface SidebarItem {
   dot?: boolean;
 }
 
-interface SidebarProps {
+export interface SidebarSection {
+  title: string;
   items: SidebarItem[];
+}
+
+interface SidebarProps {
+  items?: SidebarItem[];
+  sections?: SidebarSection[];
   active: string;
   onNav: (id: string) => void;
   title: string;
@@ -19,7 +25,52 @@ interface SidebarProps {
   footer?: React.ReactNode;
 }
 
-export function Sidebar({ items, active, onNav, title, subtitle, footer }: SidebarProps) {
+function NavButton({ item, active, onNav }: { item: SidebarItem; active: string; onNav: (id: string) => void }) {
+  const isActive = active === item.id;
+  return (
+    <button
+      onClick={() => onNav(item.id)}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 12px",
+        borderRadius: 8,
+        border: "none",
+        cursor: "pointer",
+        marginBottom: 2,
+        fontFamily: T.sans,
+        background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
+        color: isActive ? "#fff" : "rgba(255,255,255,0.5)",
+        fontSize: 13.5,
+        fontWeight: isActive ? 600 : 400,
+      }}
+    >
+      <Icon d={item.icon} size={18} color={isActive ? T.glow : "rgba(255,255,255,0.35)"} />
+      {item.label}
+      {item.badge != null && item.badge > 0 && (
+        <span
+          style={{
+            marginLeft: "auto",
+            background: T.accent,
+            color: "#fff",
+            fontSize: 10,
+            fontWeight: 700,
+            padding: "2px 7px",
+            borderRadius: 10,
+            fontFamily: T.sans,
+          }}
+        >
+          {item.badge}
+        </span>
+      )}
+      {item.dot && <span style={{ marginLeft: "auto", width: 7, height: 7, borderRadius: "50%", background: T.amber }} />}
+    </button>
+  );
+}
+
+export function Sidebar({ items, sections, active, onNav, title, subtitle, footer }: SidebarProps) {
   return (
     <div style={{ width: 248, minHeight: "100vh", background: T.primaryDeep, display: "flex", flexDirection: "column" }}>
       {/* Logo */}
@@ -51,64 +102,49 @@ export function Sidebar({ items, active, onNav, title, subtitle, footer }: Sideb
 
       {/* Navigation */}
       <nav style={{ padding: "16px 12px", flex: 1 }}>
-        <div
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            color: "rgba(255,255,255,0.25)",
-            letterSpacing: "1px",
-            textTransform: "uppercase",
-            padding: "6px 10px 12px",
-            fontFamily: T.sans,
-          }}
-        >
-          Navigation
-        </div>
-        {items.map((it) => {
-          const isActive = active === it.id;
-          return (
-            <button
-              key={it.id}
-              onClick={() => onNav(it.id)}
+        {sections ? (
+          /* Grouped mode */
+          sections.map((section, idx) => (
+            <div key={section.title} style={{ marginTop: idx > 0 ? 16 : 0 }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.25)",
+                  letterSpacing: "1px",
+                  textTransform: "uppercase",
+                  padding: "6px 10px 8px",
+                  fontFamily: T.sans,
+                }}
+              >
+                {section.title}
+              </div>
+              {section.items.map((it) => (
+                <NavButton key={it.id} item={it} active={active} onNav={onNav} />
+              ))}
+            </div>
+          ))
+        ) : (
+          /* Flat mode (backwards compat) */
+          <>
+            <div
               style={{
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: "none",
-                cursor: "pointer",
-                marginBottom: 2,
+                fontSize: 10,
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.25)",
+                letterSpacing: "1px",
+                textTransform: "uppercase",
+                padding: "6px 10px 12px",
                 fontFamily: T.sans,
-                background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
-                color: isActive ? "#fff" : "rgba(255,255,255,0.5)",
-                fontSize: 13.5,
-                fontWeight: isActive ? 600 : 400,
               }}
             >
-              <Icon d={it.icon} size={18} color={isActive ? T.glow : "rgba(255,255,255,0.35)"} />
-              {it.label}
-              {it.badge != null && it.badge > 0 && (
-                <span
-                  style={{
-                    marginLeft: "auto",
-                    background: T.accent,
-                    color: "#fff",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: "2px 7px",
-                    borderRadius: 10,
-                    fontFamily: T.sans,
-                  }}
-                >
-                  {it.badge}
-                </span>
-              )}
-              {it.dot && <span style={{ marginLeft: "auto", width: 7, height: 7, borderRadius: "50%", background: T.amber }} />}
-            </button>
-          );
-        })}
+              Navigation
+            </div>
+            {(items ?? []).map((it) => (
+              <NavButton key={it.id} item={it} active={active} onNav={onNav} />
+            ))}
+          </>
+        )}
       </nav>
 
       {/* Footer */}

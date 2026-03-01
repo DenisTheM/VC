@@ -13,13 +13,16 @@ export interface ClientOrg {
   sro: string | null;
   contact_name: string | null;
   contact_salutation: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  contact_role: string | null;
   userRole: OrgRole;
 }
 
 export async function loadUserOrganization(userId: string): Promise<ClientOrg | null> {
   const { data, error } = await supabase
     .from("organization_members")
-    .select("role, organizations(id, name, short_name, industry, sro, contact_name, contact_salutation)")
+    .select("role, organizations(id, name, short_name, industry, sro, contact_name, contact_salutation, contact_email, contact_phone, contact_role)")
     .eq("user_id", userId)
     .limit(1)
     .maybeSingle();

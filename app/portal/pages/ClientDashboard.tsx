@@ -10,6 +10,7 @@ import { PROFILE_FIELDS } from "@shared/data/profileFields";
 import { calcProfileCompletion, completionColor } from "@shared/lib/profileCompletion";
 import { TrustBadge } from "@shared/components/TrustBadge";
 import { t } from "@shared/lib/i18n";
+import { coFirstName } from "../lib/contactHelper";
 
 interface ClientDashboardProps {
   onNav: (id: string) => void;
@@ -463,7 +464,7 @@ export function ClientDashboard({ onNav, onAlertNav, org }: ClientDashboardProps
                         overflow: "hidden",
                       }}
                     >
-                      Elena: {alert.elenaComment.slice(0, 140)}...
+                      {coFirstName(org)}: {alert.elenaComment.slice(0, 140)}...
                     </div>
                   </div>
                 </div>

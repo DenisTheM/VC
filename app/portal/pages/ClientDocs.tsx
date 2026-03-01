@@ -7,6 +7,7 @@ import { loadClientDocuments, approveDocument, loadDocumentAuditLog, loadDocAler
 import { VersionHistory } from "@shared/components/VersionHistory";
 import { MarkdownContent } from "@shared/components/MarkdownContent";
 import { exportDocumentAsPdf } from "@shared/lib/pdfExport";
+import { coName, coFirstName, coInitials, coEmail } from "../lib/contactHelper";
 
 interface ClientDocsProps {
   org: ClientOrg | null;
@@ -185,7 +186,7 @@ export function ClientDocs({ org, initialDocName, onDocConsumed, onAlertNav }: C
         Ihre Dokumente
       </h1>
       <p style={{ fontSize: 14, color: T.ink3, fontFamily: T.sans, margin: "0 0 24px" }}>
-        Alle Compliance-Dokumente für {orgShort}, erstellt und gepflegt von Elena Hartmann.
+        Alle Compliance-Dokumente für {orgShort}, erstellt und gepflegt von {coName(org)}.
       </p>
 
       {/* Stats bar — clickable as quick-filters */}
@@ -574,18 +575,18 @@ export function ClientDocs({ org, initialDocName, onDocConsumed, onAlertNav }: C
             flexShrink: 0,
           }}
         >
-          EH
+          {coInitials(org)}
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13.5, fontWeight: 600, color: T.ink, fontFamily: T.sans }}>
-            Dokumente werden von Elena Hartmann gepflegt
+            Dokumente werden von {coName(org)} gepflegt
           </div>
           <div style={{ fontSize: 12.5, color: T.ink3, fontFamily: T.sans }}>
             Alle Dokumente werden regelmässig auf regulatorische Änderungen geprüft und bei Bedarf aktualisiert.
           </div>
         </div>
         <button
-          onClick={() => { window.location.href = "mailto:es@virtue-compliance.ch"; }}
+          onClick={() => { window.location.href = "mailto:" + coEmail(org); }}
           style={{
             background: T.accent,
             color: "#fff",
@@ -603,7 +604,7 @@ export function ClientDocs({ org, initialDocName, onDocConsumed, onAlertNav }: C
           }}
         >
           <Icon d={icons.mail} size={14} color="#fff" />
-          Elena kontaktieren
+          {coFirstName(org)} kontaktieren
         </button>
       </div>
     </div>
@@ -861,7 +862,7 @@ function DocDetail({
           </button>
         )}
         <button
-          onClick={() => { window.location.href = "mailto:es@virtue-compliance.ch?subject=" + encodeURIComponent("Frage zu Dokument: " + doc.name); }}
+          onClick={() => { window.location.href = "mailto:" + coEmail(org) + "?subject=" + encodeURIComponent("Frage zu Dokument: " + doc.name); }}
           style={{
             background: "#fff",
             color: T.ink3,
@@ -879,7 +880,7 @@ function DocDetail({
           }}
         >
           <Icon d={icons.mail} size={14} color={T.ink4} />
-          Elena kontaktieren
+          {coFirstName(org)} kontaktieren
         </button>
       </div>
     </div>

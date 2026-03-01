@@ -34,9 +34,10 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
 
 interface ComplianceChecklistPageProps {
   org: ClientOrg | null;
+  embedded?: boolean;
 }
 
-export function ComplianceChecklistPage({ org }: ComplianceChecklistPageProps) {
+export function ComplianceChecklistPage({ org, embedded }: ComplianceChecklistPageProps) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -161,18 +162,22 @@ export function ComplianceChecklistPage({ org }: ComplianceChecklistPageProps) {
 
   if (loading) {
     return (
-      <div style={{ padding: "40px 48px", textAlign: "center", color: T.ink3, fontFamily: T.sans }}>
+      <div style={{ padding: embedded ? "20px 0" : "40px 48px", textAlign: "center", color: T.ink3, fontFamily: T.sans }}>
         Checkliste wird geladen...
       </div>
     );
   }
 
   return (
-    <div style={{ padding: "40px 48px", maxWidth: 800 }}>
-      <SectionLabel text="Compliance-Checkliste" />
-      <h1 style={{ fontSize: 28, fontWeight: 700, color: T.ink, fontFamily: T.sans, margin: "0 0 4px", letterSpacing: "-0.5px" }}>
-        Compliance-Checkliste
-      </h1>
+    <div style={embedded ? { maxWidth: 800 } : { padding: "40px 48px", maxWidth: 800 }}>
+      {!embedded && (
+        <>
+          <SectionLabel text="Compliance-Checkliste" />
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: T.ink, fontFamily: T.sans, margin: "0 0 4px", letterSpacing: "-0.5px" }}>
+            Compliance-Checkliste
+          </h1>
+        </>
+      )}
       <p style={{ fontSize: 15, color: T.ink3, fontFamily: T.sans, margin: "0 0 8px" }}>
         {packageName ? `Paket: ${packageName} (${org?.sro ?? "Keine SRO"})` : "Kein SRO-Paket zugewiesen."}
       </p>

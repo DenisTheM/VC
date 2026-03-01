@@ -10,6 +10,10 @@ import { exportCustomerDocumentAsPdf, exportAuditTrailAsPdf } from "@shared/lib/
 import { useAutosave, readAutosave } from "@shared/hooks/useAutosave";
 import type { ClientOrg } from "../lib/api";
 import {
+  loadKycCases, createKycCase, updateKycCase, type KycCase,
+  loadUboDeclaration, saveUboDeclaration, type UboEntry,
+} from "../lib/api";
+import {
   loadCustomers, loadCustomer, createCustomer, updateCustomer, archiveCustomer,
   loadCustomerDocuments, createCustomerDocument, saveCustomerDocumentData,
   submitForReview, approveCustomerDocument, rejectCustomerDocument, reviseCustomerDocument,
@@ -19,6 +23,8 @@ import {
   type Customer, type CustomerDocument, type CustomerDocAuditEntry, type CustomerAuditEntry,
   type CustomerContact, type DeletedCustomerArchive,
 } from "../lib/customerApi";
+import { FORM_A_FIELDS, FORM_A_SECTIONS } from "@shared/data/formAFields";
+import { FORM_K_FIELDS, FORM_K_SECTIONS } from "@shared/data/formKFields";
 import { CUSTOMER_DOC_STATUS, RISK_LEVEL, CUSTOMER_STATUS, CUSTOMER_TYPE, CONTACT_ROLES, AUDIT_ACTION_COLORS } from "../data/statusConfig";
 import { CUSTOMER_TEMPLATES, getTemplatesForType, type CustomerTemplate } from "../data/customerTemplates";
 
@@ -550,7 +556,7 @@ function CustomerDetail({ org, role, customerId, onBack, onOpenDoc }: {
   const [auditCustomer, setAuditCustomer] = useState<CustomerAuditEntry[]>([]);
   const [auditDocs, setAuditDocs] = useState<CustomerDocAuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"docs" | "profile" | "screening" | "history">("docs");
+  const [tab, setTab] = useState<"docs" | "profile" | "kyc" | "screening" | "ubo" | "history">("docs");
   const [showTemplateSelect, setShowTemplateSelect] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<Record<string, string>>({});
@@ -686,20 +692,23 @@ function CustomerDetail({ org, role, customerId, onBack, onOpenDoc }: {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${T.border}`, marginBottom: 24 }}>
-        {(["docs", "profile", "screening", "history"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              padding: "10px 20px", border: "none", cursor: "pointer", fontSize: 13, fontWeight: tab === t ? 600 : 400,
-              color: tab === t ? T.accent : T.ink3, background: "none", fontFamily: T.sans,
-              borderBottom: tab === t ? `2px solid ${T.accent}` : "2px solid transparent", marginBottom: -1,
-            }}
-          >
-            {t === "docs" ? "Dokumente" : t === "profile" ? "Stammdaten" : t === "screening" ? "Screening" : "Verlauf"}
-          </button>
-        ))}
+      <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${T.border}`, marginBottom: 24, flexWrap: "wrap" }}>
+        {(["docs", "profile", "kyc", "screening", "ubo", "history"] as const).map((t) => {
+          const labels: Record<string, string> = { docs: "Dokumente", profile: "Stammdaten", kyc: "KYC", screening: "Screening", ubo: "UBO", history: "Verlauf" };
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              style={{
+                padding: "10px 16px", border: "none", cursor: "pointer", fontSize: 13, fontWeight: tab === t ? 600 : 400,
+                color: tab === t ? T.accent : T.ink3, background: "none", fontFamily: T.sans,
+                borderBottom: tab === t ? `2px solid ${T.accent}` : "2px solid transparent", marginBottom: -1,
+              }}
+            >
+              {labels[t]}
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab: Dokumente */}
@@ -925,9 +934,19 @@ function CustomerDetail({ org, role, customerId, onBack, onOpenDoc }: {
         </>
       )}
 
+      {/* Tab: KYC */}
+      {tab === "kyc" && (
+        <KycTabContent org={org} customer={customer} role={role} />
+      )}
+
       {/* Tab: Screening */}
       {tab === "screening" && (
         <ScreeningTab org={org} customer={customer} role={role} />
+      )}
+
+      {/* Tab: UBO */}
+      {tab === "ubo" && (
+        <UboTabContent org={org} customer={customer} role={role} />
       )}
 
       {/* Tab: Verlauf */}
@@ -1794,6 +1813,403 @@ function DeletedCustomerDetail({ org, archiveId, onBack }: {
         </div>
       </div>
     </>
+  );
+}
+
+// =================================================================
+//  KYC Tab Content (inline in customer detail)
+// =================================================================
+
+const KYC_STATUS_COLORS: Record<string, { bg: string; color: string; label: string }> = {
+  draft: { bg: T.s2, color: T.ink3, label: "Entwurf" },
+  in_review: { bg: "#fffbeb", color: "#d97706", label: "In Prüfung" },
+  approved: { bg: "#ecf5f1", color: "#16654e", label: "Genehmigt" },
+  rejected: { bg: "#fef2f2", color: "#dc2626", label: "Abgelehnt" },
+};
+
+function KycTabContent({ org, customer, role }: { org: ClientOrg; customer: Customer; role?: string }) {
+  const [cases, setCases] = useState<KycCase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [selectedCase, setSelectedCase] = useState<KycCase | null>(null);
+  const [formData, setFormData] = useState<Record<string, unknown>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    loadKycCases(org.id)
+      .then((all) => setCases(all.filter((c) => {
+        // Filter by customer: check if form_data references this customer
+        const fd = c.form_data as Record<string, string>;
+        if (customer.customer_type === "natural_person") {
+          return fd?.last_name === customer.last_name && fd?.first_name === customer.first_name;
+        }
+        return fd?.company_name === customer.company_name;
+      })))
+      .catch((err) => console.error("Load KYC cases:", err))
+      .finally(() => setLoading(false));
+  }, [org.id, customer]);
+
+  const handleCreate = async (type: "form_a" | "form_k") => {
+    setCreating(true);
+    try {
+      const newCase = await createKycCase(org.id, type);
+      // Pre-fill with customer data
+      const prefill: Record<string, unknown> = {};
+      if (customer.customer_type === "natural_person") {
+        prefill.first_name = customer.first_name || "";
+        prefill.last_name = customer.last_name || "";
+        prefill.date_of_birth = customer.date_of_birth || "";
+        prefill.nationality = customer.nationality || "";
+        prefill.address = customer.address || "";
+      } else {
+        prefill.company_name = customer.company_name || "";
+        prefill.uid_number = customer.uid_number || "";
+        prefill.legal_form = customer.legal_form || "";
+        prefill.legal_seat = customer.legal_seat || "";
+        prefill.purpose = customer.purpose || "";
+        prefill.address = customer.address || "";
+      }
+      await updateKycCase(newCase.id, { form_data: prefill });
+      newCase.form_data = prefill;
+      setCases((prev) => [newCase, ...prev]);
+      setSelectedCase(newCase);
+      setFormData(prefill);
+    } catch (err) {
+      console.error("Create KYC case:", err);
+      alert("Fehler beim Erstellen des KYC-Falls.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!selectedCase) return;
+    setSaving(true);
+    try {
+      await updateKycCase(selectedCase.id, { form_data: formData });
+      setCases((prev) => prev.map((c) => c.id === selectedCase.id ? { ...c, form_data: formData } : c));
+    } catch (err) {
+      console.error("Save KYC:", err);
+      alert("Fehler beim Speichern.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div style={{ padding: 20, textAlign: "center", color: T.ink3, fontSize: 14 }}>KYC-Fälle werden geladen...</div>;
+  }
+
+  // Detail view: editing a KYC case
+  if (selectedCase) {
+    const fields = selectedCase.case_type === "form_a" ? FORM_A_FIELDS : FORM_K_FIELDS;
+    const sections = selectedCase.case_type === "form_a" ? FORM_A_SECTIONS : FORM_K_SECTIONS;
+
+    return (
+      <div>
+        <button
+          onClick={() => setSelectedCase(null)}
+          style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: T.accent, fontWeight: 600, fontFamily: T.sans, marginBottom: 16, padding: 0 }}
+        >
+          <Icon d={icons.back} size={14} color={T.accent} /> Zurück zur Übersicht
+        </button>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: T.ink, margin: "0 0 16px" }}>
+          {selectedCase.case_type === "form_a" ? "Formular A (Natürliche Person)" : "Formular K (Juristische Person)"}
+        </h3>
+        {sections.map((section) => {
+          const sectionFields = fields.filter((f) => f.section === section);
+          return (
+            <div key={section} style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: T.accent, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                {section}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, background: "#fff", borderRadius: T.r, padding: 16, border: `1px solid ${T.border}` }}>
+                {sectionFields.map((f) => (
+                  <div key={f.id} style={{ gridColumn: f.type === "textarea" ? "1 / -1" : undefined }}>
+                    <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4 }}>
+                      {f.label} {f.required && <span style={{ color: "#dc2626" }}>*</span>}
+                    </label>
+                    {f.type === "select" ? (
+                      <select
+                        value={(formData[f.id] as string) || ""}
+                        onChange={(e) => setFormData((p) => ({ ...p, [f.id]: e.target.value }))}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans }}
+                      >
+                        <option value="">— Auswählen —</option>
+                        {f.options?.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    ) : f.type === "textarea" ? (
+                      <textarea
+                        value={(formData[f.id] as string) || ""}
+                        onChange={(e) => setFormData((p) => ({ ...p, [f.id]: e.target.value }))}
+                        rows={3}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, resize: "vertical", boxSizing: "border-box" }}
+                      />
+                    ) : (
+                      <input
+                        type={f.type === "date" ? "date" : "text"}
+                        value={(formData[f.id] as string) || ""}
+                        onChange={(e) => setFormData((p) => ({ ...p, [f.id]: e.target.value }))}
+                        placeholder={f.placeholder}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, boxSizing: "border-box" }}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+          <button onClick={handleSave} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.6 : 1 }}>
+            {saving ? "Wird gespeichert..." : "Speichern"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // List view
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: T.ink, margin: 0 }}>KYC-Fälle</h3>
+        {canEdit(role) && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => handleCreate(customer.customer_type === "natural_person" ? "form_a" : "form_k")}
+              disabled={creating}
+              style={{ ...btnPrimary, fontSize: 12, padding: "8px 14px", opacity: creating ? 0.6 : 1 }}
+            >
+              <Icon d={icons.plus} size={13} color="#fff" />
+              {creating ? "Wird erstellt..." : `Neuen KYC-Fall (${customer.customer_type === "natural_person" ? "Form A" : "Form K"})`}
+            </button>
+          </div>
+        )}
+      </div>
+      {cases.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 32, color: T.ink3, fontSize: 14, background: T.s1, borderRadius: 10 }}>
+          Keine KYC-Fälle für diesen Kunden vorhanden.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {cases.map((c) => {
+            const st = KYC_STATUS_COLORS[c.status] ?? KYC_STATUS_COLORS.draft;
+            return (
+              <div
+                key={c.id}
+                onClick={() => { setSelectedCase(c); setFormData(c.form_data); }}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "14px 18px", background: "#fff", borderRadius: T.r,
+                  border: `1px solid ${T.border}`, cursor: "pointer", transition: "box-shadow 0.15s",
+                }}
+                onMouseOver={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = T.shMd)}
+                onMouseOut={(e) => ((e.currentTarget as HTMLDivElement).style.boxShadow = "none")}
+              >
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: T.ink }}>
+                    {c.case_type === "form_a" ? "Formular A" : "Formular K"}
+                  </div>
+                  <div style={{ fontSize: 12, color: T.ink4, marginTop: 2 }}>
+                    Erstellt: {new Date(c.created_at).toLocaleDateString("de-CH")}
+                    {c.risk_category && <> &middot; Risiko: {c.risk_category}</>}
+                  </div>
+                </div>
+                <Badge label={st.label} bg={st.bg} color={st.color} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =================================================================
+//  UBO Tab Content (inline in customer detail)
+// =================================================================
+
+const LETA_STATUS_COLORS: Record<string, { bg: string; color: string; label: string }> = {
+  not_checked: { bg: T.s2, color: T.ink3, label: "Nicht geprüft" },
+  matched: { bg: "#ecf5f1", color: "#16654e", label: "Übereinstimmend" },
+  discrepancy: { bg: "#fef2f2", color: "#dc2626", label: "Abweichung" },
+  pending: { bg: "#fffbeb", color: "#d97706", label: "In Prüfung" },
+};
+
+function UboTabContent({ org, customer, role }: { org: ClientOrg; customer: Customer; role?: string }) {
+  const [entries, setEntries] = useState<UboEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: "", birthDate: "", nationality: "", share_percent: "", control_type: "direct" });
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    loadUboDeclaration(org.id, customer.id)
+      .then(setEntries)
+      .catch((err) => console.error("Load UBO:", err))
+      .finally(() => setLoading(false));
+  }, [org.id, customer.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleAdd = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    try {
+      const newUbo = {
+        name: form.name.trim(),
+        birthDate: form.birthDate || null,
+        nationality: form.nationality || null,
+        share_percent: form.share_percent ? parseFloat(form.share_percent) : null,
+        control_type: form.control_type,
+      };
+      await saveUboDeclaration(org.id, customer.id, [newUbo]);
+      setForm({ name: "", birthDate: "", nationality: "", share_percent: "", control_type: "direct" });
+      setShowForm(false);
+      load();
+    } catch (err) {
+      console.error("Save UBO:", err);
+      alert("Fehler beim Speichern der UBO-Erklärung.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div style={{ padding: 20, textAlign: "center", color: T.ink3, fontSize: 14 }}>UBO-Daten werden geladen...</div>;
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: T.ink, margin: 0 }}>Wirtschaftlich Berechtigte (UBO)</h3>
+        {canEdit(role) && (
+          <button onClick={() => setShowForm(true)} style={{ ...btnPrimary, fontSize: 12, padding: "8px 14px" }}>
+            <Icon d={icons.plus} size={13} color="#fff" /> UBO hinzufügen
+          </button>
+        )}
+      </div>
+
+      {entries.length === 0 && !showForm ? (
+        <div style={{ textAlign: "center", padding: 32, color: T.ink3, fontSize: 14, background: T.s1, borderRadius: 10 }}>
+          Keine UBO-Einträge für diesen Kunden vorhanden.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {entries.map((entry) => {
+            const letaSt = LETA_STATUS_COLORS[entry.leta_status] ?? LETA_STATUS_COLORS.not_checked;
+            return (
+              <div
+                key={entry.id}
+                style={{
+                  background: "#fff", borderRadius: T.rLg, border: `1px solid ${T.border}`,
+                  padding: "16px 20px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: T.ink }}>{entry.name || "Unbekannt"}</div>
+                  <Badge label={letaSt.label} bg={letaSt.bg} color={letaSt.color} />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                  {entry.birth_date && (
+                    <div>
+                      <div style={{ fontSize: 11, color: T.ink4, marginBottom: 2 }}>Geburtsdatum</div>
+                      <div style={{ fontSize: 13, color: T.ink2 }}>{entry.birth_date}</div>
+                    </div>
+                  )}
+                  {entry.nationality && (
+                    <div>
+                      <div style={{ fontSize: 11, color: T.ink4, marginBottom: 2 }}>Nationalität</div>
+                      <div style={{ fontSize: 13, color: T.ink2 }}>{entry.nationality}</div>
+                    </div>
+                  )}
+                  {entry.share_percent != null && (
+                    <div>
+                      <div style={{ fontSize: 11, color: T.ink4, marginBottom: 2 }}>Anteil</div>
+                      <div style={{ fontSize: 13, color: T.ink2 }}>{entry.share_percent}%</div>
+                    </div>
+                  )}
+                  {entry.control_type && (
+                    <div>
+                      <div style={{ fontSize: 11, color: T.ink4, marginBottom: 2 }}>Kontrollart</div>
+                      <div style={{ fontSize: 13, color: T.ink2 }}>{entry.control_type}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add UBO form */}
+      {showForm && (
+        <div style={{ marginTop: 16, background: "#fff", borderRadius: T.rLg, border: `1px solid ${T.border}`, padding: 20 }}>
+          <h4 style={{ fontSize: 14, fontWeight: 600, color: T.ink, margin: "0 0 12px" }}>Neuen UBO erfassen</h4>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4 }}>Name *</label>
+              <input
+                value={form.name}
+                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                placeholder="Max Mustermann"
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, boxSizing: "border-box" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4 }}>Geburtsdatum</label>
+              <input
+                type="date"
+                value={form.birthDate}
+                onChange={(e) => setForm((p) => ({ ...p, birthDate: e.target.value }))}
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, boxSizing: "border-box" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4 }}>Nationalität</label>
+              <input
+                value={form.nationality}
+                onChange={(e) => setForm((p) => ({ ...p, nationality: e.target.value }))}
+                placeholder="CH"
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, boxSizing: "border-box" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4 }}>Anteil (%)</label>
+              <input
+                type="number"
+                value={form.share_percent}
+                onChange={(e) => setForm((p) => ({ ...p, share_percent: e.target.value }))}
+                placeholder="25"
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans, boxSizing: "border-box" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: T.ink2, display: "block", marginBottom: 4 }}>Kontrollart</label>
+              <select
+                value={form.control_type}
+                onChange={(e) => setForm((p) => ({ ...p, control_type: e.target.value }))}
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.sans }}
+              >
+                <option value="direct">Direkt</option>
+                <option value="indirect">Indirekt</option>
+                <option value="trust">Trust</option>
+                <option value="other">Andere</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <button onClick={() => setShowForm(false)} style={btnSecondary}>Abbrechen</button>
+            <button onClick={handleAdd} disabled={saving || !form.name.trim()} style={{ ...btnPrimary, opacity: saving || !form.name.trim() ? 0.6 : 1 }}>
+              {saving ? "Wird gespeichert..." : "Speichern"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
